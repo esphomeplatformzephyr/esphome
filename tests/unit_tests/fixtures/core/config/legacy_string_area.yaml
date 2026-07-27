@@ -1,5 +1,0 @@
-esphome:
-  name: test-legacy-area
-  area: Living Room
-
-host:

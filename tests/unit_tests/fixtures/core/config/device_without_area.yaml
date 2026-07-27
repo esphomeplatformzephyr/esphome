@@ -1,7 +1,0 @@
-esphome:
-  name: test-device-no-area
-  devices:
-    - id: test_device
-      name: Test Device
-
-host:
