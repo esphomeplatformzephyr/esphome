@@ -9,7 +9,7 @@ namespace esphome::uart {
 
 static const char *const TAG = "uart.zephyr";
 
-void ZephyrUartComponent::uart_irq_handler_s_(const struct device *dev, void *user_data) {
+void ZephyrUartComponent::uart_irq_handler_s(const struct device *dev, void *user_data) {
   static_cast<ZephyrUartComponent *>(user_data)->uart_irq_handler_();
 }
 
@@ -82,7 +82,7 @@ void ZephyrUartComponent::setup() {
   ring_buf_init(&this->rx_rb_, static_cast<uint32_t>(this->rx_buffer_size_), this->rx_buf_mem_.get());
   this->uart_dev_ = dev;
   compiler_barrier();  // ensure uart_dev_ write is visible before IRQ is armed
-  uart_irq_callback_user_data_set(dev, uart_irq_handler_s_, this);
+  uart_irq_callback_user_data_set(dev, uart_irq_handler_s, this);
   uart_irq_rx_enable(dev);
 }
 

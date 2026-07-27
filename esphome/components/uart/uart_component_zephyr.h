@@ -30,7 +30,7 @@ class ZephyrUartComponent : public UARTComponent, public Component {
  protected:
   void check_logger_conflict() override {}
 
-  static void uart_irq_handler_s_(const struct device *dev, void *user_data);
+  static void uart_irq_handler_s(const struct device *dev, void *user_data);
   void uart_irq_handler_();
 
   const struct device *uart_dev_{nullptr};

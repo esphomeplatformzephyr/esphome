@@ -19,14 +19,14 @@ void ZephyrI2CEmulator::add_register(uint8_t reg, const uint8_t *data, uint8_t e
 }
 
 ZephyrI2CEmulator::RegEntry *ZephyrI2CEmulator::find_entry_(uint8_t reg) {
-  for (size_t i = 0; i < this->registers_.size(); i++) {
-    if (this->registers_[i].reg == reg)
-      return &this->registers_[i];
+  for (auto &entry : this->registers_) {
+    if (entry.reg == reg)
+      return &entry;
   }
   return nullptr;
 }
 
-int ZephyrI2CEmulator::transfer_s_(const struct emul *target, struct i2c_msg *msgs, int num_msgs, int addr) {
+int ZephyrI2CEmulator::transfer_s(const struct emul *target, struct i2c_msg *msgs, int num_msgs, int addr) {
   auto *self = static_cast<ZephyrI2CEmulator *>(target->data);
   return self->transfer_(msgs, num_msgs, addr);
 }
@@ -60,7 +60,7 @@ int ZephyrI2CEmulator::transfer_(struct i2c_msg *msgs, int num_msgs, int addr) {
 }
 
 void ZephyrI2CEmulator::setup() {
-  this->emul_api_.transfer = transfer_s_;
+  this->emul_api_.transfer = transfer_s;
 
   this->i2c_emul_.api = &this->emul_api_;
   this->i2c_emul_.addr = this->address_;

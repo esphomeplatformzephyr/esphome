@@ -25,7 +25,7 @@ void i2c_passthrough_close(int fd) {
     close(fd);
 }
 
-int i2c_passthrough_transfer(int fd, unsigned short addr, const unsigned char *write_buf, unsigned int write_len,
+int i2c_passthrough_transfer(int fd, uint16_t addr, const unsigned char *write_buf, unsigned int write_len,
                              unsigned char *read_buf, unsigned int read_len) {
   struct i2c_msg msgs[2];
   struct i2c_rdwr_ioctl_data ioctl_data;

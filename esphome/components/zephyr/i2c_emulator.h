@@ -45,7 +45,7 @@ class ZephyrI2CEmulator : public Component {
     uint8_t index{0};
   };
 
-  static int transfer_s_(const struct emul *target, struct i2c_msg *msgs, int num_msgs, int addr);
+  static int transfer_s(const struct emul *target, struct i2c_msg *msgs, int num_msgs, int addr);
   int transfer_(struct i2c_msg *msgs, int num_msgs, int addr);
   RegEntry *find_entry_(uint8_t reg);
 

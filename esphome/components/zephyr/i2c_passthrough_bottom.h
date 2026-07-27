@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 namespace esphome::zephyr {
 
 /* Host (Linux) side of the I2C passthrough bridge.
@@ -20,6 +22,6 @@ void i2c_passthrough_close(int fd);
  *
  * Either half may be skipped by passing a zero length. Returns 0 on success,
  * or a negative errno value on failure. */
-int i2c_passthrough_transfer(int fd, unsigned short addr, const unsigned char *write_buf, unsigned int write_len,
+int i2c_passthrough_transfer(int fd, uint16_t addr, const unsigned char *write_buf, unsigned int write_len,
                              unsigned char *read_buf, unsigned int read_len);
 }  // namespace esphome::zephyr
