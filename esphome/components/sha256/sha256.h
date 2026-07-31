@@ -29,6 +29,14 @@
 #elif defined(USE_ESP8266) || defined(USE_RP2)
 #include <bearssl/bearssl_hash.h>
 #elif defined(USE_ZEPHYR)
+#if defined(USE_ZEPHYR_VARIANT_NRF52)
+// NCS's nrf_security crypto backend (oberon-psa-crypto) doesn't ship the
+// legacy mbedtls/build_info.h compat header that mainline Zephyr's own
+// mbedtls module provides. It implements the PSA Crypto API directly, so
+// use that instead of probing MBEDTLS_VERSION_MAJOR.
+#define USE_SHA256_PSA
+#include <psa/crypto.h>
+#else
 #include "mbedtls/build_info.h"
 #if MBEDTLS_VERSION_MAJOR >= 4
 #define USE_SHA256_PSA
@@ -36,6 +44,7 @@
 #else
 #define USE_SHA256_MBEDTLS
 #include "mbedtls/sha256.h"
+#endif
 #endif
 #elif defined(USE_HOST)
 #include <openssl/evp.h>

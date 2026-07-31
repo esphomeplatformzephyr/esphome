@@ -25,7 +25,7 @@ _DEFAULT_BOARD = "adafruit_feather_nrf52840"
 # adafruit_feather_nrf52840_mcuboot_usb (custom_zephyr_boards) is the same hardware
 # with boot_partition grown to fit MCUboot's USB CDC-ACM serial recovery -- only
 # needed if mcuboot_serial_recovery: true below.
-_VALID_BOARDS = [_DEFAULT_BOARD, "adafruit_feather_nrf52840_mcuboot_usb"]
+_VALID_BOARDS = [_DEFAULT_BOARD, "adafruit_feather_nrf52840_mcuboot_usb", "xiao_ble"]
 
 CONF_MCUBOOT_SERIAL_RECOVERY = "mcuboot_serial_recovery"
 
@@ -115,7 +115,12 @@ def config_schema(config: ConfigType) -> ConfigType:
 
 
 async def to_code(config: ConfigType) -> None:
-    from .. import zephyr_add_prj_conf, zephyr_setup_preferences, zephyr_to_code
+    from .. import (
+        zephyr_add_overlay,
+        zephyr_add_prj_conf,
+        zephyr_setup_preferences,
+        zephyr_to_code,
+    )
 
     zephyr_to_code(config)
     cg.add_build_flag("-DUSE_ZEPHYR_VARIANT_NRF52")
@@ -131,6 +136,74 @@ async def to_code(config: ConfigType) -> None:
     # independent of whether serial recovery is enabled.
     zephyr_add_prj_conf("BOOT_SIGNATURE_TYPE_RSA", False, image="mcuboot")
     zephyr_add_prj_conf("BOOT_SIGNATURE_TYPE_ECDSA_P256", True, image="mcuboot")
+
+    if config[CONF_BOARD].startswith("xiao_ble"):
+        # xiao_ble's upstream devicetree ships a fixed UF2/SoftDevice-coexistence
+        # partition table (SoftDevice/code_partition/storage_partition/boot_partition)
+        # with no slot0/slot1 labels -- sysbuild's dynamic Partition Manager needs
+        # those when building MCUboot as a child image. Pin the app slots explicitly;
+        # MCUboot itself is placed by the Partition Manager via
+        # PM_PARTITION_SIZE_MCUBOOT.
+        mcuboot_size = 0x9000
+        storage_size = 0x8000
+        total_flash_size = 0x100000  # nRF52840: 1 MB flash
+        slot0_start = mcuboot_size
+        slot_size = (
+            (total_flash_size - mcuboot_size - storage_size) // 2 // 0x1000
+        ) * 0x1000
+        slot1_start = slot0_start + slot_size
+        storage_start = slot1_start + slot_size
+
+        def _mcuboot_partition_overlay() -> str:
+            def part(name, start, size):
+                return f"""
+                {name}: partition@{start:x} {{
+                    reg = <0x{start:x} 0x{size:x}>;
+                }};"""
+
+            return f"""
+                /delete-node/ &reserved_partition_0;
+                /delete-node/ &code_partition;
+                /delete-node/ &storage_partition;
+                /delete-node/ &boot_partition;
+
+                &flash0 {{
+                    partitions {{
+                        compatible = "fixed-partitions";
+                        #address-cells = <1>;
+                        #size-cells = <1>;
+                        {part("boot_partition", 0, mcuboot_size)}
+                        {part("slot0_partition", slot0_start, slot_size)}
+                        {part("slot1_partition", slot1_start, slot_size)}
+                        {part("storage_partition", storage_start, storage_size)}
+                    }};
+                }};
+            """
+
+        def _code_partition_overlay(partition: str) -> str:
+            return f"""
+                / {{
+                    chosen {{
+                        zephyr,code-partition = &{partition};
+                    }};
+                }};
+                """
+
+        zephyr_add_overlay(_mcuboot_partition_overlay())
+        zephyr_add_overlay(_mcuboot_partition_overlay(), "mcuboot")
+        # MCUboot's own build resolves its load offset from
+        # `zephyr,code-partition` too (not just the app's) -- each image needs
+        # its own partition here, or MCUboot links itself at the same address
+        # as the app it's supposed to boot.
+        zephyr_add_overlay(_code_partition_overlay("slot0_partition"))
+        zephyr_add_overlay(_code_partition_overlay("boot_partition"), "mcuboot")
+        zephyr_add_prj_conf("USB_DEVICE_STACK", False, image="mcuboot")
+        zephyr_add_prj_conf("CONSOLE", False, image="mcuboot")
+        from esphome.components.zephyr import HexValue
+
+        zephyr_add_prj_conf(
+            "PM_PARTITION_SIZE_MCUBOOT", HexValue(mcuboot_size), image="mcuboot"
+        )
 
     if config[CONF_ADVANCED][CONF_MCUBOOT_SERIAL_RECOVERY]:
         # Needs the board's USB CDC-ACM devicetree node (only

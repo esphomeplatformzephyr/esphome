@@ -20,8 +20,13 @@ async def to_code(config: ConfigType) -> None:
         # All platform:zephyr variants (native_sim/esp32_h2 >= 4.4.0) are above
         # the PSA crypto threshold.
         zephyr_add_prj_conf("PSA_CRYPTO", True)
-        zephyr_add_prj_conf("MBEDTLS_MD_C", True)
         zephyr_add_prj_conf("PSA_WANT_ALG_SHA_256", True)
+        if not CORE.is_nrf52:
+            # NCS's nrf_security (used on nrf52) implements the PSA Crypto
+            # API directly -- see sha256.h's USE_ZEPHYR_VARIANT_NRF52 branch.
+            # This Kconfig only matters for mainline Zephyr's own mbedtls
+            # module (the legacy compat header used on other variants).
+            zephyr_add_prj_conf("MBEDTLS_MD_C", True)
         return
 
     # Add OpenSSL library for host platform (Zephyr uses PSA crypto, not OpenSSL)
