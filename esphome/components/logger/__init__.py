@@ -557,6 +557,11 @@ async def _late_logger_init(config: ConfigType) -> None:
     if CORE.is_zephyr and has_serial_logging:
         zephyr_add_prj_conf("SERIAL", True)
         hw_uart = config.get(CONF_HARDWARE_UART, UART0)
+        if zephyr_variant_family() == "stm32":
+            # temporarily ignore hardwware_uart and log via serial console
+            zephyr_add_prj_conf("UART_CONSOLE", True)
+            zephyr_add_prj_conf("CONSOLE", True)
+            hw_uart = None
         # Board defaults set zephyr,console to the variant's default UART node regardless
         # of hardware_uart; Zephyr's native LOG subsystem always attaches there, so leaving
         # it at the default would silently lose native log output whenever the user picks

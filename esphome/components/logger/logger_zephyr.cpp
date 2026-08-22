@@ -150,7 +150,7 @@ void HOT Logger::write_msg_(const char *msg, uint16_t len) {
   write(STDOUT_FILENO, msg, len);
 #else
   // Single write with newline already in buffer (added by caller)
-#ifdef CONFIG_RTT_CONSOLE
+#if defined(CONFIG_RTT_CONSOLE) || defined(CONFIG_CONSOLE)
   // Requires the debug component and an active SWD connection (pyocd rtt -t nrf52840).
   // Gated on CONFIG_RTT_CONSOLE, not the broader CONFIG_PRINTK -- the latter is also on
   // whenever CONFIG_LOG is, which would duplicate every line onto the same console UART
