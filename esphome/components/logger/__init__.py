@@ -148,6 +148,7 @@ UART_SELECTION_HOST_ZEPHYR = [UART0, UART1]
 # esp32_h2 and esp32_c6 both expose a native USB-Serial/JTAG peripheral as a Zephyr UART
 # device (see the USB_SERIAL_JTAG codegen branch below) -- shared list for both.
 UART_SELECTION_ZEPHYR_ESP32_JTAG = [UART0, UART1, USB_SERIAL_JTAG]
+UART_SELECTION_ZEPHYR_STM32 = [DEFAULT]
 # nRF52840 and RP2040 both have native USB (same &usbd/zephyr_udc0 peripheral
 # MCUboot's own serial recovery uses) -- see the USB_CDC codegen branch below.
 UART_SELECTION_ZEPHYR_USB_CDC = [UART0, UART1, USB_CDC]
@@ -211,6 +212,8 @@ def uart_selection(value):
         family = zephyr_variant_family()
         if family in {"nordic", "rpi_pico", "renesas"}:
             return cv.one_of(*UART_SELECTION_ZEPHYR_USB_CDC, upper=True)(value)
+        if family in {"stm32"}:
+            return cv.one_of(*UART_SELECTION_ZEPHYR_STM32, upper=True)(value)
         return cv.one_of(*UART_SELECTION_HOST_ZEPHYR, upper=True)(value)
     raise NotImplementedError
 
@@ -343,6 +346,7 @@ CONFIG_SCHEMA = cv.All(
                 zephyr_rp2040=USB_CDC,
                 zephyr_rp2350=USB_CDC,
                 zephyr_ra4m1=UART1,
+                zephyr_stm32l4=DEFAULT,
             ): cv.All(
                 cv.only_on(
                     [
@@ -557,11 +561,6 @@ async def _late_logger_init(config: ConfigType) -> None:
     if CORE.is_zephyr and has_serial_logging:
         zephyr_add_prj_conf("SERIAL", True)
         hw_uart = config.get(CONF_HARDWARE_UART, UART0)
-        if zephyr_variant_family() == "stm32":
-            # temporarily ignore hardwware_uart and log via serial console
-            zephyr_add_prj_conf("UART_CONSOLE", True)
-            zephyr_add_prj_conf("CONSOLE", True)
-            hw_uart = None
         # Board defaults set zephyr,console to the variant's default UART node regardless
         # of hardware_uart; Zephyr's native LOG subsystem always attaches there, so leaving
         # it at the default would silently lose native log output whenever the user picks
@@ -580,6 +579,9 @@ async def _late_logger_init(config: ConfigType) -> None:
             # uart20/uart30) would otherwise resolve to a nonexistent "uart0"/"uart1"
             # node, silently leaving uart_dev_ null and dropping every log line.
             cg.add_define("LOGGER_UART_NODE_LABEL", cg.RawExpression(node))
+        if hw_uart == DEFAULT:
+            zephyr_add_prj_conf("UART_CONSOLE", True)
+            zephyr_add_prj_conf("CONSOLE", True)
         elif hw_uart == USB_SERIAL_JTAG:
             # A standard Zephyr UART device, not a USB CDC-ACM stack like nrf52's
             # USB_CDC option -- CONFIG_SERIAL_ESP32_USB auto-selects once the DTS

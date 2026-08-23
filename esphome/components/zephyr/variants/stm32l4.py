@@ -103,9 +103,6 @@ async def to_code(config: ConfigType) -> None:
     # get_mac_address_raw() (zephyr/core.cpp) reads the efuse MAC via hwinfo_get_device_id().
     zephyr_add_prj_conf("HWINFO", True)
 
-    zephyr_add_prj_conf("UART_CONSOLE", True)
-    zephyr_add_prj_conf("CONSOLE", True)
-
     if zephyr_data()[KEY_BOOTLOADER] == BOOTLOADER_MCUBOOT:
         zephyr_add_sysbuild_conf("BOOTLOADER_MCUBOOT", True)
         zephyr_add_prj_conf("BOOT_SIGNATURE_TYPE_RSA", False, image="mcuboot")
