@@ -102,7 +102,7 @@ static constexpr size_t THREAD_NAME_BUF_SIZE = 64;
  * Advanced configuration (pin selection, etc) is not supported.
  */
 enum UARTSelection : uint8_t {
-#if defined(USE_LIBRETINY) || defined(USE_ZEPHYR_VARIANT_STM32L4)
+#if defined(USE_LIBRETINY) || defined(USE_ZEPHYR_VARIANT_FAMILY_STM32)
   UART_SELECTION_DEFAULT = 0,
   UART_SELECTION_UART0,
 #else
