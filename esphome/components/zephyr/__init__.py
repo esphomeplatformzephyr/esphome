@@ -1929,6 +1929,7 @@ def zephyr_to_code(config: ConfigType) -> None:
             if zephyr_variant_family() in (
                 "nordic",
                 "silabs",
+                "silabs_siwx91x",
                 "rpi_pico",
                 "stm32",
                 "renesas",
@@ -1937,8 +1938,9 @@ def zephyr_to_code(config: ConfigType) -> None:
                 # also set (arch/arm/core/Kconfig selects the dependency it needs);
                 # RISC-V (esp32_h2/c6) enables ARCH_HAS_STACKWALK unconditionally,
                 # so it doesn't need this and setting it there would just warn.
-                # silabs (EFR32MG24, Cortex-M33), stm32 (STM32L4, Cortex-M4), and
-                # renesas (RA4M1, Cortex-M4) need the same treatment as nordic.
+                # silabs (EFR32MG24, Cortex-M33), silabs_siwx91x (SiWx917,
+                # Cortex-M4F), stm32 (STM32L4, Cortex-M4), and renesas (RA4M1,
+                # Cortex-M4) need the same treatment as nordic.
                 zephyr_add_prj_conf("EXTRA_EXCEPTION_INFO", True)
             zephyr_add_prj_conf("EXCEPTION_STACK_TRACE", True)
 

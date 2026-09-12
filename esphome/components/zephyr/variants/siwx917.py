@@ -182,10 +182,19 @@ async def to_code(config: ConfigType) -> None:
     cg.add_define(ThreadModel.SINGLE)
     zephyr_setup_preferences()
     zephyr_add_prj_conf("REBOOT", True)
-    # Deliberately no HWINFO here, unlike every other real-hardware variant: the
-    # only Silicon Labs HWINFO backend in mainline Zephyr (drivers/hwinfo/
-    # hwinfo_silabs_series2.c) depends on SOC_FAMILY_SILABS_S2 (EFR32 Series 2),
-    # not SOC_FAMILY_SILABS_SIWX91X -- there is no hwinfo_get_device_id() backend
-    # for this chip yet, so get_mac_address_raw() (zephyr/core.cpp) would have
-    # nothing to read. Left unset until real hardware testing confirms whether the
-    # WiseConnect NWP exposes a factory-programmed ID/MAC through some other route.
+    # This board's own defconfig (siwx917_dk2605a_defconfig) is unusually minimal --
+    # unlike every other board this platform targets, it doesn't set CONFIG_GPIO=y
+    # itself (confirmed on real hardware: without this, DEVICE_DT_GET() on gpioa/
+    # gpiob links but the actual device is never compiled in -- undefined reference
+    # to __device_dts_ord_*, not a DTS-level failure).
+    zephyr_add_prj_conf("GPIO", True)
+    # No real HWINFO backend for this chip in mainline Zephyr yet (the only Silicon
+    # Labs one, drivers/hwinfo/hwinfo_silabs_series2.c, depends on
+    # SOC_FAMILY_SILABS_S2 -- EFR32 Series 2, not SOC_FAMILY_SILABS_SIWX91X). Still
+    # enabled: get_mac_address_raw() (zephyr/core.cpp) unconditionally calls
+    # hwinfo_get_device_id() for this family, which needs CONFIG_HWINFO just to link
+    # (its weak default implementation returns -ENOSYS with no backend selected,
+    # which get_mac_address_raw() already treats as "no MAC available" and zeroes).
+    # Real hardware testing may yet find a genuine ID/MAC source via the WiseConnect
+    # NWP instead -- until then, this variant's MAC is all-zero.
+    zephyr_add_prj_conf("HWINFO", True)

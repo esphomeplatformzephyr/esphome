@@ -523,6 +523,12 @@ async def to_code(config: ConfigType) -> None:
         # (SIWX91X_ADC_INPUT_HPnn); unlike either nRF52 or EFR32, this driver also
         # requires a controller-level silabs,adc-ref-voltage property (board's own
         # 3.3V reference rail, matching siwx917_dk2605a.dts's own example channel).
+        # acquisition-time is the literal 0 (not the ADC_ACQ_TIME_DEFAULT macro other
+        # branches use): that macro lives in dt-bindings/adc/adc.h, which this board's
+        # own DTS never #includes -- confirmed on real hardware, the bare macro fails
+        # devicetree preprocessing ("expected number or parenthesized expression").
+        # 0 is that macro's actual value, and is what the board's own reference
+        # channel@0 example already uses literally.
         data = _get_data()
         channel_id = data.zephyr_adc_channel_id
         data.zephyr_adc_channel_id += 1
@@ -554,7 +560,7 @@ async def to_code(config: ConfigType) -> None:
                         reg = <{channel_id}>;
                         zephyr,gain = "ADC_GAIN_1";
                         zephyr,reference = "ADC_REF_INTERNAL";
-                        zephyr,acquisition-time = <ADC_ACQ_TIME_DEFAULT>;
+                        zephyr,acquisition-time = <0>;
                         zephyr,input-positive = <{ain_name}>;
                         zephyr,resolution = <12>;
                     }};
