@@ -55,13 +55,16 @@ _ADC_AIN_MAP = {
 }
 
 # https://github.com/zephyrproject-rtos/zephyr/blob/main/include/zephyr/dt-bindings/pinctrl/silabs/siwx91x-pinctrl.h
-# Unlike EFR32's full crossbar, SiWx91x's HP GPIO mux routes each signal through
-# only a handful of fixed candidate pins -- these are gspi0's, the chip's only SPI
+# Unlike EFR32's full crossbar (a per-pin macro *formula*, e.g. "{PREFIX}_{SIGNAL}_
+# P{letter}{num}"), SiWx91x's HP GPIO mux only defines a macro for a handful of
+# enumerated candidate pins per signal -- these are gspi0's, the chip's only SPI
 # controller. Flat pin numbers equal the macros' own HPnn suffix (port*16+pin
-# always reduces to nn for these macros, the same fact the ADC map above relies on).
-_SPI_CLK_PINS = frozenset({8, 25, 46, 52})
-_SPI_MOSI_PINS = frozenset({6, 12, 27, 48, 57})
-_SPI_MISO_PINS = frozenset({11, 26, 47, 56})
+# always reduces to nn for these macros, the same fact the ADC map above relies
+# on), so the macro name itself is still derivable, just not by formula -- hence
+# a lookup table (spi_pin_macros) rather than spi_valid_pins alone.
+_SPI_CLK_MACROS = {p: f"GSPI_CLK_HP{p}" for p in (8, 25, 46, 52)}
+_SPI_MOSI_MACROS = {p: f"GSPI_MOSI_HP{p}" for p in (6, 12, 27, 48, 57)}
+_SPI_MISO_MACROS = {p: f"GSPI_MISO_HP{p}" for p in (11, 26, 47, 56)}
 
 # Registry entries — collected by variants/__init__.py
 VARIANT_NAME = ZEPHYR_VARIANT_SIWX917
@@ -122,10 +125,18 @@ VARIANT = ZephyrVariant(
     # UART0=uart0 and warns that it doesn't match the board's actual console).
     uart_node_labels={},
     spi_valid_pins={
-        "clk": _SPI_CLK_PINS,
-        "mosi": _SPI_MOSI_PINS,
-        "miso": _SPI_MISO_PINS,
+        "clk": frozenset(_SPI_CLK_MACROS),
+        "mosi": frozenset(_SPI_MOSI_MACROS),
+        "miso": frozenset(_SPI_MISO_MACROS),
     },
+    spi_pin_macros={
+        "clk": _SPI_CLK_MACROS,
+        "mosi": _SPI_MOSI_MACROS,
+        "miso": _SPI_MISO_MACROS,
+    },
+    # This SoC's own dtsi names its pinctrl controller "pinctrl0", not the
+    # "pinctrl" every other family wired up so far uses.
+    pinctrl_node_label="pinctrl0",
     # No MCUboot/OTA support: the board's flash0 partitions are hardcoded to a
     # single `code_partition` (`zephyr,code-partition` set unconditionally, no
     # slot0/slot1 dual-bank layout, no bootloader:-selectable Kconfig gate) --
