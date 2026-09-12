@@ -138,6 +138,7 @@ def config_schema(config: ConfigType) -> ConfigType:
 
 async def to_code(config: ConfigType) -> None:
     from .. import (
+        zephyr_add_overlay,
         zephyr_add_prj_conf,
         zephyr_add_sysbuild_conf,
         zephyr_setup_preferences,
@@ -161,3 +162,19 @@ async def to_code(config: ConfigType) -> None:
     zephyr_add_sysbuild_conf("BOOTLOADER_MCUBOOT", True)
     # sysbuild's own BOOT_SIGNATURE_TYPE choice overrides a per-image setting.
     zephyr_add_sysbuild_conf("BOOT_SIGNATURE_TYPE_ECDSA_P256", True)
+
+    # xg27_dk2602a's onboard sensor mezzanine (thunderboard.dtsi) gates power to its
+    # Si7021/VEML6035/Si7210 sensors behind a GPIO-controlled fixed regulator
+    # (sw_sensor_enable, PC6) that only declares `regulator-always-on` -- which just
+    # stops a *consumer* from disabling it again, it does not turn it on by itself
+    # (see Zephyr's regulator_common_init()). Upstream's own si7210 sample works
+    # because CONFIG_SI7210's driver init calls regulator_enable() on it as a
+    # consumer; ESPHome has none, so without this the whole onboard I2C bus stays
+    # unpowered -- confirmed on real hardware (i2c scan timed out on every address).
+    # regulator-boot-on makes the regulator subsystem enable it unconditionally at
+    # init instead, matching what that consumer would have triggered. Guarded to
+    # this specific board since a custom board_source: board wouldn't have this
+    # node at all.
+    if config[CONF_BOARD].partition("@")[0] == "xg27_dk2602a":
+        zephyr_add_prj_conf("REGULATOR", True)
+        zephyr_add_overlay("&sw_sensor_enable { regulator-boot-on; };")
