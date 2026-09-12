@@ -78,6 +78,7 @@ from .const import (
     KEY_SYSBUILD_CONF,
     KEY_USER,
     KEY_ZEPHYR,
+    ZEPHYR_VARIANT_EFR32BG27,
     ZEPHYR_VARIANT_EFR32MG24,
     ZEPHYR_VARIANT_ESP32,
     ZEPHYR_VARIANT_ESP32_C3,
@@ -2468,7 +2469,16 @@ def _resolve_board_source(config: ConfigType, board: str) -> Path:
                 doc = yaml.safe_load(board_yml.read_text())
             except (OSError, yaml.YAMLError):
                 continue
-            if isinstance(doc, dict) and doc.get("board", {}).get("name") == parts.name:
+            if not isinstance(doc, dict):
+                continue
+            # Two board.yml schemas coexist upstream: the older singular "board:" and
+            # newer HWMv2 "boards:" (a list) -- same distinction dts_lookup.py's own
+            # _find_board_dir() fallback scanner handles.
+            entries = [doc["board"]] if "board" in doc else doc.get("boards", [])
+            if any(
+                isinstance(entry, dict) and entry.get("name") == parts.name
+                for entry in entries
+            ):
                 board_yml_matches = [board_yml]
                 break
     if not board_yml_matches:
@@ -2722,6 +2732,10 @@ def _variant_config_schema(config: ConfigType) -> ConfigType:
         from .variants.efr32mg24 import config_schema as _efr32mg24_config_schema
 
         config = _efr32mg24_config_schema(config)
+    elif variant == ZEPHYR_VARIANT_EFR32BG27:
+        from .variants.efr32bg27 import config_schema as _efr32bg27_config_schema
+
+        config = _efr32bg27_config_schema(config)
     elif variant == ZEPHYR_VARIANT_STM32L4:
         from .variants.stm32l4 import config_schema as _stm32_config_schema
 
@@ -2877,6 +2891,11 @@ async def to_code(config: ConfigType) -> None:
         from .variants.efr32mg24 import to_code as _efr32mg24_to_code
 
         await _efr32mg24_to_code(config)
+        return
+    if variant == ZEPHYR_VARIANT_EFR32BG27:
+        from .variants.efr32bg27 import to_code as _efr32bg27_to_code
+
+        await _efr32bg27_to_code(config)
         return
     if variant == ZEPHYR_VARIANT_STM32L4:
         from .variants.stm32l4 import to_code as _stm32_to_code
