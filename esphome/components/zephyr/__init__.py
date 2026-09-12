@@ -91,6 +91,7 @@ from .const import (
     ZEPHYR_VARIANT_RA4M1,
     ZEPHYR_VARIANT_RP2040,
     ZEPHYR_VARIANT_RP2350,
+    ZEPHYR_VARIANT_SIWX917,
     ZEPHYR_VARIANT_STM32F1,
     ZEPHYR_VARIANT_STM32F4,
     ZEPHYR_VARIANT_STM32L4,
@@ -1765,6 +1766,14 @@ def zephyr_to_code(config: ConfigType) -> None:
         zephyr_add_prj_conf("REQUIRES_FULL_LIBCPP", True)
         # Consumed by C++ code shared across every silabs-family variant (core.cpp, etc.).
         cg.add_build_flag("-DUSE_ZEPHYR_VARIANT_FAMILY_SILABS")
+    elif zephyr_variant_family() == "silabs_siwx91x":
+        # Same reasoning as esp32/nordic/silabs above: mainline Zephyr's MINIMAL_LIBCPP
+        # has no STL, which ESPHome's C++ core requires regardless of chip vendor. Its
+        # own family (not "silabs" above) -- see siwx917.py's family= comment for why.
+        zephyr_add_prj_conf("CPP", True)
+        zephyr_add_prj_conf("REQUIRES_FULL_LIBCPP", True)
+        # Consumed by C++ code shared across every silabs_siwx91x-family variant.
+        cg.add_build_flag("-DUSE_ZEPHYR_VARIANT_FAMILY_SILABS_SIWX91X")
     elif zephyr_variant_family() == "stm32":
         zephyr_add_prj_conf("CPP", True)
         zephyr_add_prj_conf("REQUIRES_FULL_LIBCPP", True)
@@ -2754,6 +2763,10 @@ def _variant_config_schema(config: ConfigType) -> ConfigType:
         from .variants.rp2350 import config_schema as _rp2350_config_schema
 
         config = _rp2350_config_schema(config)
+    elif variant == ZEPHYR_VARIANT_SIWX917:
+        from .variants.siwx917 import config_schema as _siwx917_config_schema
+
+        config = _siwx917_config_schema(config)
     else:
         raise cv.Invalid(f"Variant {variant!r} has no config schema registered yet")
     if config[CONF_SINGLE_SLOT] and zephyr_data()[KEY_BOOTLOADER] != BOOTLOADER_MCUBOOT:
@@ -2917,6 +2930,11 @@ async def to_code(config: ConfigType) -> None:
         from .variants.rp2350 import to_code as _rp2350_to_code
 
         await _rp2350_to_code(config)
+        return
+    if variant == ZEPHYR_VARIANT_SIWX917:
+        from .variants.siwx917 import to_code as _siwx917_to_code
+
+        await _siwx917_to_code(config)
         return
     raise NotImplementedError(f"Zephyr variant {variant!r} has no to_code registered")
 

@@ -587,6 +587,7 @@ _VARIANT_MODULES = [
     "rp2040",
     "rp2350",
     "ra4m1",
+    "siwx917",
 ]
 
 
