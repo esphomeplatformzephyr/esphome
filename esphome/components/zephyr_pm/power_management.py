@@ -14,7 +14,7 @@ from .const import (
     CONF_ENABLE_LIGHT_SLEEP,
     CONF_POLICY,
     CONF_POWER_DOWN_DEVICE,
-    CONF_PROFILING,
+    CONF_STATS,
     POLICIES,
 )
 
@@ -40,7 +40,7 @@ CONFIG_SCHEMA = cv.Schema(
         # DTS, not known until to_code(), which decides what "unset" means there.
         cv.Optional(CONF_ENABLE_LIGHT_SLEEP): cv.boolean,
         cv.Optional(CONF_POWER_DOWN_DEVICE): cv.boolean,
-        cv.Optional(CONF_PROFILING): cv.boolean,
+        cv.Optional(CONF_STATS): cv.boolean,
         cv.Optional(CONF_POLICY): cv.one_of(*POLICIES, lower=True),
     }
 ).extend(cv.COMPONENT_SCHEMA)
@@ -86,11 +86,11 @@ async def to_code(config):
         zephyr.zephyr_add_prj_conf("CPU_FREQ", True)
         zephyr.zephyr_add_prj_conf(f"CPU_FREQ_POLICY_{policy.upper()}", True)
 
-    if config.get(CONF_PROFILING):
+    if config.get(CONF_STATS):
         # Catch-all: profiles whichever of PM/CPU_FREQ is actually active.
         if not light_sleep and policy is None:
             raise EsphomeError(
-                f"{CONF_PROFILING}: True requires {CONF_ENABLE_LIGHT_SLEEP} or "
+                f"{CONF_STATS}: True requires {CONF_ENABLE_LIGHT_SLEEP} or "
                 f"{CONF_POLICY} to be set -- there is nothing to profile otherwise"
             )
         if light_sleep:

@@ -21,7 +21,7 @@ void ZephyrPowerManagement::dump_config() {
                      "driver supports it are affected");
 #endif
 #if CONFIG_PM_STATS
-  ESP_LOGCONFIG(TAG, "  PM Profiling Enabled");
+  ESP_LOGCONFIG(TAG, "  PM Stats Enabled");
 #endif
 #if CONFIG_CPU_FREQ_POLICY_ON_DEMAND
   ESP_LOGCONFIG(TAG, "  CPU Frequency Policy: on-demand");
@@ -29,7 +29,7 @@ void ZephyrPowerManagement::dump_config() {
   ESP_LOGCONFIG(TAG, "  CPU Frequency Policy: pressure");
 #endif
 #if CONFIG_CPU_FREQ_LOG_LEVEL_DBG
-  ESP_LOGCONFIG(TAG, "  CPU Frequency Profiling Enabled");
+  ESP_LOGCONFIG(TAG, "  CPU Frequency Stats Enabled");
 #endif
 }
 
