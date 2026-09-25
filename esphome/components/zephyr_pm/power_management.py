@@ -6,8 +6,8 @@ from esphome.components.zephyr.dts_lookup import (
     board_has_pm_states,
 )
 import esphome.config_validation as cv
-from esphome.const import CONF_ID, CONF_PLATFORM
-from esphome.core import EsphomeError
+from esphome.const import CONF_ID, CONF_OPENTHREAD, CONF_PLATFORM
+from esphome.core import CORE, EsphomeError
 import esphome.final_validate as fv
 
 from .const import (
@@ -74,6 +74,9 @@ async def to_code(config):
             )
             zephyr.zephyr_add_prj_conf("COUNTER", True)
             zephyr.zephyr_add_prj_conf("PM_DEVICE", True)
+            if CORE.config.get(CONF_OPENTHREAD):
+                # Without this, light sleep can engage mid-TX/RX and corrupt the radio.
+                zephyr.zephyr_add_prj_conf("IEEE802154_ESP32_SLEEP_ENABLE", True)
 
     if config.get(CONF_POWER_DOWN_DEVICE):
         # Only suspends devices whose own driver implements PM_DEVICE hooks --
