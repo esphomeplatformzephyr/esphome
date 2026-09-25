@@ -59,8 +59,21 @@ async def to_code(config):
         )
     light_sleep = has_pm and enable_light_sleep is True
 
+    is_esp32 = zephyr.zephyr_variant_family() == "esp32"
     if light_sleep:
         zephyr.zephyr_add_prj_conf("PM", True)
+        if is_esp32:
+            # rtc_timer is disabled by default in every Espressif SoC dtsi, and
+            # soc/espressif/common/power.c requires it ready and flagged as a wakeup
+            # source to actually enter light sleep -- without this it silently
+            # no-ops PM_STATE_STANDBY. PM_DEVICE is what makes the wakeup-source
+            # flag exist at all (PM_DEVICE_DT_INST_DEFINE() is a no-op without it),
+            # independent of whether power_down_device below is also requested.
+            zephyr.zephyr_add_overlay(
+                '&rtc_timer { status = "okay"; wakeup-source; };\n'
+            )
+            zephyr.zephyr_add_prj_conf("COUNTER", True)
+            zephyr.zephyr_add_prj_conf("PM_DEVICE", True)
 
     if config.get(CONF_POWER_DOWN_DEVICE):
         # Only suspends devices whose own driver implements PM_DEVICE hooks --
@@ -73,6 +86,12 @@ async def to_code(config):
             # RUNTIME alone leaves devices active unless DEFAULT_ENABLE opts them in.
             zephyr.zephyr_add_prj_conf("PM_DEVICE_RUNTIME", True)
             zephyr.zephyr_add_prj_conf("PM_DEVICE_RUNTIME_DEFAULT_ENABLE", True)
+    elif light_sleep and is_esp32:
+        # PM_DEVICE above is only for rtc_timer's own wakeup-source flag -- without
+        # power_down_device, suppress its unrelated default (PM_DEVICE_SYSTEM_MANAGED
+        # defaults to y whenever PM_DEVICE is on and PM_DEVICE_RUNTIME isn't) of
+        # suspending every PM_DEVICE-capable device around every sleep/wake.
+        zephyr.zephyr_add_prj_conf("PM_DEVICE_SYSTEM_MANAGED", False)
 
     policy = config.get(CONF_POLICY)
     if policy is not None:
