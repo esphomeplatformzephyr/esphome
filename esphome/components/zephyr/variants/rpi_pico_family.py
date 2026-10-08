@@ -101,7 +101,8 @@ def to_code(config: ConfigType) -> None:
     applies there, and CONFIG_RETENTION_BOOT_MODE gets silently dropped for
     lack of the "zephyr,boot-mode" chosen node it depends on."""
     import esphome.codegen as cg  # noqa: PLC0415
-    from esphome.const import CONF_LOG_LEVEL  # noqa: PLC0415
+    from esphome.const import CONF_AP, CONF_LOG_LEVEL, CONF_WIFI  # noqa: PLC0415
+    from esphome.core import CORE  # noqa: PLC0415
 
     from .. import zephyr_add_overlay, zephyr_add_prj_conf, zephyr_data, zephyr_variant  # noqa: PLC0415 -- avoids circular import at module load
     from ..const import BOOTLOADER_MCUBOOT, KEY_BOOTLOADER, ZEPHYR_VARIANT_RP2040  # noqa: PLC0415
@@ -122,6 +123,10 @@ def to_code(config: ConfigType) -> None:
         zephyr_add_prj_conf("EXCEPTION_STACK_TRACE", True)
     # Consumed by C++ code shared across every rpi_pico-family variant (core.cpp, etc.).
     cg.add_build_flag("-DUSE_ZEPHYR_VARIANT_FAMILY_RPI_PICO")
+    # The CYW43 driver refuses to connect while the AP is up, so the fallback
+    # AP takes turns with the networks.
+    if CORE.config.get(CONF_WIFI, {}).get(CONF_AP):
+        cg.add_define("USE_WIFI_AP_EXCLUSIVE")
 
     boot_mode_dtsi = (
         "rp2040-boot-mode-retention"
