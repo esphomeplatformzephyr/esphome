@@ -212,6 +212,34 @@ def test_failed_update_leaves_no_ready_sentinel_and_is_retried(
     assert (framework / ".ready").is_file()
 
 
+def test_second_failed_update_in_a_row_starts_over(tmp_path: Path) -> None:
+    """One failure resumes; a second in a row removes the workspace, so the
+    next build initializes it anew."""
+    framework = tmp_path / "sdk-zephyr" / "frameworks" / _CACHE_KEY
+    with pytest.raises(EsphomeError, match="retries it"):
+        _run_check_and_install(tmp_path, None, update_returncode=1)
+    assert (framework / ".update_failed").is_file()
+
+    with pytest.raises(EsphomeError, match="twice in a row"):
+        _run_check_and_install(tmp_path, None, update_returncode=1)
+    assert not framework.exists()
+
+    calls, _ = _run_check_and_install(tmp_path, None)
+    assert [c for c in calls if c[2:4] == ["west", "init"]]
+    assert not (framework / ".update_failed").exists()
+
+
+def test_successful_update_clears_the_failure_marker(tmp_path: Path) -> None:
+    framework = tmp_path / "sdk-zephyr" / "frameworks" / _CACHE_KEY
+    with pytest.raises(EsphomeError):
+        _run_check_and_install(tmp_path, None, update_returncode=1)
+
+    _run_check_and_install(tmp_path, None)
+
+    assert not (framework / ".update_failed").exists()
+    assert (framework / ".ready").is_file()
+
+
 def test_rebuilt_venv_updates_workspace_without_reclone(tmp_path: Path) -> None:
     """A missing venv (e.g. its interpreter was removed) must not wipe the workspace."""
     _run_check_and_install(tmp_path, None)

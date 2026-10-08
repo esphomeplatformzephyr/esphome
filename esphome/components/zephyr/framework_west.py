@@ -491,8 +491,22 @@ def _check_and_install(
         env = os.environ.copy()
         env.update(west_env)
         result = subprocess.run(cmd, env=env, cwd=str(framework), check=False)
+        update_failed = framework / ".update_failed"
         if result.returncode != 0:
-            raise EsphomeError(f"Can't update Zephyr SDK {ver_tag} ({label})")
+            # As nrf52: one failure is likely a flaky network and resumes;
+            # a second in a row means a broken workspace, so start over.
+            if is_local or not update_failed.exists():
+                if not is_local:
+                    update_failed.touch()
+                raise EsphomeError(
+                    f"Can't update Zephyr SDK {ver_tag} ({label}); the next build retries it"
+                )
+            rmdir(framework, msg=f"Clean up {ver_tag} framework")
+            raise EsphomeError(
+                f"Can't update Zephyr SDK {ver_tag} ({label}) twice in a row; "
+                "the workspace was removed and the next build downloads it anew"
+            )
+        update_failed.unlink(missing_ok=True)
 
         if needs_init or pinned or incomplete or install_venv:
             zephyr_reqs = zephyr_dir / "scripts" / "requirements.txt"
