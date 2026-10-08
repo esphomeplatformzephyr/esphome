@@ -430,6 +430,31 @@ def _ccache_env(env: dict, source_dir: Path) -> dict[str, str]:
     return settings
 
 
+def check_bootloader_built(build_dir: Path) -> None:
+    """Refuse a serial flash of a --skip-bootloader build: west flash writes
+    every sysbuild image, and the MCUboot one was never compiled."""
+    domains = build_dir / "domains.yaml"
+    if not domains.is_file():
+        return
+    names = {d.get("name") for d in yaml.safe_load(domains.read_text())["domains"]}
+    if (
+        "mcuboot" in names
+        and not (build_dir / "mcuboot" / "zephyr" / "zephyr.elf").is_file()
+    ):
+        raise EsphomeError(
+            "This build was compiled with --skip-bootloader; recompile without it"
+        )
+
+
+def _app_domain_args() -> list[str]:
+    from .mcuboot import zephyr_swap_method  # noqa: PLC0415
+
+    args = ["--domain", "zephyr"]
+    if zephyr_swap_method() == "direct":
+        args += ["--domain", "zephyr_slot1_variant"]
+    return args
+
+
 def run_west_build(
     python_executable: Path,
     framework_path: Path,
@@ -493,6 +518,10 @@ def run_west_build(
         west_cmd.append(f"--cmake-opt=-DSNIPPET_ROOT={snippet_root}")
     for snippet in snippets or []:
         west_cmd += ["-S", snippet]
+    if CORE.skip_bootloader:
+        # Sysbuild still configures MCUboot, which the app's signing needs;
+        # only its compile is skipped.
+        west_cmd += _app_domain_args()
 
     if pch.pch_enabled():
         pch.log_pch_in_use()

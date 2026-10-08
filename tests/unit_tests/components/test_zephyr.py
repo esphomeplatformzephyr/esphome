@@ -38,7 +38,10 @@ from esphome.components.zephyr import (
     zephyr_variant_family,
 )
 from esphome.components.zephyr.const import CONF_BOARD_SOURCE, KEY_ZEPHYR
-from esphome.components.zephyr.mcuboot import zephyr_swap_method
+from esphome.components.zephyr.mcuboot import (
+    zephyr_skip_bootloader_supported,
+    zephyr_swap_method,
+)
 from esphome.components.zephyr.pinctrl import (
     _build_i2c_pinctrl_states_overlay,
     _build_uart_pinctrl_states_overlay,
@@ -2278,6 +2281,27 @@ def test_zephyr_swap_method_none_on_other_platform() -> None:
     CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: PLATFORM_ESP32}
     CORE.config = {"ota": [{"platform": "esphome", "swap_method": "direct"}]}
     assert zephyr_swap_method() is None
+
+
+@pytest.mark.parametrize(
+    ("variant", "ota", "expected"),
+    [
+        ("ESP32", [{"platform": "esphome"}], True),
+        ("ESP32", [], False),  # no OTA, so no MCUboot to skip
+        ("NATIVESIM", [{"platform": "esphome"}], False),
+    ],
+)
+def test_zephyr_skip_bootloader_supported(
+    variant: str, ota: list[dict], expected: bool
+) -> None:
+    _set_zephyr_ota(variant, ota)
+    assert zephyr_skip_bootloader_supported() is expected
+
+
+def test_zephyr_skip_bootloader_unsupported_on_other_platform() -> None:
+    CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: PLATFORM_ESP32}
+    CORE.config = {"ota": [{"platform": "esphome"}]}
+    assert zephyr_skip_bootloader_supported() is False
 
 
 def test_firmware_alt_bin_direct_without_to_code(tmp_path: Path) -> None:

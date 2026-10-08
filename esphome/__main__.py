@@ -846,13 +846,23 @@ def write_cpp_file() -> int:
     return 0
 
 
+def _skip_bootloader_supported() -> bool:
+    if CORE.is_esp32 and CORE.using_toolchain_esp_idf:
+        return True
+    if CORE.is_zephyr:
+        from esphome.components.zephyr.mcuboot import zephyr_skip_bootloader_supported  # noqa: PLC0415
+
+        return zephyr_skip_bootloader_supported()
+    return False
+
+
 def compile_program(args: ArgsProtocol, config: ConfigType) -> int:
-    if CORE.skip_bootloader and not (CORE.is_esp32 and CORE.using_toolchain_esp_idf):
+    if CORE.skip_bootloader and not _skip_bootloader_supported():
         # Debug only: an orchestrator cannot see YAML toolchain overrides,
         # so this is its expected no-op, and a full build is safe.
         _LOGGER.debug(
             "--skip-bootloader ignored: only supported on ESP32 with the "
-            "esp-idf toolchain"
+            "esp-idf toolchain, and on Zephyr with ota:"
         )
         CORE.skip_bootloader = False
     # Keep this gate here, NOT in config validation: device-builder needs
@@ -1814,8 +1824,7 @@ def command_logs(args: ArgsProtocol, config: ConfigType) -> int | None:
 def command_run(args: ArgsProtocol, config: ConfigType) -> int | None:
     if (
         CORE.skip_bootloader
-        and CORE.is_esp32
-        and CORE.using_toolchain_esp_idf
+        and _skip_bootloader_supported()
         and any(
             get_port_type(device) == PortType.SERIAL for device in (args.device or [])
         )

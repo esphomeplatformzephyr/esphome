@@ -1560,6 +1560,14 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
             )
         _restore_upload_data(zephyr_config)
 
+    from esphome.upload_targets import PortType, get_port_type
+
+    if host == "PYOCD" or get_port_type(host) in (PortType.SERIAL, PortType.BOOTSEL):
+        from .build_zephyr import check_bootloader_built
+
+        # Every non-OTA path writes the bootloader too
+        check_bootloader_built(CORE.relative_build_path(".west_build"))
+
     if host == "BOOTSEL":
         from .variants import rpi_pico_family
 
@@ -1619,8 +1627,6 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
     # Non-ESP32 Zephyr variants (for example EFR32/nRF in SDK-Zephyr mode) are
     # generally flashed by the board's default west runner (jlink, pyocd, etc.)
     # rather than esptool over a selected serial port.
-    from esphome.upload_targets import PortType, get_port_type
-
     if get_port_type(host) != PortType.SERIAL:
         return False
 
