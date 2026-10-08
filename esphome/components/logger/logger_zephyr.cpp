@@ -13,11 +13,6 @@
 #elif __has_include(<version.h>)
 #include <version.h>
 #endif
-#if ZEPHYR_VERSION_CODE >= ZEPHYR_VERSION(3, 6, 0)
-#define ESPHOME_ARCH_ESF_T arch_esf
-#else
-#define ESPHOME_ARCH_ESF_T z_arch_esf_t
-#endif
 #ifdef USE_ZEPHYR_VARIANT_NATIVE_SIM
 #include <unistd.h>
 #endif
@@ -36,6 +31,13 @@ __attribute__((weak)) void print_coredump() {}
 }  // namespace esphome::zephyr_coredump
 
 namespace esphome::logger {
+
+// Zephyr 3.7 renamed z_arch_esf_t to struct arch_esf; the old name was later removed.
+#if KERNEL_VERSION_NUMBER >= 0x030700
+using FatalErrorEsf = ::arch_esf;
+#else
+using FatalErrorEsf = z_arch_esf_t;
+#endif
 
 __attribute__((section(".noinit"))) struct {
   uint32_t magic;
@@ -230,7 +232,7 @@ void Logger::dump_crash_() {
   }
 }
 
-void k_sys_fatal_error_handler(unsigned int reason, const ESPHOME_ARCH_ESF_T *esf) {
+void k_sys_fatal_error_handler(unsigned int reason, const FatalErrorEsf *esf) {
   crash_buf.magic = App.get_config_hash();
   crash_buf.reason = reason;
 #ifndef USE_ZEPHYR_VARIANT_NATIVE_SIM
@@ -264,7 +266,7 @@ void k_sys_fatal_error_handler(unsigned int reason, const ESPHOME_ARCH_ESF_T *es
 
 extern "C" {
 
-void k_sys_fatal_error_handler(unsigned int reason, const ESPHOME_ARCH_ESF_T *esf) {
+void k_sys_fatal_error_handler(unsigned int reason, const esphome::logger::FatalErrorEsf *esf) {
   esphome::logger::k_sys_fatal_error_handler(reason, esf);
 }
 }
