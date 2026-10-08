@@ -2355,6 +2355,53 @@ def test_upload_program_ota_with_file_arg(
     )
 
 
+def test_upload_program_ota_passes_firmware_alt_bin(
+    mock_run_ota: Mock,
+    mock_get_port_type: Mock,
+    tmp_path: Path,
+) -> None:
+    """An app upload of the built firmware offers the direct-xip slot-1 image."""
+    setup_core(platform=PLATFORM_ESP32, tmp_path=tmp_path)
+    mock_get_port_type.return_value = "NETWORK"
+    mock_run_ota.return_value = (0, "192.168.1.100")
+    alt_bin = tmp_path / "slot1.signed.bin"
+    config = {CONF_OTA: [{CONF_PLATFORM: CONF_ESPHOME, CONF_PORT: 3232}]}
+
+    with patch.object(
+        type(CORE), "firmware_alt_bin", new_callable=PropertyMock, return_value=alt_bin
+    ):
+        exit_code, _ = upload_program(config, MockArgs(), ["192.168.1.100"])
+
+    assert exit_code == 0
+    assert mock_run_ota.call_args.kwargs["alt_filename"] == alt_bin
+    assert mock_run_ota.call_args.args[3] == CORE.firmware_bin
+
+
+def test_upload_program_ota_file_arg_skips_firmware_alt_bin(
+    mock_run_ota: Mock,
+    mock_get_port_type: Mock,
+    tmp_path: Path,
+) -> None:
+    """--file bypasses the built firmware, so no slot-1 image is offered."""
+    setup_core(platform=PLATFORM_ESP32, tmp_path=tmp_path)
+    mock_get_port_type.return_value = "NETWORK"
+    mock_run_ota.return_value = (0, "192.168.1.100")
+    config = {CONF_OTA: [{CONF_PLATFORM: CONF_ESPHOME, CONF_PORT: 3232}]}
+
+    with patch.object(
+        type(CORE),
+        "firmware_alt_bin",
+        new_callable=PropertyMock,
+        return_value=tmp_path / "slot1.signed.bin",
+    ):
+        exit_code, _ = upload_program(
+            config, MockArgs(file="custom.bin"), ["192.168.1.100"]
+        )
+
+    assert exit_code == 0
+    assert mock_run_ota.call_args.kwargs["alt_filename"] is None
+
+
 _PARTITION_TABLE_LEN = 0xC00
 
 
