@@ -472,3 +472,44 @@ def test_tools_path_default_is_global_cache(monkeypatch: pytest.MonkeyPatch) -> 
         Path(platformdirs.user_cache_dir("esphome", appauthor=False)) / "sdk-zephyr"
     ).resolve()
     assert _tools_path() == expected
+
+
+def _gen_defines(zephyr_dir: Path, line: str) -> Path:
+    path = zephyr_dir / "scripts" / "dts" / "gen_defines.py"
+    path.parent.mkdir(parents=True)
+    path.write_text(f'header = f"""\n * Generated from:\n *{line}\n"""\n')
+    path.chmod(0o755)
+    return path
+
+
+def test_patch_gen_defines_dts_path_strips_the_directory(tmp_path: Path) -> None:
+    """The devicetree header comment keeps only the dts basename, once."""
+    from esphome.components.zephyr.framework_west import _patch_gen_defines_dts_path
+
+    path = _gen_defines(tmp_path, "  {edt.dts_path}")
+    _patch_gen_defines_dts_path(tmp_path)
+    _patch_gen_defines_dts_path(tmp_path)
+    text = path.read_text()
+    assert text.count("{os.path.basename(edt.dts_path)}") == 1
+    assert "  {edt.dts_path}" not in text
+    assert path.stat().st_mode & 0o777 == 0o755
+
+
+def test_patch_gen_defines_dts_path_warns_on_drift(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """A reformatted upstream line is left alone and reported."""
+    from esphome.components.zephyr.framework_west import _patch_gen_defines_dts_path
+
+    path = _gen_defines(tmp_path, " {edt.dts_source}")
+    before = path.read_text()
+    _patch_gen_defines_dts_path(tmp_path)
+    assert path.read_text() == before
+    assert "no longer matches" in caplog.text
+
+
+def test_patch_gen_defines_dts_path_without_the_script(tmp_path: Path) -> None:
+    """A tree without gen_defines.py is skipped quietly."""
+    from esphome.components.zephyr.framework_west import _patch_gen_defines_dts_path
+
+    _patch_gen_defines_dts_path(tmp_path)

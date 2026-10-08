@@ -329,6 +329,30 @@ def resign_direct_xip_images(build_dir: Path) -> None:
     _LOGGER.info("Signed the direct-xip images as version %s", version)
 
 
+def _ccache_env(env: dict, source_dir: Path) -> dict[str, str]:
+    """Managed ccache settings for `west build`, as nrf52's get_build_env().
+
+    Zephyr wraps compiles with any ccache it finds, and sysbuild images never
+    see USE_CCACHE=0, so a disabled ccache must be turned off explicitly.
+    """
+    from esphome.build_helpers.ccache import ccache_env, resolve_ccache_path
+    from esphome.build_helpers.tools_cache import SDK_ZEPHYR_TOOLS_CACHE
+
+    ccache = resolve_ccache_path()
+    if ccache is None:
+        return {} if "CCACHE_DISABLE" in env else {"CCACHE_DISABLE": "1"}
+    settings = ccache_env(ccache, SDK_ZEPHYR_TOOLS_CACHE)
+    # The per-device source map is the only per-device flag; a spaced path
+    # cannot survive ccache's space-split list, so it stays hashed.
+    source = source_dir.as_posix()
+    if not any(ch.isspace() for ch in source):
+        device_map = f"-fmacro-prefix-map={source}=CMAKE_SOURCE_DIR"
+        settings["CCACHE_IGNOREOPTIONS"] = (
+            f"{env.get('CCACHE_IGNOREOPTIONS', '')} {device_map}".strip()
+        )
+    return settings
+
+
 def run_west_build(
     python_executable: Path,
     framework_path: Path,
@@ -350,10 +374,14 @@ def run_west_build(
     undefined, which fails for native_sim (no SDK installed).
     """
     build_dir = CORE.relative_build_path(".west_build")
-    run_env = {**env, "ZEPHYR_TOOLCHAIN_VARIANT": zephyr_toolchain_variant}
+    source_dir = CORE.relative_build_path("zephyr")
+    run_env = {
+        **env,
+        "ZEPHYR_TOOLCHAIN_VARIANT": zephyr_toolchain_variant,
+        **_ccache_env(env, source_dir),
+    }
     if sdk_install_dir is not None:
         run_env["ZEPHYR_SDK_INSTALL_DIR"] = str(sdk_install_dir)
-    source_dir = CORE.relative_build_path("zephyr")
 
     west_cmd = [
         str(python_executable),
