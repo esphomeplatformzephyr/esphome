@@ -721,6 +721,10 @@ def run_miniterm(config: ConfigType, port: str, args) -> int:
     # Decoder resolution, crash isolation, and disable-after-failure
     # all live in LogLineProcessor, shared with the API log path.
     processor = LogLineProcessor(config, CORE.target_platform)
+    if args.reset and CORE.is_zephyr:
+        from esphome.components.zephyr import reset_over_usb  # noqa: PLC0415
+
+        reset_over_usb(config, port)
     ser = serial.Serial()
     ser.baudrate = baud_rate
     ser.port = port

@@ -1713,6 +1713,40 @@ def test_variant_config_schema_defaults_watchdog_timeout_for_real_hardware() -> 
     assert config["watchdog_timeout"] == cv.TimePeriod(seconds=10)
 
 
+def _nrf52_advanced(**advanced: object) -> dict:
+    _init_variant_schema_core()
+    config = _variant_config_schema({"variant": "NRF52", "advanced": advanced})
+    return config["advanced"]
+
+
+def test_nrf52_dfu_defaults_on_with_adafruit_bootloader() -> None:
+    advanced = _nrf52_advanced(bootloader="adafruit_nrf52_sd140_v6")
+    assert advanced["dfu"] is not None
+
+
+def test_nrf52_dfu_can_be_turned_off() -> None:
+    advanced = _nrf52_advanced(bootloader="adafruit_nrf52_sd140_v6", dfu=False)
+    assert advanced["dfu"] is None
+
+
+def test_nrf52_dfu_is_off_with_mcuboot() -> None:
+    advanced = _nrf52_advanced()
+    assert "dfu" not in advanced
+
+
+def test_nrf52_dfu_config_validates_again() -> None:
+    _init_variant_schema_core()
+    first = _variant_config_schema(
+        {"variant": "NRF52", "advanced": {"bootloader": "adafruit_nrf52_sd140_v6"}}
+    )
+    assert _variant_config_schema(first)["advanced"]["dfu"] is not None
+
+
+def test_nrf52_dfu_rejects_mcuboot() -> None:
+    with pytest.raises(cv.Invalid, match="needs an Adafruit bootloader"):
+        _nrf52_advanced(bootloader="mcuboot", dfu=True)
+
+
 def test_variant_config_schema_raises_for_unregistered_variant(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

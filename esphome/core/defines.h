@@ -704,6 +704,10 @@
 // with Zephyr's generic zephyr,uart-emul devicetree node instead of real silicon,
 // letting a ZephyrUartEmulator answer TX writes with scripted responses.
 #define USE_ZEPHYR_UART_EMULATION
+// Emitted by zephyr/variants/nrf52.py when advanced: dfu: is set.
+#define USE_ZEPHYR_NRF52_DFU
+// Emitted by zephyr_add_usb_baud_rate() -- reports baud rates the USB host sets on the serial port.
+#define USE_ZEPHYR_USB_BAUD_RATE
 #endif
 
 // Emitted for every platform: zephyr/nrf52 target with real watchdog hardware
@@ -716,8 +720,8 @@
 #define USE_ZEPHYR_WATCHDOG_TIMEOUT_MS 10000
 #endif
 
-// Emitted for every rpi_pico-family variant (RP2040/RP2350) -- lets logger_zephyr.cpp's
-// USB_CDC poll loop detect a 1200-baud "touch" and reboot into BOOTSEL without the
+// Emitted for every rpi_pico-family variant (RP2040/RP2350) -- lets BootselTouch
+// detect a 1200-baud "touch" and reboot into BOOTSEL without the
 // physical button, backed by Zephyr's retention bootmode API.
 #ifdef USE_ZEPHYR_VARIANT_FAMILY_RPI_PICO
 #define USE_ZEPHYR_BOOTSEL_TOUCH
