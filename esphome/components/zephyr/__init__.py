@@ -659,6 +659,19 @@ def zephyr_to_code(config: ConfigType) -> None:
             if zephyr_variant() != ZEPHYR_VARIANT_ESP32:
                 cg.add_define("USE_ZEPHYR_ARCH_STACKWALK")
 
+    # As nrf52: off unless a component needs them, since board defconfigs turn
+    # them on (UART pins, flash, idle current). Weak, so logger/uart/kconfig_options win.
+    if zephyr_variant() not in (None, ZEPHYR_VARIANT_NATIVE_SIM):
+        for option in (
+            "USB_DEVICE_STACK",
+            "SERIAL",
+            "CONSOLE",
+            "UART_CONSOLE",
+            "PRINTK",
+            "BOOT_BANNER",
+        ):
+            zephyr_add_prj_conf(option, False, False)
+
     # .get(): nrf52's config dict has no log_level key yet, falls back to the same
     # default as a genuine platform: zephyr block.
     log_level = config.get(CONF_LOG_LEVEL, "ERROR")
