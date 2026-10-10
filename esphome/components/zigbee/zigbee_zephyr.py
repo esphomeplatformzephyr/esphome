@@ -6,6 +6,7 @@ from esphome.components.zephyr import (
     request_zephyr_module,
     zephyr_add_prj_conf,
     zephyr_framework_type,
+    zephyr_require_partition,
     zephyr_variant,
 )
 from esphome.components.zephyr.variants import VARIANTS, resolve_sdk
@@ -134,6 +135,9 @@ async def zephyr_to_code(config: ConfigType) -> "MockObj":
         # "zigbee" module (see there) -- this can't fail.
         request_zephyr_module("zigbee")
         cg.add_define("USE_ZEPHYR_FRAMEWORK_ZIGBEE")
+        # ncs-zigbee has no Partition Manager; the layout must come from devicetree.
+        zephyr_require_partition("zboss_nvram", "Zigbee")
+        zephyr_require_partition("zboss_product_config", "Zigbee")
 
     # Top-level Zigbee-stack-enable Kconfig symbol: "ZIGBEE" for platform: nrf52's
     # legacy inline stack, "ZIGBEE_ADD_ON" for the separate ncs-zigbee module (the
@@ -360,18 +364,6 @@ async def _ctx_to_code(config: ConfigType) -> None:
     cg.add(cg.RawExpression("ZB_AF_REGISTER_DEVICE_CTX(&zb_device_ctx)"))
 
 
-async def zephyr_setup_binary_sensor(entity: cg.MockObj, config: ConfigType) -> None:
-    CORE.add_job(_add_binary_sensor, entity, config)
-
-
-async def zephyr_setup_sensor(entity: cg.MockObj, config: ConfigType) -> None:
-    CORE.add_job(_add_sensor, entity, config)
-
-
-async def zephyr_setup_switch(entity: cg.MockObj, config: ConfigType) -> None:
-    CORE.add_job(_add_switch, entity, config)
-
-
 async def zephyr_setup_number(
     entity: cg.MockObj,
     config: ConfigType,
@@ -450,7 +442,7 @@ async def _add_zigbee_ep(
     cg.add(var.set_parent(hub))
 
 
-async def _add_binary_sensor(entity: cg.MockObj, config: ConfigType) -> None:
+async def add_binary_sensor(entity: cg.MockObj, config: ConfigType) -> None:
     await _add_zigbee_ep(
         entity,
         config,
@@ -462,7 +454,7 @@ async def _add_binary_sensor(entity: cg.MockObj, config: ConfigType) -> None:
     )
 
 
-async def _add_sensor(entity: cg.MockObj, config: ConfigType) -> None:
+async def add_sensor(entity: cg.MockObj, config: ConfigType) -> None:
     # Get BACnet engineering unit from unit_of_measurement
     unit = config.get(CONF_UNIT_OF_MEASUREMENT, "")
     bacnet_unit = BACNET_UNITS.get(unit, BACNET_UNIT_NO_UNITS)
@@ -479,7 +471,7 @@ async def _add_sensor(entity: cg.MockObj, config: ConfigType) -> None:
     )
 
 
-async def _add_switch(entity: cg.MockObj, config: ConfigType) -> None:
+async def add_switch(entity: cg.MockObj, config: ConfigType) -> None:
     await _add_zigbee_ep(
         entity,
         config,

@@ -38,6 +38,7 @@ from esphome.const import (
     TYPE_LOCAL,
 )
 from esphome.core import CORE, CoroPriority, EsphomeError, coroutine_with_priority
+from esphome.cpp_generator import MockObj
 from esphome.helpers import copy_file_if_changed, rmtree, write_file_if_changed
 from esphome.types import ConfigType
 from esphome.writer import clean_cmake_cache
@@ -60,6 +61,7 @@ from .const import (
     CONF_WEST_VERSION,
     KEY_BOARD,
     KEY_BOARD_ROOT,
+    KEY_BOOT_LAYOUT,
     KEY_BOOTLOADER,
     KEY_EXTRA_BUILD_FILES,
     KEY_FRAMEWORK_TYPE,
@@ -68,6 +70,7 @@ from .const import (
     KEY_MODULE_REQUESTS,
     KEY_OVERLAY,
     KEY_OVERLAY_BUILDER,
+    KEY_PARTITION_REQUIREMENTS,
     KEY_PM_STATIC,
     KEY_PRJ_CONF,
     KEY_RUNNER,
@@ -82,10 +85,17 @@ from .const import (
     KEY_ZEPHYR,
     ZEPHYR_VARIANT_ESP32,
     ZEPHYR_VARIANT_NATIVE_SIM,
+    ZEPHYR_VARIANT_NRF52,
     ZEPHYR_VARIANT_RP2040,
     zephyr_ns,
 )
 from .gpio import zephyr_pin_to_code as _zephyr_pin_to_code  # noqa: F401
+from .partitions import (  # noqa: F401
+    BootLayout,
+    render_sysbuild_cmake,
+    zephyr_require_partition,
+    zephyr_set_boot_layout,
+)
 
 # I2C/UART/SPI pinctrl overlay generation lives in pinctrl.py; re-exported here so
 # the i2c/uart/spi components' existing `from . import zephyr_setup_*_pinctrl`
@@ -95,6 +105,7 @@ from .pinctrl import (  # noqa: F401
     zephyr_setup_spi_pinctrl,
     zephyr_setup_uart_pinctrl,
 )
+from .usb_baud_rate import CONF_USB_BAUD_RATE
 from .variants import (
     VARIANTS,
     ZephyrModule,
@@ -189,6 +200,9 @@ class ZephyrData(TypedDict):
     overlay: dict[str, str]
     extra_build_files: dict[str, Path]
     pm_static: list[Section]
+    # (label, reason) partitions components need; see partitions.zephyr_require_partition()
+    partition_requirements: list[tuple[str, str]]
+    boot_layout: BootLayout | None  # None = where the first image starts is not checked
     user: dict[str, list[str]]
     kconfig: str
     overlay_builder: list[Callable[[], str]]
@@ -254,6 +268,8 @@ def zephyr_set_core_data(config: ConfigType) -> None:
         overlay_builder=[],
         extra_build_files={},
         pm_static=[],
+        partition_requirements=[],
+        boot_layout=None,
         user={},
         kconfig="",
         fake_board_manifest=None,
@@ -659,6 +675,19 @@ def zephyr_to_code(config: ConfigType) -> None:
             if zephyr_variant() != ZEPHYR_VARIANT_ESP32:
                 cg.add_define("USE_ZEPHYR_ARCH_STACKWALK")
 
+    # As nrf52: off unless a component needs them, since board defconfigs turn
+    # them on (UART pins, flash, idle current). Weak, so logger/uart/kconfig_options win.
+    if zephyr_variant() not in (None, ZEPHYR_VARIANT_NATIVE_SIM):
+        for option in (
+            "USB_DEVICE_STACK",
+            "SERIAL",
+            "CONSOLE",
+            "UART_CONSOLE",
+            "PRINTK",
+            "BOOT_BANNER",
+        ):
+            zephyr_add_prj_conf(option, False, False)
+
     # .get(): nrf52's config dict has no log_level key yet, falls back to the same
     # default as a genuine platform: zephyr block.
     log_level = config.get(CONF_LOG_LEVEL, "ERROR")
@@ -822,6 +851,20 @@ def zephyr_add_cdc_acm(config: ConfigType, id: int) -> str:
     return label
 
 
+async def zephyr_add_usb_baud_rate(config: ConfigType) -> MockObj:
+    """Ensure the USB serial port exists and that baud rates the host sets on it are
+    reported (see usb_baud_rate.h). Returns the UsbBaudRate component for consumers to
+    subscribe to. config must hold the CONF_USB_BAUD_RATE id declared at validation (the
+    Pico family keeps it in advanced:), because components are counted then."""
+    cg.add_define("USE_ZEPHYR_USB_BAUD_RATE")
+    zephyr_add_cdc_acm(config, 0)
+    # Needed to read the rate the host set.
+    zephyr_add_prj_conf("UART_LINE_CTRL", True)
+    var = cg.new_Pvariable(config[CONF_USB_BAUD_RATE])
+    await cg.register_component(var, {})
+    return var
+
+
 def zephyr_add_kconfig(kconfig: str) -> None:
     zephyr_data()[KEY_KCONFIG] += textwrap.dedent(kconfig) + "\n"
 
@@ -953,6 +996,20 @@ def copy_files() -> None:
     sysbuild_conf = "\n".join(sysbuild_conf_lines) + "\n" if sysbuild_conf_lines else ""
     changed |= _write_file_if_changed_or_remove_when_empty(
         CORE.relative_build_path("zephyr/sysbuild.conf"), sysbuild_conf
+    )
+
+    # Flash layout checks, platform: zephyr only. Removed otherwise so a build folder
+    # shared with platform: nrf52 doesn't run them; a change drops the CMake cache,
+    # which a new file needs anyway to replace Zephyr's sysbuild template.
+    sysbuild_cmake = (
+        render_sysbuild_cmake(
+            zephyr_data()[KEY_BOOT_LAYOUT], zephyr_data()[KEY_PARTITION_REQUIREMENTS]
+        )
+        if zephyr_variant() is not None
+        else ""
+    )
+    changed |= _write_file_if_changed_or_remove_when_empty(
+        CORE.relative_build_path("zephyr/sysbuild/CMakeLists.txt"), sysbuild_cmake
     )
 
     if changed:
@@ -1550,6 +1607,50 @@ def _restore_upload_data(zephyr_config: ConfigType) -> None:
     )
 
 
+def reset_over_usb(config: ConfigType, port: str, timeout: float = 10.0) -> bool:
+    """Restart a running device by opening its USB serial port at 2001 baud, then wait
+    for the port to disappear and come back. Returns False, sending nothing, if the
+    firmware has no handler for it (see dfu.cpp, bootsel_touch.cpp)."""
+    import time  # noqa: PLC0415
+
+    import serial  # noqa: PLC0415
+
+    from esphome.util import get_serial_ports  # noqa: PLC0415
+
+    from .variants.nrf52 import CONF_DFU  # noqa: PLC0415
+
+    if KEY_ZEPHYR not in CORE.data:
+        # Best effort: logs do not need a compiled build, so do not fail them.
+        try:
+            _restore_upload_data(config[CORE.target_platform])
+        except (KeyError, EsphomeError) as err:
+            _LOGGER.debug("Skipping USB reset: %s", err)
+            return False
+
+    has_handler = zephyr_variant_family() == "rpi_pico" or (
+        zephyr_variant() == ZEPHYR_VARIANT_NRF52
+        and config[CORE.target_platform].get(CONF_ADVANCED, {}).get(CONF_DFU)
+        is not None
+    )
+    if not has_handler:
+        return False
+    try:
+        with serial.Serial(port, baudrate=2001):
+            pass
+    except serial.SerialException as err:
+        _LOGGER.warning("Could not open %s at 2001 baud: %s", port, err)
+        return False
+    deadline = time.monotonic() + timeout
+    gone = False
+    while time.monotonic() < deadline:
+        present = port in (p.path for p in get_serial_ports())
+        if gone and present:
+            return True
+        gone = gone or not present
+        time.sleep(0.5)
+    return False
+
+
 def upload_program(config: ConfigType, args, host: str) -> bool:
     if KEY_ZEPHYR not in CORE.data:
         zephyr_config = config.get(CORE.target_platform)
@@ -1559,6 +1660,14 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
                 "please re-validate and recompile."
             )
         _restore_upload_data(zephyr_config)
+
+    from esphome.upload_targets import PortType, get_port_type
+
+    if host == "PYOCD" or get_port_type(host) in (PortType.SERIAL, PortType.BOOTSEL):
+        from .build_zephyr import check_bootloader_built
+
+        # Every non-OTA path writes the bootloader too
+        check_bootloader_built(CORE.relative_build_path(".west_build"))
 
     if host == "BOOTSEL":
         from .variants import rpi_pico_family
@@ -1600,6 +1709,13 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
             raise EsphomeError("Zephyr pyocd flash failed")
         return True
 
+    # nRF52 with an Adafruit bootloader: 1200-baud touch, then serial DFU.
+    if zephyr_variant() == ZEPHYR_VARIANT_NRF52:
+        from .variants import nrf52
+
+        if nrf52.uses_serial_dfu() and get_port_type(host) == PortType.SERIAL:
+            return nrf52.upload_serial_dfu(host)
+
     # rpi_pico-family variants (RP2040/RP2350) given a normal serial port instead of
     # BOOTSEL: the board's default west runner (uf2) only works once already in
     # BOOTSEL, so trigger that ourselves first via the 1200-baud touch (see
@@ -1619,8 +1735,6 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
     # Non-ESP32 Zephyr variants (for example EFR32/nRF in SDK-Zephyr mode) are
     # generally flashed by the board's default west runner (jlink, pyocd, etc.)
     # rather than esptool over a selected serial port.
-    from esphome.upload_targets import PortType, get_port_type
-
     if get_port_type(host) != PortType.SERIAL:
         return False
 
@@ -1759,6 +1873,11 @@ def run_compile(args, config: ConfigType) -> bool:
         snippet_root=zephyr_data().get(KEY_SNIPPET_ROOT),
         requested_runner=zephyr_data().get(KEY_RUNNER),
     )
+    if zephyr_variant() == ZEPHYR_VARIANT_NRF52:
+        from .variants import nrf52
+
+        if nrf52.uses_serial_dfu():
+            nrf52.build_dfu_package(python_bin, west_env)
     return True
 
 
