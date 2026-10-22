@@ -1,6 +1,7 @@
 import esphome.codegen as cg
 import esphome.config_validation as cv
 from esphome.const import (
+    CONF_ADVANCED,
     CONF_BOARD,
     CONF_FRAMEWORK,
     CONF_SOURCE,
@@ -9,7 +10,13 @@ from esphome.const import (
 )
 from esphome.types import ConfigType
 
-from ..const import BOOTLOADER_MCUBOOT, CONF_BOARD_SOURCE, ZEPHYR_VARIANT_SIMG301
+from ..const import (
+    ADVANCED_SCHEMA,
+    BOOTLOADER_MCUBOOT,
+    CONF_BOARD_SOURCE,
+    CONF_RUNNER,
+    ZEPHYR_VARIANT_SIMG301,
+)
 from ..partitions import BootLayout
 from . import (
     MAINLINE,
@@ -29,6 +36,8 @@ _DEFAULT_BOARD = "simg301_ek2719a"
 # and B (4 pins) -- unlike EFR32 Series 2's full crossbar (six301-pinctrl.h vs.
 # efr32mg24.py's _GPIO_MATRIX_PINS). Packed the same way: port = p // 16, pin = p % 16.
 _EUSART0_PINS = frozenset([*range(9), *range(16, 20)])
+
+_ADVANCED_SCHEMA = ADVANCED_SCHEMA
 
 # Registry entries — collected by variants/__init__.py
 VARIANT_NAME = ZEPHYR_VARIANT_SIMG301
@@ -69,6 +78,7 @@ def config_schema(config: ConfigType) -> ConfigType:
     config = dict(config)
     if CONF_BOARD not in config:
         config[CONF_BOARD] = _DEFAULT_BOARD
+    config[CONF_ADVANCED] = _ADVANCED_SCHEMA(config.get(CONF_ADVANCED, {}))
     config[CONF_BOARD] = qualify_board(VARIANT, config[CONF_BOARD])
     if CONF_BOARD_SOURCE not in config:
         raise cv.Invalid(
@@ -93,6 +103,7 @@ def config_schema(config: ConfigType) -> ConfigType:
         config,
         framework_type=sdk_name,
         sdk_source=config[CONF_FRAMEWORK].get(CONF_SOURCE),
+        runner=config[CONF_ADVANCED].get(CONF_RUNNER),
     )
     return config
 
