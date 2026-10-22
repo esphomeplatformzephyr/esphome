@@ -1,0 +1,27 @@
+esphome:
+  name: componenttestsimg301
+  friendly_name: $component_name
+
+zephyr:
+  variant: SIMG301
+  # Board isn't upstream yet (see variants/simg301.py's module comment) and the SoC
+  # support it needs isn't in a tagged release yet either -- both require sourcing
+  # from git instead of the usual pinned SDK release. board_source: requires board:
+  # to also be set explicitly (zephyr/__init__.py's own schema check).
+  board: simg301_ek2719a
+  board_source:
+    type: git
+    url: https://github.com/esphomeplatformzephyr/custom_zephyr_boards
+  framework:
+    source:
+      type: git
+      ref: main
+
+logger:
+  level: VERY_VERBOSE
+
+packages:
+  component_under_test: !include
+    file: $component_test_file
+    vars:
+      component_test_file: $component_test_file

@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from esphome.components.zephyr.const import VERSION_RECOMMENDED
+from esphome.components.zephyr.const import VERSION_RECOMMENDED, ZEPHYR_VARIANT_SIMG301
 from esphome.components.zephyr.variants import (
     VARIANTS,
     ZephyrModule,
@@ -246,9 +246,15 @@ def test_module_template_resolve_ignores_min_version_for_non_semver_ref() -> Non
     assert module.revision == "main"
 
 
-@pytest.mark.parametrize("variant", sorted(VARIANTS))
+@pytest.mark.parametrize("variant", sorted(set(VARIANTS) - {ZEPHYR_VARIANT_SIMG301}))
 def test_validated_config_round_trips_through_config_schema(variant: str) -> None:
-    """upload/logs feed the cached validated config back through CONFIG_SCHEMA."""
+    """upload/logs feed the cached validated config back through CONFIG_SCHEMA.
+
+    SIMG301 needs `board_source:`/`framework: source:` just to validate at all (its
+    board and SoC support aren't upstream/tagged yet) -- a real git fetch, not a bare
+    `{variant: ...}` config like every other variant here. Covered on its own, with
+    that fetch mocked out, in test_simg301.py.
+    """
     from esphome.components.zephyr import CONFIG_SCHEMA  # noqa: PLC0415
     from esphome.const import CONF_VARIANT, KEY_CORE  # noqa: PLC0415
     from esphome.core import CORE  # noqa: PLC0415

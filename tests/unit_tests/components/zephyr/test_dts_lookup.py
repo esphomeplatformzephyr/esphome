@@ -13,6 +13,7 @@ import pytest
 from esphome.components.zephyr import dts_lookup
 from esphome.components.zephyr.const import KEY_ZEPHYR
 from esphome.components.zephyr.dts_lookup import (
+    _DtsReadError,
     _find_board_dir,
     _find_board_yaml,
     _find_cpp,
@@ -22,6 +23,7 @@ from esphome.components.zephyr.dts_lookup import (
     _find_snippet_dir,
     _format_size,
     _get_edt,
+    _preprocess_dts_file,
     _shield_overlay_files,
     _snippet_overlay_files,
     get_board_partitions,
@@ -1428,6 +1430,57 @@ def test_find_cpp_caches_first_working_candidate(
     assert _find_cpp() == "/usr/bin/cpp"
     assert _find_cpp() == "/usr/bin/cpp"
     assert calls == ["/usr/bin/cpp"]
+
+
+def test_find_cpp_smoke_test_uses_nostdinc(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The smoke test must mirror _preprocess_dts_file()'s real flags -- a candidate
+    that only works without -nostdinc would otherwise be picked and then fail later."""
+    captured: list[list[str]] = []
+
+    def _fake_run(cmd: list[str], **kwargs: Any) -> SimpleNamespace:
+        captured.append(cmd)
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(dts_lookup.shutil, "which", {"cpp": "/usr/bin/cpp"}.get)
+    monkeypatch.setattr(dts_lookup.subprocess, "run", _fake_run)
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
+
+    _find_cpp()
+
+    assert "-nostdinc" in captured[0]
+
+
+def test_find_cpp_skips_candidate_that_times_out(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def _fake_run(cmd: list[str], **kwargs: Any) -> SimpleNamespace:
+        if "cpp" in cmd[0]:
+            raise dts_lookup.subprocess.TimeoutExpired(cmd, kwargs.get("timeout"))
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(
+        dts_lookup.shutil,
+        "which",
+        {"cpp": "/usr/bin/cpp", "gcc": "/usr/bin/gcc"}.get,
+    )
+    monkeypatch.setattr(dts_lookup.subprocess, "run", _fake_run)
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
+
+    assert _find_cpp() == "/usr/bin/gcc"
+
+
+def test_preprocess_dts_file_raises_on_timeout(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    def _fake_run(cmd: list[str], **kwargs: Any) -> NoReturn:
+        raise dts_lookup.subprocess.TimeoutExpired(cmd, kwargs.get("timeout"))
+
+    monkeypatch.setattr(dts_lookup, "_find_cpp", lambda: "/usr/bin/cpp")
+    monkeypatch.setattr(dts_lookup, "_get_dts_include_paths", lambda zephyr_base: [])
+    monkeypatch.setattr(dts_lookup.subprocess, "run", _fake_run)
+
+    with pytest.raises(_DtsReadError, match="timed out"):
+        _preprocess_dts_file(tmp_path / "board.dts", tmp_path, [])
 
 
 # ---------------------------------------------------------------------------
