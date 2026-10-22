@@ -876,13 +876,17 @@ def _preprocess_dts_file(
     cmd.append(str(src_file))
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)  # noqa: S603
+        result = subprocess.run(  # noqa: S603
+            cmd, capture_output=True, text=True, check=True, timeout=30
+        )
         return result.stdout
     except subprocess.CalledProcessError as exc:
         lines = (exc.stderr or "").strip().splitlines()
         raise _DtsReadError(
             f"cpp failed: {lines[-1] if lines else 'no output'}"
         ) from exc
+    except subprocess.TimeoutExpired as exc:
+        raise _DtsReadError("cpp timed out") from exc
 
 
 def _find_in_search_roots(
@@ -976,7 +980,7 @@ def _snippet_overlay_files(snippet_dir: Path, board: str) -> list[Path]:
 
 
 def _cpp_candidate_works(path: str) -> bool:
-    """Smoke-test a preprocessor candidate with the exact invocation
+    """Smoke-test a preprocessor candidate with the exact flags
     _preprocess_dts_file() uses. On macOS, 'cpp', 'gcc' and 'cc' are all the
     same Apple clang driver binary, but its 'cpp' personality mishandles
     '-x assembler-with-cpp' together with a trailing source file and fails
@@ -984,13 +988,14 @@ def _cpp_candidate_works(path: str) -> bool:
     fine invoked as 'gcc'/'cc'. shutil.which() alone can't tell them apart."""
     try:
         result = subprocess.run(  # noqa: S603
-            [path, "-x", "assembler-with-cpp", "-E", "-P", "-"],
+            [path, "-x", "assembler-with-cpp", "-nostdinc", "-E", "-P", "-"],
             input="",
             capture_output=True,
             text=True,
             check=False,
+            timeout=10,
         )
-    except OSError:
+    except (OSError, subprocess.TimeoutExpired):
         return False
     return result.returncode == 0
 

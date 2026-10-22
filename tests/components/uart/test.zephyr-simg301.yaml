@@ -1,0 +1,17 @@
+esphome:
+  on_boot:
+    then:
+      - uart.write: 'Hello World'
+      - uart.write: [0x00, 0x20, 0x42]
+
+uart:
+  # simg301_ek2719a's eusart0_default claims PB0/PB2 (flat 16/18); PA1/PA2 exercise
+  # the SILABS_DBUS-based remap onto a different pin pair instead.
+  - id: uart_id
+    port: UART0
+    tx_pin: 1
+    rx_pin: 2
+    baud_rate: 115200
+    data_bits: 8
+    parity: NONE
+    stop_bits: 1

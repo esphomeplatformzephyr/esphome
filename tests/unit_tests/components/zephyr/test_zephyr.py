@@ -42,7 +42,11 @@ from esphome.components.zephyr import (
     zephyr_variant,
     zephyr_variant_family,
 )
-from esphome.components.zephyr.const import CONF_BOARD_SOURCE, KEY_ZEPHYR
+from esphome.components.zephyr.const import (
+    CONF_BOARD_SOURCE,
+    KEY_ZEPHYR,
+    ZEPHYR_VARIANT_SIMG301,
+)
 from esphome.components.zephyr.mcuboot import zephyr_skip_bootloader_supported
 from esphome.components.zephyr.pinctrl import (
     _build_i2c_pinctrl_states_overlay,
@@ -71,6 +75,7 @@ from esphome.components.zephyr.variants.silabs_family import (
 )
 import esphome.config_validation as cv
 from esphome.const import (
+    CONF_BOARD,
     CONF_FRAMEWORK,
     CONF_ID,
     CONF_NAME,
@@ -1863,8 +1868,11 @@ def test_variant_config_schema_raises_for_unregistered_variant(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("variant", sorted(VARIANTS))
+@pytest.mark.parametrize("variant", sorted(set(VARIANTS) - {ZEPHYR_VARIANT_SIMG301}))
 def test_variant_config_schema_round_trips_cleanly(variant: str) -> None:
+    # SIMG301 needs `board_source:`/`framework: source:` just to validate at all (a
+    # real git fetch) -- covered on its own, with that fetch mocked out, in
+    # test_simg301.py.
     _init_variant_schema_core()
     validated = _variant_config_schema({CONF_VARIANT: variant})
 
@@ -1987,10 +1995,40 @@ def zephyr_data_snapshot() -> dict:
     return dict(CORE.data[KEY_ZEPHYR])
 
 
-@pytest.mark.parametrize("variant", sorted(VARIANTS))
+@pytest.mark.parametrize("variant", sorted(set(VARIANTS) - {ZEPHYR_VARIANT_SIMG301}))
 def test_upload_program_restores_what_validation_set(variant: str) -> None:
+    # SIMG301 needs `board_source:`/`framework: source:` just to validate at all (a
+    # real git fetch) -- see test_upload_program_restore_works_for_simg301 below.
     validated = _validate_zephyr_config({CONF_VARIANT: variant})
     expected, restored = _restore_from_cache(validated)
+    assert restored == expected
+
+
+def test_upload_program_restore_works_for_simg301(tmp_path: Path) -> None:
+    CORE.config_path = tmp_path / "test.yaml"
+    board_root = tmp_path / "boards_repo"
+    (board_root / "boards" / "silabs" / "simg301_ek2719a").mkdir(parents=True)
+    (board_root / "boards" / "silabs" / "simg301_ek2719a" / "board.yml").write_text(
+        "board:\n  name: simg301_ek2719a\n  vendor: silabs\n"
+    )
+    sdk_root = tmp_path / "sdk_source"
+    sdk_root.mkdir()
+    (sdk_root / "VERSION").write_text(
+        "VERSION_MAJOR = 4\nVERSION_MINOR = 5\nPATCHLEVEL = 0\n"
+    )
+
+    validated = _validate_zephyr_config(
+        {
+            CONF_VARIANT: ZEPHYR_VARIANT_SIMG301,
+            CONF_BOARD: "simg301_ek2719a",
+            CONF_BOARD_SOURCE: {CONF_TYPE: TYPE_LOCAL, CONF_PATH: str(board_root)},
+            CONF_FRAMEWORK: {
+                CONF_SOURCE: {CONF_TYPE: TYPE_LOCAL, CONF_PATH: str(sdk_root)}
+            },
+        }
+    )
+    expected, restored = _restore_from_cache(validated)
+
     assert restored == expected
 
 
