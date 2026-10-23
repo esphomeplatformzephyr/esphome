@@ -606,6 +606,9 @@ def zephyr_family_uart_drivers() -> frozenset[str]:
 
 def zephyr_to_code(config: ConfigType) -> None:
     cg.add_build_flag("-DUSE_ZEPHYR")
+    # Zephyr's base warnings include -Wdouble-promotion, which every float passed to a log call
+    # trips; the promotion is how variadic arguments work, so the warning only adds noise
+    cg.add_build_flag("-Wno-double-promotion")
     cg.add_define("USE_NATIVE_64BIT_TIME")
     # The settings subsystem finds stored preferences by key, so key migration is possible
     cg.add_define("USE_PREFERENCE_KEY_LOOKUP")
@@ -691,9 +694,8 @@ def zephyr_to_code(config: ConfigType) -> None:
 
 
 def _watchdog_to_code(config: ConfigType) -> None:
-    # zephyr_variant() is None for platform: nrf52, which manages its own watchdog
-    # setup separately (nrf52/__init__.py) but defines the same consumer macro.
-    # native_sim has no real watchdog hardware.
+    # platform: nrf52 (no variant) sets up its own watchdog in nrf52/__init__.py;
+    # native_sim has no watchdog hardware.
     if zephyr_variant() is not None and zephyr_variant() != ZEPHYR_VARIANT_NATIVE_SIM:
         timeout_ms = int(config[CONF_WATCHDOG_TIMEOUT].total_milliseconds)
         # 0 disables the watchdog: forced off so a board defconfig can't build a driver that
