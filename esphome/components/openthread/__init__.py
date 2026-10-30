@@ -627,9 +627,6 @@ async def to_code(config: ConfigType) -> None:
                 include_west_project("oberon-psa-crypto")
             # nRF Connect SDK uses pre-built Nordic OpenThread libraries.
             zephyr_add_prj_conf(f"OPENTHREAD_NORDIC_LIBRARY_{device_type}", True)
-            # PlatformIO's bundled nrf52 Zephyr fork only goes up to Thread 1.3.1 -- the
-            # mainline-only 1.4 option would abort the Kconfig parse here.
-            zephyr_add_prj_conf("OPENTHREAD_THREAD_VERSION_1_3_1", True)
         else:
             # Mainline Zephyr builds OpenThread from source.
             zephyr_add_prj_conf("OPENTHREAD_SOURCES", True)
@@ -652,10 +649,10 @@ async def to_code(config: ConfigType) -> None:
             # Kconfig default (1.1).
             zephyr_add_prj_conf("OPENTHREAD_THREAD_VERSION_1_4", True)
         zephyr_add_prj_conf(f"OPENTHREAD_{device_type}", True)
-        # Without SLAAC the device never forms an OMR (Off-Mesh-Routable) address, so
-        # SRP's auto-registered host resolves by name but every address lookup times out.
-        zephyr_add_prj_conf("OPENTHREAD_SLAAC", True)
         if CORE.using_zephyr_rtos:
+            # Without SLAAC the device never forms an OMR (Off-Mesh-Routable) address, so
+            # SRP's auto-registered host resolves by name but every address lookup times out.
+            zephyr_add_prj_conf("OPENTHREAD_SLAAC", True)
             zephyr_raise_prj_conf_min("MAIN_STACK_SIZE", 4096)
         else:
             zephyr_add_prj_conf("MAIN_STACK_SIZE", 4096)
