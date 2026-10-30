@@ -377,7 +377,11 @@ def choose_upload_log_host(
         purpose == Purpose.UPLOADING
         and (
             picotool := (
-                (_find_picotool() if CORE.is_rp2 else None)
+                (
+                    _find_picotool()
+                    if CORE.is_rp2 and not CORE.using_zephyr_rtos
+                    else None
+                )
                 or (_find_picotool_zephyr() if _is_zephyr_rpi_pico() else None)
             )
         )
@@ -1104,7 +1108,7 @@ def upload_using_platformio(config: ConfigType, port: str) -> int:
     # RP2040 platform-raspberrypi build recipe expects firmware.bin.signed for
     # the upload target, but 'nobuild' skips the build phase that creates it.
     # Create it here so the upload doesn't fail.
-    if CORE.is_rp2:
+    if CORE.is_rp2 and not CORE.using_zephyr_rtos:
         idedata = toolchain.get_idedata(config)
         build_dir = Path(idedata.firmware_elf_path).parent
         firmware_bin = build_dir / "firmware.bin"
@@ -1326,10 +1330,10 @@ def upload_program(
         check_permissions(host)
 
         exit_code = 1
-        if CORE.is_esp32 or CORE.is_esp8266:
+        if (CORE.is_esp32 and not CORE.using_zephyr_rtos) or CORE.is_esp8266:
             file = getattr(args, "file", None)
             exit_code = upload_using_esptool(config, host, file, args.upload_speed)
-        elif CORE.is_rp2 or CORE.is_libretiny:
+        elif (CORE.is_rp2 and not CORE.using_zephyr_rtos) or CORE.is_libretiny:
             exit_code = upload_using_platformio(config, host)
         # else: Unknown target platform, exit_code remains 1
 

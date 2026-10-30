@@ -306,6 +306,7 @@ def test_storage_json_from_esphome_core(setup_core: Path) -> None:
     mock_core.web_port = 8080
     mock_core.target_platform = "esp32"
     mock_core.is_esp32 = True
+    mock_core.using_zephyr_rtos = False
     mock_core.build_path = "/build/my_device"
     mock_core.firmware_bin = "/build/my_device/firmware.bin"
     mock_core.loaded_integrations = {"wifi", "api"}

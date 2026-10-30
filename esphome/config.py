@@ -27,6 +27,8 @@ from esphome.const import (
     CONF_PACKAGES,
     CONF_PLATFORM,
     CONF_SUBSTITUTIONS,
+    PLATFORM_ESP32,
+    PLATFORM_RP2,
     ErrorFormat,
 )
 from esphome.core import CORE, DocumentLocation, DocumentRange, EsphomeError
@@ -901,6 +903,17 @@ class MetadataValidationStep(ConfigValidationStep):
             if component_dep not in result:
                 result.add_str_error(
                     f"Component {self.domain} requires component {component_dep}",
+                    self.path,
+                )
+                success = False
+            elif CORE.using_zephyr_rtos and component_dep in (
+                PLATFORM_ESP32,
+                PLATFORM_RP2,
+            ):
+                # Modules that depend on esp32 or rp2 are written for ESP-IDF or Arduino
+                result.add_str_error(
+                    f"Component {self.domain} is not available on {component_dep} "
+                    "with framework: type: zephyr",
                     self.path,
                 )
                 success = False

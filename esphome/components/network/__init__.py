@@ -125,7 +125,11 @@ def has_active_interface() -> bool:
     That is ESP32 with more than one interface in 'network: priority:', the same
     condition that emits USE_NETWORK_DEFAULT_ROUTE.
     """
-    return CORE.is_esp32 and len(CORE.config.get(DOMAIN, {}).get(CONF_PRIORITY, [])) > 1
+    return (
+        CORE.is_esp32
+        and not CORE.using_zephyr_rtos
+        and len(CORE.config.get(DOMAIN, {}).get(CONF_PRIORITY, [])) > 1
+    )
 
 
 async def register_active_interface_listener(listener: cg.MockObj) -> bool:
@@ -390,10 +394,17 @@ _ENABLE_IPV6_FRAMEWORK_VERSION_VALIDATOR = cv.require_framework_version(
     bk72xx_arduino=cv.Version(1, 7, 0),
     esp_idf=cv.Version(0, 0, 0),
     esp32_arduino=cv.Version(0, 0, 0),
+    esp32_zephyr=cv.Version(0, 0, 0),
     esp8266_arduino=cv.Version(0, 0, 0),
     host=cv.Version(0, 0, 0),
     rp2_arduino=cv.Version(0, 0, 0),
     nrf52_zephyr=cv.Version(0, 0, 0),
+    nrf_zephyr=cv.Version(0, 0, 0),
+    nxp_zephyr=cv.Version(0, 0, 0),
+    renesas_zephyr=cv.Version(0, 0, 0),
+    rp2_zephyr=cv.Version(0, 0, 0),
+    silabs_zephyr=cv.Version(0, 0, 0),
+    stm32_zephyr=cv.Version(0, 0, 0),
     zephyr_zephyr=cv.Version(0, 0, 0),
 )
 
@@ -487,6 +498,7 @@ def _final_validate(config: ConfigType) -> None:
             - ARBITRATED_NETWORK_TYPES
         )
         and CORE.is_esp32
+        and not CORE.using_zephyr_rtos
     ):
         raise cv.Invalid(
             "Default-route arbitration does not support: "
@@ -550,7 +562,7 @@ async def to_code(config: ConfigType) -> None:
             "High performance networking disabled by user configuration (overriding component request)"
         )
 
-    if CORE.is_esp32 and should_enable:
+    if CORE.is_esp32 and not CORE.using_zephyr_rtos and should_enable:
         # Check if PSRAM is guaranteed (set by psram component during final validation)
         psram_guaranteed = psram_is_guaranteed()
         # ESP-IDF ethernet drivers malloc() received frames into internal RAM, so
@@ -610,7 +622,10 @@ async def to_code(config: ConfigType) -> None:
             add_idf_sdkconfig_option("CONFIG_LWIP_TCP_RECVMBOX_SIZE", 64)
             add_idf_sdkconfig_option("CONFIG_LWIP_TCPIP_RECVMBOX_SIZE", tcpip_mailbox)
     elif (
-        CORE.is_esp32 and enable_high_perf is not False and has_high_performance_wifi()
+        CORE.is_esp32
+        and not CORE.using_zephyr_rtos
+        and enable_high_perf is not False
+        and has_high_performance_wifi()
     ):
         # Forwarded frames still queue through tcpip_input, so the WiFi-only tier deepens that mailbox too
         add_idf_sdkconfig_option(
@@ -620,7 +635,7 @@ async def to_code(config: ConfigType) -> None:
     # After the high performance block so an explicit size wins over the
     # bundle's 65534 (last write wins in the sdkconfig store).
     if (tcp_send_buffer := config.get(CONF_TCP_SEND_BUFFER)) is not None:
-        if CORE.is_esp32 and should_enable:
+        if CORE.is_esp32 and not CORE.using_zephyr_rtos and should_enable:
             _LOGGER.info(
                 "TCP send buffer set to %d bytes by configuration (overriding high performance value)",
                 tcp_send_buffer,
@@ -687,7 +702,7 @@ async def to_code(config: ConfigType) -> None:
         cg.add_define(
             "USE_NETWORK_MIN_IPV6_ADDR_COUNT", config[CONF_MIN_IPV6_ADDR_COUNT]
         )
-    if CORE.is_esp32:
+    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
         add_idf_sdkconfig_option("CONFIG_LWIP_IPV6", enable_ipv6)
         add_idf_sdkconfig_option("CONFIG_LWIP_IPV6_AUTOCONFIG", enable_ipv6)
     elif enable_ipv6:
@@ -697,7 +712,7 @@ async def to_code(config: ConfigType) -> None:
             cg.add_build_flag("-DCONFIG_IPV6")
         if CORE.is_esp8266:
             cg.add_build_flag("-DPIO_FRAMEWORK_ARDUINO_LWIP2_IPV6_LOW_MEMORY")
-        if CORE.is_rp2:
+        if CORE.is_rp2 and not CORE.using_zephyr_rtos:
             cg.add_build_flag("-DPIO_FRAMEWORK_ARDUINO_ENABLE_IPV6")
     if enable_ipv6 and CORE.using_zephyr_rtos:
         ipv6_addr_floor = 6 if "openthread" in CORE.config else 2
@@ -707,14 +722,14 @@ async def to_code(config: ConfigType) -> None:
         )
 
     cg.add_define("USE_NETWORK_IPV4", enable_ipv4)
-    if CORE.is_esp32:
+    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
         add_idf_sdkconfig_option("CONFIG_LWIP_IPV4", enable_ipv4)
 
     # Pvariable creation lives in a separate coroutine at NETWORK_SERVICES so it
     # emits after wifi/ethernet at COMMUNICATION. This keeps compile-time config
     # (above) separate from C++ object lifecycle and allows wiring in interface
     # pointers via get_variable().
-    if CORE.is_esp32:
+    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
         CORE.add_job(network_component_to_code, config)
 
 

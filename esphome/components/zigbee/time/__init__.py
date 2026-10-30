@@ -30,7 +30,7 @@ def _validate_zigbee_time(config: ConfigType) -> ConfigType:
     if zigbee_zephyr_supported():
         config = default_zigbee_ids(config)
         return consume_endpoint(config)
-    if CORE.is_esp32:
+    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
         cl = [
             {
                 CONF_ID: "TIME",
@@ -64,7 +64,7 @@ CONFIG_SCHEMA = cv.All(
 async def to_code(config: ConfigType) -> None:
     if CORE.using_zephyr:
         CORE.add_job(_add_time_zephyr, config)
-    if CORE.is_esp32:
+    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
         zb = await cg.get_variable(config[CONF_ZIGBEE_ID])
         var = cg.new_Pvariable(config[CONF_ID], zb, get_first_ep_num())
         await cg.register_component(var, config)

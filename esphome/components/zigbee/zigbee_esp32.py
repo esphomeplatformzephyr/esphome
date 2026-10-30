@@ -174,11 +174,15 @@ ZIGBEE_ESP32_VARIANTS = frozenset(
 def zigbee_esp32_supported() -> bool:
     """True on the ESP32 variants with a native 802.15.4 radio (shared with WiFi on
     the same chip) and Espressif's own zigbee stack."""
-    return CORE.is_esp32 and get_esp32_variant() in ZIGBEE_ESP32_VARIANTS
+    return (
+        CORE.is_esp32
+        and not CORE.using_zephyr_rtos
+        and get_esp32_variant() in ZIGBEE_ESP32_VARIANTS
+    )
 
 
 def final_validate_esp32(config: ConfigType) -> ConfigType:
-    if not CORE.is_esp32:
+    if not CORE.is_esp32 or CORE.using_zephyr_rtos:
         return config
     if CONF_WIFI in fv.full_config.get():
         if CONF_AP in fv.full_config.get()[CONF_WIFI]:
@@ -363,7 +367,7 @@ def validate_switch_esp32(config: ConfigType) -> ConfigType:
 def zigbee_require_vfs_select(config: ConfigType) -> ConfigType:
     """Register VFS select requirement during config validation."""
     # Zigbee uses esp_vfs_eventfd which requires VFS select support
-    if CORE.is_esp32:
+    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
         require_vfs_select()
     return config
 

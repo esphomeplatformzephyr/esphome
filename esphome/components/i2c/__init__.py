@@ -112,7 +112,7 @@ def validate_device(value: str) -> str:
 
 
 def _bus_declare_type(value: Any) -> ID:
-    if CORE.is_esp32:
+    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
         return cv.declare_id(IDFI2CBus)(value)
     if CORE.is_libretiny:
         return cv.declare_id(SoftwareI2CBus)(value)
@@ -158,11 +158,11 @@ def validate_config(config: ConfigType) -> ConfigType:
                     f"'{CONF_INVERTED}' is not supported on the I2C pins",
                     [key, CONF_INVERTED],
                 )
-    if CORE.is_esp32:
+    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
         return cv.require_framework_version(
             esp_idf=cv.Version(5, 4, 2), esp32_arduino=cv.Version(3, 2, 1)
         )(config)
-    if CORE.is_rp2:
+    if CORE.is_rp2 and not CORE.using_zephyr_rtos:
         sda_controller = _rp2040_i2c_controller(config[CONF_SDA])
         scl_controller = _rp2040_i2c_controller(config[CONF_SCL])
         if sda_controller != scl_controller:
@@ -276,7 +276,7 @@ def _final_validate(config: ConfigType) -> None:
     full_config = fv.full_config.get()[DOMAIN]
     if CORE.using_zephyr and len(full_config) > 1:
         raise cv.Invalid("Second i2c is not implemented on Zephyr yet")
-    if CORE.is_rp2:
+    if CORE.is_rp2 and not CORE.using_zephyr_rtos:
         if len(full_config) > 2:
             raise cv.Invalid(
                 "The maximum number of I2C interfaces for RP2040/RP2350 is 2"
@@ -293,7 +293,11 @@ def _final_validate(config: ConfigType) -> None:
                     "even pin pairs (0-1, 4-5, 8-9, ...) use I2C0, "
                     "odd pin pairs (2-3, 6-7, 10-11, ...) use I2C1."
                 )
-    if CORE.is_esp32 and get_esp32_variant() in ESP32_I2C_CAPABILITIES:
+    if (
+        CORE.is_esp32
+        and not CORE.using_zephyr_rtos
+        and get_esp32_variant() in ESP32_I2C_CAPABILITIES
+    ):
         variant = get_esp32_variant()
         max_num = ESP32_I2C_CAPABILITIES[variant]["NUM"]
         if len(full_config) > max_num:
@@ -327,7 +331,7 @@ FINAL_VALIDATE_SCHEMA = _final_validate
 async def to_code(config: ConfigType) -> None:
     cg.add_global(i2c_ns.using)
     cg.add_define("USE_I2C")
-    if CORE.is_esp32:
+    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
         from esphome.components.esp32 import include_builtin_idf_component
 
         # Re-enable the I2C driver (excluded by default to save compile time)

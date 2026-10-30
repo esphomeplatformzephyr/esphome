@@ -249,7 +249,7 @@ async def to_code(config: ConfigType) -> None:
         from .zigbee_zephyr import zephyr_to_code
 
         var = await zephyr_to_code(config)
-    if CORE.is_esp32:
+    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
         from .zigbee_esp32 import esp32_to_code
 
         var = await esp32_to_code(config)
@@ -344,7 +344,7 @@ def consume_endpoint(config: ConfigType) -> ConfigType:
 def validate_binary_sensor(config: ConfigType) -> ConfigType:
     if DOMAIN not in CORE.loaded_integrations or config.get(CONF_INTERNAL):
         return config
-    if CORE.is_esp32:
+    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
         return validate_binary_sensor_esp32(config)
     if zigbee_zephyr_supported():
         config = default_zigbee_ids(
@@ -356,7 +356,7 @@ def validate_binary_sensor(config: ConfigType) -> ConfigType:
 def validate_sensor(config: ConfigType) -> ConfigType:
     if DOMAIN not in CORE.loaded_integrations or config.get(CONF_INTERNAL):
         return config
-    if CORE.is_esp32:
+    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
         return validate_sensor_esp32(config)
     if zigbee_zephyr_supported():
         config = default_zigbee_ids(
@@ -368,7 +368,7 @@ def validate_sensor(config: ConfigType) -> ConfigType:
 def validate_switch(config: ConfigType) -> ConfigType:
     if DOMAIN not in CORE.loaded_integrations or config.get(CONF_INTERNAL):
         return config
-    if CORE.is_esp32:
+    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
         return validate_switch_esp32(config)
     if zigbee_zephyr_supported():
         config = default_zigbee_ids(
@@ -380,7 +380,7 @@ def validate_switch(config: ConfigType) -> ConfigType:
 def validate_number(config: ConfigType) -> ConfigType:
     if DOMAIN not in CORE.loaded_integrations or config.get(CONF_INTERNAL):
         return config
-    if CORE.is_esp32:
+    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
         return validate_number_esp32(config)
     if zigbee_zephyr_supported():
         config = default_zigbee_ids(

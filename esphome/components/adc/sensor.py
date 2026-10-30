@@ -122,7 +122,7 @@ def validate_config(config: ConfigType) -> ConfigType:
 
 def _require_adc_iram(config: ConfigType) -> ConfigType:
     """Register ADC oneshot IRAM requirement during config validation."""
-    if CORE.is_esp32:
+    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
         require_adc_oneshot_iram()
     return config
 
@@ -339,7 +339,7 @@ async def to_code(config: ConfigType) -> None:
     if (sampling_mode := config[CONF_SAMPLING_MODE]) != DEFAULT_SAMPLING_MODE:
         cg.add(var.set_sampling_mode(sampling_mode))
 
-    if CORE.is_esp32:
+    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
         # Re-enable ESP-IDF's ADC driver (excluded by default to save compile time)
         include_builtin_idf_component("esp_adc")
 

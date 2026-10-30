@@ -62,3 +62,31 @@ def test_variant_from_another_family_is_rejected(
 
     assert read_config({}) is None
     assert "Unknown value 'NRF52'" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("snippet", "message"),
+    [
+        (
+            "esp32_touch:\n",
+            "Component esp32_touch is not available on esp32 with framework: type: zephyr",
+        ),
+        (
+            "output:\n  - platform: ledc\n    pin: 2\n    id: o1\n",
+            "Component output.ledc is not available on esp32 with framework: type: zephyr",
+        ),
+        (
+            "deep_sleep:\n  esp32_ext1_wakeup:\n    pins: [2]\n    mode: ALL_LOW\n",
+            "This feature is not available on esp32 with framework: type: zephyr",
+        ),
+    ],
+)
+def test_esp32_only_features_are_rejected_on_zephyr(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], snippet: str, message: str
+) -> None:
+    config = tmp_path / "esp32_only.yaml"
+    config.write_text((CONFIG_DIR / "esp32.yaml").read_text() + snippet)
+    CORE.config_path = config
+
+    assert read_config({}) is None
+    assert message in capsys.readouterr().out

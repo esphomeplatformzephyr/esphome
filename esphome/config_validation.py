@@ -892,6 +892,16 @@ def only_on(platforms):
     def validator_(obj):
         if CORE.target_platform not in platforms:
             raise Invalid(f"This feature is only available on {platforms}")
+        # esp32 and rp2 entries mean ESP-IDF or Arduino; Zephyr support is
+        # declared with only_on_or_zephyr_rtos.
+        if CORE.using_zephyr_rtos and CORE.target_platform in (
+            PLATFORM_ESP32,
+            PLATFORM_RP2,
+        ):
+            raise Invalid(
+                f"This feature is not available on {CORE.target_platform} "
+                "with framework: type: zephyr"
+            )
         return obj
 
     return validator_

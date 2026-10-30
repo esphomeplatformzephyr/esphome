@@ -135,7 +135,7 @@ def validate_pin_number_esp32(value: ConfigType) -> ConfigType:
 
 
 def validate_pin_number(value: ConfigType) -> ConfigType:
-    if not CORE.is_esp32:
+    if not CORE.is_esp32 or CORE.using_zephyr_rtos:
         return value
     return validate_pin_number_esp32(value)
 

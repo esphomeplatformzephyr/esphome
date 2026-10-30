@@ -31,7 +31,7 @@ def AUTO_LOAD() -> list[str]:
     components = ["safe_mode"]
     if not CORE.is_nrf52:
         components.append("md5")
-    if CORE.is_esp32:
+    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
         components.extend(["watchdog"])
     return components
 

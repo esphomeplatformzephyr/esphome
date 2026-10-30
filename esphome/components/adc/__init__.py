@@ -254,7 +254,7 @@ ESP32_VARIANT_ADC2_PIN_TO_CHANNEL = {
 
 def validate_adc_pin(value: Any) -> ConfigType | str:
     if str(value).upper() == "VCC":
-        if CORE.is_rp2:
+        if CORE.is_rp2 and not CORE.using_zephyr_rtos:
             return pins.internal_gpio_input_pin_schema(29)
         return cv.only_on([PLATFORM_ESP8266])("VCC")
 
@@ -262,7 +262,7 @@ def validate_adc_pin(value: Any) -> ConfigType | str:
     if str(value).upper() == "TEMPERATURE":
         return cv.only_on_rp2("TEMPERATURE")
 
-    if CORE.is_esp32:
+    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
         conf = pins.internal_gpio_input_pin_schema(value)
         value = conf[CONF_NUMBER]
         variant = get_esp32_variant()
@@ -289,7 +289,7 @@ def validate_adc_pin(value: Any) -> ConfigType | str:
             raise cv.Invalid("ESP8266: Only pin A0 (GPIO17) supports ADC")
         return conf
 
-    if CORE.is_rp2:
+    if CORE.is_rp2 and not CORE.using_zephyr_rtos:
         conf = pins.internal_gpio_input_pin_schema(value)
         number = conf[CONF_NUMBER]
         if number not in (26, 27, 28, 29):

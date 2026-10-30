@@ -71,8 +71,8 @@ def _uses_zephyr(config: ConfigType) -> bool:
     return isinstance(framework, dict) and framework.get(CONF_TYPE) == FRAMEWORK_ZEPHYR
 
 
-def AUTO_LOAD(config: ConfigType) -> list[str]:
-    return ["zephyr_rtos"] if _uses_zephyr(config) else ["preferences"]
+def AUTO_LOAD() -> list[str]:
+    return ["zephyr_rtos"] if CORE.using_zephyr_rtos else ["preferences"]
 
 
 # Legacy top-level YAML keys that route here. The framework
