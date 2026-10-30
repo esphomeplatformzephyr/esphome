@@ -2,6 +2,7 @@
 
 from collections.abc import Callable
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 
@@ -9,6 +10,7 @@ from esphome.components import logger
 from esphome.components.zephyr import zephyr_data
 from esphome.components.zephyr.const import KEY_PRJ_CONF
 from esphome.config import read_config
+import esphome.config_validation as cv
 from esphome.const import (
     KEY_CORE,
     KEY_TARGET_FRAMEWORK,
@@ -90,3 +92,22 @@ def test_esp32_only_features_are_rejected_on_zephyr(
 
     assert read_config({}) is None
     assert message in capsys.readouterr().out
+
+
+@pytest.mark.parametrize(
+    ("platform", "variant", "expected"),
+    [
+        (PLATFORM_ESP32, "ESP32C3", ["esp32_c3_zephyr", "esp32_zephyr"]),
+        (PLATFORM_ESP32, "ESP32", ["esp32_zephyr"]),
+        (PLATFORM_RP2, "RP2040", ["rp2_2040_zephyr", "rp2_zephyr"]),
+        (PLATFORM_NRF, "NRF54L15", ["nrf_54l15", "nrf"]),
+        (PLATFORM_NXP, "MCXN236", ["nxp_mcxn236", "nxp"]),
+        (PLATFORM_STM32, "STM32L4", ["stm32_l4", "stm32"]),
+    ],
+)
+def test_split_default_keys(platform: str, variant: str, expected: list[str]) -> None:
+    with (
+        patch("esphome.components.zephyr.zephyr_rtos_platform", return_value=platform),
+        patch("esphome.components.zephyr.zephyr_variant", return_value=variant),
+    ):
+        assert cv._zephyr_rtos_default_keys() == expected

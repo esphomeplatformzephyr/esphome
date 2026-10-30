@@ -2326,6 +2326,28 @@ def _get_default_key(*args):
     return ["_".join([CORE.target_platform] + list(args))]
 
 
+def _zephyr_rtos_default_keys() -> list[str]:
+    """``<platform>_<variant>`` then ``<platform>``, the variant without its platform
+    prefix (``stm32_l4``, ``nrf_52``). esp32 and rp2 add ``_zephyr`` (``esp32_c3_zephyr``,
+    ``rp2_zephyr``): their plain keys hold ESP-IDF and Arduino values.
+    """
+    from esphome.components.zephyr import zephyr_rtos_platform, zephyr_variant
+
+    platform = zephyr_rtos_platform()
+    variant = (zephyr_variant() or "").lower()
+    suffix = ""
+    if platform == PLATFORM_ESP32:
+        variant = variant.removeprefix("esp32")
+        suffix = "_zephyr"
+    elif platform == PLATFORM_RP2:
+        variant = variant.removeprefix("rp")
+        suffix = "_zephyr"
+    else:
+        variant = variant.removeprefix(platform)
+    keys = [f"{platform}_{variant}{suffix}"] if variant else []
+    return keys + [f"{platform}{suffix}"]
+
+
 class SplitDefault(Optional):
     """Mark this key to have a split default per target platform / variant / framework.
 
@@ -2344,6 +2366,8 @@ class SplitDefault(Optional):
     variant strips just ``RP`` (``RP2040`` → ``2040``, ``RP2350`` → ``2350``)
     so kwargs read naturally — `rp2_2040=...` is the override for the
     Pico / Pico W and `rp2_2350=...` is the override for the Pico 2.
+
+    framework: type: zephyr builds use the keys from ``_zephyr_rtos_default_keys``.
     """
 
     def __init__(self, key, **kwargs):
@@ -2358,15 +2382,7 @@ class SplitDefault(Optional):
     def default(self):
         keys = []
         if CORE.using_zephyr_rtos:
-            from esphome.components.zephyr import zephyr_variant
-
-            if zephyr_var := zephyr_variant():
-                keys += [f"zephyr_{zephyr_var.lower()}"]
-            # One zephyr= default covers every Zephyr RTOS platform; the esp32 and rp2
-            # keys hold ESP-IDF and Arduino values, so those platforms skip their own.
-            if not (CORE.is_esp32 or CORE.is_rp2):
-                keys += _get_default_key()
-            keys += ["zephyr"]
+            keys += _zephyr_rtos_default_keys()
         elif CORE.is_esp32:
             from esphome.components.esp32 import VARIANT_ESP32, get_esp32_variant
 

@@ -150,12 +150,7 @@ CONFIG_SCHEMA = cv.All(
             cv.SplitDefault(
                 CONF_ATTENUATION,
                 esp32=DEFAULT_ATTENUATION,
-                zephyr_esp32=DEFAULT_ATTENUATION,
-                zephyr_esp32h2=DEFAULT_ATTENUATION,
-                zephyr_esp32c6=DEFAULT_ATTENUATION,
-                zephyr_esp32c5=DEFAULT_ATTENUATION,
-                zephyr_esp32c3=DEFAULT_ATTENUATION,
-                zephyr_esp32s3=DEFAULT_ATTENUATION,
+                esp32_zephyr=DEFAULT_ATTENUATION,
             ): _attenuation,
             cv.OnlyWith(CONF_NRF_SAADC, PLATFORM_NRF52): cv.declare_id(adc_dt_spec),
             cv.Optional(CONF_SAMPLES, default=DEFAULT_SAMPLES): cv.int_range(

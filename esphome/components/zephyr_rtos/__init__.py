@@ -44,6 +44,14 @@ from esphome.const import (
     KEY_FRAMEWORK_VERSION,
     KEY_TARGET_FRAMEWORK,
     KEY_TARGET_PLATFORM,
+    PLATFORM_ESP32,
+    PLATFORM_NRF,
+    PLATFORM_NXP,
+    PLATFORM_RENESAS,
+    PLATFORM_RP2,
+    PLATFORM_SILABS,
+    PLATFORM_STM32,
+    PLATFORM_ZEPHYR,
     TYPE_GIT,
     TYPE_LOCAL,
 )
@@ -223,6 +231,26 @@ def zephyr_framework_type() -> str | None:
 def zephyr_variant_family() -> str | None:
     """Return the active variant's silicon family (e.g. "esp32"), or None if unset/unfamilied."""
     return zephyr_rtos_data().get("family")
+
+
+# Temporary: the zephyr: key has no platform of its own, so its variant family picks one.
+_ZEPHYR_KEY_FAMILY_PLATFORMS = {
+    "esp32": PLATFORM_ESP32,
+    "nordic": PLATFORM_NRF,
+    "nxp": PLATFORM_NXP,
+    "renesas": PLATFORM_RENESAS,
+    "rpi_pico": PLATFORM_RP2,
+    "silabs": PLATFORM_SILABS,
+    "silabs_siwx91x": PLATFORM_SILABS,
+    "stm32": PLATFORM_STM32,
+}
+
+
+def zephyr_rtos_platform() -> str:
+    """The platform the build's per-platform defaults are looked up under."""
+    if CORE.target_platform == PLATFORM_ZEPHYR:
+        return _ZEPHYR_KEY_FAMILY_PLATFORMS[zephyr_variant_family()]
+    return CORE.target_platform
 
 
 def zephyr_only_on_variant(*variant_names: str):

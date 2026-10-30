@@ -354,7 +354,10 @@ CONFIG_SCHEMA = cv.All(
         {
             cv.GenerateID(): cv.declare_id(ESPHomeOTAComponent),
             cv.Optional(CONF_VERSION, default=2): cv.one_of(1, 2, int=True),
-            cv.SplitDefault(CONF_PORT, **DEFAULT_OTA_PORTS): cv.port,
+            # framework: type: zephyr uses the Zephyr port on esp32 and rp2 too
+            cv.SplitDefault(
+                CONF_PORT, **DEFAULT_OTA_PORTS, esp32_zephyr=4232, rp2_zephyr=4232
+            ): cv.port,
             cv.Optional(CONF_ALLOW_PARTITION_ACCESS, default=False): cv.boolean,
             **SWAP_METHOD_SCHEMA,
             cv.Optional(CONF_PASSWORD): cv.sensitive(),

@@ -466,8 +466,14 @@ CONFIG_SCHEMA = cv.All(
                 host=4,  # Abundant resources
                 ln882x=4,  # Moderate RAM
                 nrf52=4,  # ~256KB RAM, BSD sockets
-                zephyr=4,  # Zephyr platform variants
-                zephyr_rp2040=1,  # Limited RAM (264KB)
+                esp32_zephyr=4,
+                nrf=4,
+                nxp=4,
+                renesas=4,
+                rp2_2040_zephyr=1,
+                rp2_zephyr=4,
+                silabs=4,
+                stm32=4,
             ): cv.int_range(min=1, max=10),
             cv.SplitDefault(
                 CONF_MAX_CONNECTIONS,
@@ -479,7 +485,13 @@ CONFIG_SCHEMA = cv.All(
                 host=8,  # Abundant resources
                 ln882x=5,  # Moderate RAM
                 nrf52=4,  # ~256KB RAM, BSD sockets, Thread (single HA controller)
-                zephyr=4,  # default for platform: zephyr
+                esp32_zephyr=4,
+                nrf=4,
+                nxp=4,
+                renesas=4,
+                rp2_zephyr=4,
+                silabs=4,
+                stm32=4,
             ): cv.int_range(min=1, max=20),
             # Max queued messages per connection, and 2 KB of backlog per slot up
             # to 64 KB (a lone message is exempt), before the connection is dropped
@@ -494,11 +506,17 @@ CONFIG_SCHEMA = cv.All(
                 rtl87xx=8,  # Moderate RAM
                 host=16,  # Abundant resources
                 ln882x=8,  # Moderate RAM
-                zephyr=8,  # default for platform: zephyr
-                zephyr_stm32l4=4,  # 128KB RAM, fail fast like esp8266 rather than buffer
-                zephyr_stm32f4=4,  # 96KB RAM (nucleo_f401re), same tier as stm32l4
-                zephyr_ra4m1=4,  # 32KB RAM
-                zephyr_stm32f1=2,  # 20KB RAM
+                esp32_zephyr=8,
+                nrf=8,
+                nxp=8,
+                renesas=8,
+                rp2_zephyr=8,
+                silabs=8,
+                stm32=8,
+                renesas_ra4m1=4,  # 32KB RAM
+                stm32_f1=2,  # 20KB RAM
+                stm32_f4=4,  # 96KB RAM (nucleo_f401re), same tier as stm32_l4
+                stm32_l4=4,  # 128KB RAM, fail fast like esp8266 rather than buffer
             ): cv.int_range(min=1, max=64),
         }
     ).extend(cv.COMPONENT_SCHEMA),

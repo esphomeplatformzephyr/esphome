@@ -53,10 +53,16 @@ CONF_SWAP_METHOD = "swap_method"
 SWAP_METHOD_SCHEMA = {
     cv.SplitDefault(
         CONF_SWAP_METHOD,
-        zephyr="offset",
-        zephyr_nrf52="move",
-        zephyr_nrf54l15="move",
-        zephyr_nrf54lm20a="move",
+        esp32_zephyr="offset",
+        nrf="offset",
+        nrf_52="move",
+        nrf_54l15="move",
+        nrf_54lm20a="move",
+        nxp="offset",
+        renesas="offset",
+        rp2_zephyr="offset",
+        silabs="offset",
+        stm32="offset",
     ): cv.one_of("scratch", "move", "offset", lower=True),
 }
 

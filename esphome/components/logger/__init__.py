@@ -423,7 +423,13 @@ CONFIG_SCHEMA = cv.All(
                 ln882x=768,
                 rtl87xx=768,
                 nrf52=768,
-                zephyr=768,
+                esp32_zephyr=768,
+                nrf=768,
+                nxp=768,
+                renesas=768,
+                rp2_zephyr=768,
+                silabs=768,
+                stm32=768,
             ): cv.All(
                 cv.only_on_or_zephyr_rtos(
                     [
@@ -465,14 +471,18 @@ CONFIG_SCHEMA = cv.All(
                 ln882x=DEFAULT,
                 rtl87xx=DEFAULT,
                 nrf52=USB_CDC,
-                zephyr=UART0,
-                zephyr_esp32h2=USB_SERIAL_JTAG,
-                zephyr_esp32c6=USB_SERIAL_JTAG,
-                zephyr_esp32c5=USB_SERIAL_JTAG,
-                zephyr_esp32c3=USB_SERIAL_JTAG,
-                zephyr_nrf52=USB_CDC,
-                zephyr_rp2040=USB_CDC,
-                zephyr_rp2350=USB_CDC,
+                esp32_c3_zephyr=USB_SERIAL_JTAG,
+                esp32_c5_zephyr=USB_SERIAL_JTAG,
+                esp32_c6_zephyr=USB_SERIAL_JTAG,
+                esp32_h2_zephyr=USB_SERIAL_JTAG,
+                esp32_zephyr=UART0,
+                nrf=UART0,
+                nrf_52=USB_CDC,
+                nxp=UART0,
+                renesas=UART0,
+                rp2_zephyr=USB_CDC,
+                silabs=UART0,
+                stm32=UART0,
             ): cv.All(
                 cv.only_on_or_zephyr_rtos(
                     [
@@ -504,13 +514,31 @@ CONFIG_SCHEMA = cv.All(
             cv.SplitDefault(
                 CONF_ESP8266_STORE_LOG_STRINGS_IN_FLASH, esp8266=True
             ): cv.All(cv.only_on_esp8266, cv.boolean),
-            cv.SplitDefault(CONF_WAIT_FOR_CDC, nrf52=False, zephyr=False): cv.All(
+            cv.SplitDefault(
+                CONF_WAIT_FOR_CDC,
+                nrf52=False,
+                esp32_zephyr=False,
+                nrf=False,
+                nxp=False,
+                renesas=False,
+                rp2_zephyr=False,
+                silabs=False,
+                stm32=False,
+            ): cv.All(
                 _only_with_usb_cdc_uart,
                 cv.boolean,
             ),
-            cv.SplitDefault(CONF_EARLY_MESSAGE, nrf52=False, zephyr=False): cv.All(
-                _only_with_zephyr, cv.boolean
-            ),
+            cv.SplitDefault(
+                CONF_EARLY_MESSAGE,
+                nrf52=False,
+                esp32_zephyr=False,
+                nrf=False,
+                nxp=False,
+                renesas=False,
+                rp2_zephyr=False,
+                silabs=False,
+                stm32=False,
+            ): cv.All(_only_with_zephyr, cv.boolean),
         }
     ).extend(cv.COMPONENT_SCHEMA),
     validate_local_no_higher_than_global,

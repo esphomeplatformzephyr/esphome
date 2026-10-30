@@ -62,6 +62,7 @@ from .rtos import (  # noqa: F401
     zephyr_framework_type,
     zephyr_raise_prj_conf_min,
     zephyr_require_partition,
+    zephyr_rtos_platform,
     zephyr_setup_i2c_pinctrl,
     zephyr_setup_spi_pinctrl,
     zephyr_setup_uart_pinctrl,
