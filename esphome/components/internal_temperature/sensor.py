@@ -1,14 +1,16 @@
 import esphome.codegen as cg
 from esphome.components import sensor
-from esphome.components.esp32 import get_esp32_variant, include_builtin_idf_component
-from esphome.components.esp32.const import VARIANT_ESP32
+from esphome.components.esp32 import (
+    VARIANT_ESP32,
+    get_esp32_variant,
+    include_builtin_idf_component,
+)
 from esphome.components.zephyr import (
     zephyr_add_overlay,
     zephyr_add_prj_conf,
     zephyr_variant,
     zephyr_variant_family,
 )
-from esphome.components.zephyr.const import ZEPHYR_VARIANT_ESP32
 from esphome.config_helpers import filter_source_files_from_platform
 import esphome.config_validation as cv
 from esphome.const import (
@@ -69,7 +71,7 @@ async def to_code(config: ConfigType) -> None:
     elif (
         CORE.using_zephyr
         and zephyr_variant_family() == "esp32"
-        and zephyr_variant() != ZEPHYR_VARIANT_ESP32
+        and zephyr_variant() != VARIANT_ESP32
     ):
         # "coretemp" is the DTS node label for every esp32-family chip's die temperature
         # sensor. Original ESP32 has no such node, so it falls through below instead.

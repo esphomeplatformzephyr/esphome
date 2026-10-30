@@ -1,6 +1,7 @@
 import logging
 
 import esphome.codegen as cg
+from esphome.components.nrf.const import VARIANT_NRF5340
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ADVANCED,
@@ -14,13 +15,7 @@ from esphome.const import (
 from esphome.core import CORE
 from esphome.types import ConfigType
 
-from ..const import (
-    ADVANCED_SCHEMA,
-    BOOTLOADER_MCUBOOT,
-    CONF_BOOTLOADER,
-    CONF_RUNNER,
-    ZEPHYR_VARIANT_NRF5340,
-)
+from ..const import ADVANCED_SCHEMA, BOOTLOADER_MCUBOOT, CONF_BOOTLOADER, CONF_RUNNER
 from ..partitions import BootLayout
 from . import (
     MAINLINE,
@@ -61,7 +56,7 @@ _ADC_AIN_MAP = {
 # gpio0 (0-31) + gpio1 (32-47), any pin for any UART/SPI signal (NRF_PSEL).
 _GPIO_MATRIX_PINS = frozenset(range(48))
 
-VARIANT_NAME = ZEPHYR_VARIANT_NRF5340
+VARIANT_NAME = VARIANT_NRF5340
 VARIANT = ZephyrVariant(
     boot=BootLayout(0x0),
     sdk=NCS,

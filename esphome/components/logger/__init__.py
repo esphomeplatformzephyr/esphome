@@ -232,19 +232,19 @@ def uart_selection(value: Any) -> str:
     if CORE.is_nrf52:
         return cv.one_of(*UART_SELECTION_NRF52, upper=True)(value)
     if CORE.using_zephyr_rtos:
+        from esphome.components.esp32.const import (
+            VARIANT_ESP32C3,
+            VARIANT_ESP32C5,
+            VARIANT_ESP32C6,
+            VARIANT_ESP32H2,
+            VARIANT_ESP32S3,
+        )
         from esphome.components.zephyr import (
             RTT_PORTS,
             validate_rtt_port,
             validate_uart_label_override,
             zephyr_variant,
             zephyr_variant_family,
-        )
-        from esphome.components.zephyr.const import (
-            ZEPHYR_VARIANT_ESP32_C3,
-            ZEPHYR_VARIANT_ESP32_C5,
-            ZEPHYR_VARIANT_ESP32_C6,
-            ZEPHYR_VARIANT_ESP32_H2,
-            ZEPHYR_VARIANT_ESP32_S3,
         )
 
         if (
@@ -260,11 +260,11 @@ def uart_selection(value: Any) -> str:
         if isinstance(value, str) and value.upper() in CONSOLE_BACKENDS:
             return _console_backend(value.upper())
         if zephyr_variant() in (
-            ZEPHYR_VARIANT_ESP32_H2,
-            ZEPHYR_VARIANT_ESP32_C6,
-            ZEPHYR_VARIANT_ESP32_C5,
-            ZEPHYR_VARIANT_ESP32_C3,
-            ZEPHYR_VARIANT_ESP32_S3,
+            VARIANT_ESP32H2,
+            VARIANT_ESP32C6,
+            VARIANT_ESP32C5,
+            VARIANT_ESP32C3,
+            VARIANT_ESP32S3,
         ):
             return cv.one_of(*UART_SELECTION_ZEPHYR_ESP32_JTAG, upper=True)(value)
         family = zephyr_variant_family()

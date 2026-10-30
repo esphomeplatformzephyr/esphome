@@ -1,4 +1,5 @@
 import esphome.codegen as cg
+from esphome.components.nrf.const import VARIANT_NRF54L15
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ADVANCED,
@@ -20,7 +21,6 @@ from ..const import (
     CONF_RUNNER,
     KEY_BOOTLOADER,
     KEY_MODULE_REQUESTS,
-    ZEPHYR_VARIANT_NRF54L15,
 )
 from ..partitions import BootLayout
 from . import (
@@ -76,7 +76,7 @@ _GPIO_MATRIX_PINS = (
 )
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = ZEPHYR_VARIANT_NRF54L15
+VARIANT_NAME = VARIANT_NRF54L15
 VARIANT = ZephyrVariant(
     # Resets from the start of RRAM (nordic/nrf54l15_cpuapp_partition.dtsi).
     boot=BootLayout(0x0),

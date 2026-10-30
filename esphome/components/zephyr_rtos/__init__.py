@@ -94,10 +94,6 @@ from .const import (
     KEY_USER,
     KEY_ZEPHYR,
     KEY_ZEPHYR_RTOS,
-    ZEPHYR_VARIANT_ESP32,
-    ZEPHYR_VARIANT_ESP32_S3,
-    ZEPHYR_VARIANT_NRF52,
-    ZEPHYR_VARIANT_STM32C5,
 )
 from .gpio import zephyr_pin_to_code as _zephyr_pin_to_code  # noqa: F401
 from .partitions import (  # noqa: F401
@@ -544,7 +540,10 @@ def _watchdog_to_code(config: ConfigType) -> None:
         zephyr_add_prj_conf("THREAD_NAME", True)
         # arch_stack_walk() isn't implemented for Xtensa (ESP32, S3); the call
         # would silently do nothing there.
-        if zephyr_variant() not in (ZEPHYR_VARIANT_ESP32, ZEPHYR_VARIANT_ESP32_S3):
+        # Platform components import this package, so their constants load late.
+        from esphome.components.esp32.const import VARIANT_ESP32, VARIANT_ESP32S3
+
+        if zephyr_variant() not in (VARIANT_ESP32, VARIANT_ESP32S3):
             cg.add_define("USE_ZEPHYR_ARCH_STACKWALK")
 
 
@@ -1457,6 +1456,8 @@ def reset_over_usb(config: ConfigType, port: str, timeout: float = 10.0) -> bool
 
     import serial  # noqa: PLC0415
 
+    from esphome.components.nrf.const import VARIANT_NRF52  # noqa: PLC0415
+    from esphome.components.stm32.const import VARIANT_STM32C5  # noqa: PLC0415
     from esphome.util import get_serial_ports  # noqa: PLC0415
 
     from .variants.nrf52 import CONF_DFU  # noqa: PLC0415
@@ -1474,13 +1475,13 @@ def reset_over_usb(config: ConfigType, port: str, timeout: float = 10.0) -> bool
     has_handler = (
         zephyr_variant_family() == "rpi_pico"
         or (
-            zephyr_variant() == ZEPHYR_VARIANT_NRF52
+            zephyr_variant() == VARIANT_NRF52
             and config[CORE.target_platform][CONF_FRAMEWORK]
             .get(CONF_ADVANCED, {})
             .get(CONF_DFU)
             is not None
         )
-        or (zephyr_variant() == ZEPHYR_VARIANT_STM32C5 and stm32c5.uses_tinyuf2())
+        or (zephyr_variant() == VARIANT_STM32C5 and stm32c5.uses_tinyuf2())
     )
     if not has_handler:
         return False
@@ -1511,6 +1512,8 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
             )
         _restore_upload_data(zephyr_config)
 
+    from esphome.components.nrf.const import VARIANT_NRF52
+    from esphome.components.stm32.const import VARIANT_STM32C5
     from esphome.upload_targets import PortType, get_port_type
 
     if host == "PYOCD" or get_port_type(host) in (PortType.SERIAL, PortType.BOOTSEL):
@@ -1561,14 +1564,14 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
         return True
 
     # XIAO STM32C5's TinyUF2 bootloader: 1200-baud touch, then write zephyr.uf2 to its disk.
-    if zephyr_variant() == ZEPHYR_VARIANT_STM32C5:
+    if zephyr_variant() == VARIANT_STM32C5:
         from .variants import stm32c5
 
         if stm32c5.uses_tinyuf2() and get_port_type(host) == PortType.SERIAL:
             return stm32c5.upload_program(host)
 
     # nRF52 with an Adafruit bootloader: BLE DFU, or 1200-baud touch then serial DFU.
-    if zephyr_variant() == ZEPHYR_VARIANT_NRF52:
+    if zephyr_variant() == VARIANT_NRF52:
         from .variants import nrf52
 
         if nrf52.upload_adafruit_ble(config, host):
@@ -1640,6 +1643,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
 
 
 def run_compile(args, config: ConfigType) -> bool:
+    from esphome.components.nrf.const import VARIANT_NRF52
     from esphome.components.zephyr.library import generate_zephyr_modules
 
     variant = zephyr_rtos_data()["variant"]
@@ -1729,7 +1733,7 @@ def run_compile(args, config: ConfigType) -> bool:
         snippet_root=zephyr_rtos_data().get(KEY_SNIPPET_ROOT),
         requested_runner=zephyr_rtos_data().get(KEY_RUNNER),
     )
-    if zephyr_variant() == ZEPHYR_VARIANT_NRF52:
+    if zephyr_variant() == VARIANT_NRF52:
         from .variants import nrf52
 
         if nrf52.uses_serial_dfu():

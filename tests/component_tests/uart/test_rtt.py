@@ -6,8 +6,8 @@ from pathlib import Path
 import pytest
 
 from esphome.components import uart
+from esphome.components.nrf.const import VARIANT_NRF52
 from esphome.components.zephyr.const import KEY_ZEPHYR_RTOS
-from esphome.components.zephyr_rtos.const import ZEPHYR_VARIANT_NRF52
 from esphome.config_validation import Invalid
 from esphome.const import (
     CONF_BAUD_RATE,
@@ -29,12 +29,12 @@ def _zephyr(set_core_config: SetCoreConfigCallable, variant: str) -> None:
 
 @pytest.mark.parametrize("port", ["rtt0", "RTT1", "Rtt2"])
 def test_rtt_port_accepted(set_core_config: SetCoreConfigCallable, port: str) -> None:
-    _zephyr(set_core_config, ZEPHYR_VARIANT_NRF52)
+    _zephyr(set_core_config, VARIANT_NRF52)
     assert uart.validate_port(port) == port.upper()
 
 
 def test_rtt3_port_rejected(set_core_config: SetCoreConfigCallable) -> None:
-    _zephyr(set_core_config, ZEPHYR_VARIANT_NRF52)
+    _zephyr(set_core_config, VARIANT_NRF52)
     with pytest.raises(Invalid, match="not a valid UART port"):
         uart.validate_port("RTT3")
 
@@ -62,7 +62,7 @@ def test_every_rtt_family_declares_it(family: str) -> None:
 
 
 def test_rtt_port_rejects_pins(set_core_config: SetCoreConfigCallable) -> None:
-    _zephyr(set_core_config, ZEPHYR_VARIANT_NRF52)
+    _zephyr(set_core_config, VARIANT_NRF52)
     config = {CONF_PORT: "RTT1", CONF_BAUD_RATE: 115200, CONF_TX_PIN: {CONF_NUMBER: 6}}
     with pytest.raises(Invalid, match="debug probe"):
         uart.validate_zephyr_config(config)

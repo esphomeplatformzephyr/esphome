@@ -3,20 +3,20 @@ pinctrl overlay generation in zephyr/__init__.py."""
 
 from collections.abc import Callable
 
+from esphome.components.esp32.const import (
+    VARIANT_ESP32,
+    VARIANT_ESP32C3,
+    VARIANT_ESP32C5,
+    VARIANT_ESP32C6,
+    VARIANT_ESP32H2,
+    VARIANT_ESP32S3,
+)
 from esphome.types import ConfigType
 
-from ..const import (
-    BOOTLOADER_MCUBOOT,
-    ZEPHYR_VARIANT_ESP32,
-    ZEPHYR_VARIANT_ESP32_C3,
-    ZEPHYR_VARIANT_ESP32_C5,
-    ZEPHYR_VARIANT_ESP32_C6,
-    ZEPHYR_VARIANT_ESP32_H2,
-    ZEPHYR_VARIANT_ESP32_S3,
-)
+from ..const import BOOTLOADER_MCUBOOT
 
 # Xtensa: hardware FPU, but no arch_stack_walk(). The others are RISC-V.
-_XTENSA_VARIANTS = (ZEPHYR_VARIANT_ESP32, ZEPHYR_VARIANT_ESP32_S3)
+_XTENSA_VARIANTS = (VARIANT_ESP32, VARIANT_ESP32S3)
 
 # Devicetree property esp32-family pinctrl groups pack all their signal macros into.
 PROPERTY_NAME = "pinmux"
@@ -77,12 +77,12 @@ _ESP32_PINMUX_NOSIG = 0x1FF  # ESP_SIG_INVAL in esp-pinctrl-common.h
 # esp32-family I2C instance -> {"scl": id, "sda": id} GPIO-matrix signal IDs. I2C
 # is bidirectional, so sig_i and sig_o are always equal -- either field identifies it.
 _I2C_INSTANCE_SIGNAL_IDS = {
-    ZEPHYR_VARIANT_ESP32: {0: {"scl": 29, "sda": 30}, 1: {"scl": 95, "sda": 96}},
-    ZEPHYR_VARIANT_ESP32_C3: {0: {"scl": 53, "sda": 54}},
-    ZEPHYR_VARIANT_ESP32_C5: {0: {"scl": 46, "sda": 47}},
-    ZEPHYR_VARIANT_ESP32_C6: {0: {"scl": 45, "sda": 46}},
-    ZEPHYR_VARIANT_ESP32_H2: {0: {"scl": 45, "sda": 46}, 1: {"scl": 55, "sda": 56}},
-    ZEPHYR_VARIANT_ESP32_S3: {0: {"scl": 89, "sda": 90}, 1: {"scl": 91, "sda": 92}},
+    VARIANT_ESP32: {0: {"scl": 29, "sda": 30}, 1: {"scl": 95, "sda": 96}},
+    VARIANT_ESP32C3: {0: {"scl": 53, "sda": 54}},
+    VARIANT_ESP32C5: {0: {"scl": 46, "sda": 47}},
+    VARIANT_ESP32C6: {0: {"scl": 45, "sda": 46}},
+    VARIANT_ESP32H2: {0: {"scl": 45, "sda": 46}, 1: {"scl": 55, "sda": 56}},
+    VARIANT_ESP32S3: {0: {"scl": 89, "sda": 90}, 1: {"scl": 91, "sda": 92}},
 }
 
 
@@ -132,12 +132,12 @@ def i2c_value_role_decoder(bus_label: str) -> Callable[[int], str | None] | None
 # from RTS or RX from CTS (RXD_IN/TXD_OUT and CTS_IN/RTS_OUT are each a shared ID
 # used in different direction slots) -- this ID is what actually distinguishes them.
 _UART_INSTANCE_SIGNAL_BASE = {
-    ZEPHYR_VARIANT_ESP32: {0: 14, 1: 17, 2: 198},
-    ZEPHYR_VARIANT_ESP32_C3: {0: 6, 1: 9},
-    ZEPHYR_VARIANT_ESP32_C5: {0: 6, 1: 9},
-    ZEPHYR_VARIANT_ESP32_C6: {0: 6, 1: 9},
-    ZEPHYR_VARIANT_ESP32_H2: {0: 6, 1: 9},
-    ZEPHYR_VARIANT_ESP32_S3: {0: 12, 1: 15, 2: 18},
+    VARIANT_ESP32: {0: 14, 1: 17, 2: 198},
+    VARIANT_ESP32C3: {0: 6, 1: 9},
+    VARIANT_ESP32C5: {0: 6, 1: 9},
+    VARIANT_ESP32C6: {0: 6, 1: 9},
+    VARIANT_ESP32H2: {0: 6, 1: 9},
+    VARIANT_ESP32S3: {0: 12, 1: 15, 2: 18},
 }
 
 
@@ -214,12 +214,12 @@ def uart_pinctrl(
 # spi3 node exists on any of them). S3 has spi2=FSPI and spi3=SPI3_ (its signals
 # are named ESP_SPI3_CLK_OUT etc., hence the trailing underscore).
 SPI_INSTANCE_SIGNAL_PREFIX = {
-    ZEPHYR_VARIANT_ESP32: {2: "HSPI", 3: "VSPI"},
-    ZEPHYR_VARIANT_ESP32_C3: {2: "FSPI"},
-    ZEPHYR_VARIANT_ESP32_C5: {2: "FSPI"},
-    ZEPHYR_VARIANT_ESP32_C6: {2: "FSPI"},
-    ZEPHYR_VARIANT_ESP32_H2: {2: "FSPI"},
-    ZEPHYR_VARIANT_ESP32_S3: {2: "FSPI", 3: "SPI3_"},
+    VARIANT_ESP32: {2: "HSPI", 3: "VSPI"},
+    VARIANT_ESP32C3: {2: "FSPI"},
+    VARIANT_ESP32C5: {2: "FSPI"},
+    VARIANT_ESP32C6: {2: "FSPI"},
+    VARIANT_ESP32H2: {2: "FSPI"},
+    VARIANT_ESP32S3: {2: "FSPI", 3: "SPI3_"},
 }
 
 # esp32-family SPI instance -> {"clk": id, "miso": id, "mosi": id, "wp": id, "hd":
@@ -228,23 +228,15 @@ SPI_INSTANCE_SIGNAL_PREFIX = {
 # clk/mosi/wp/hd are all sig_o -- used to decode which real board pinctrl group
 # already carries each signal.
 _SPI_INSTANCE_SIGNAL_IDS = {
-    ZEPHYR_VARIANT_ESP32: {
+    VARIANT_ESP32: {
         2: {"clk": 8, "miso": 9, "mosi": 10, "hd": 12, "wp": 13},
         3: {"clk": 63, "miso": 64, "mosi": 65, "hd": 66, "wp": 67},
     },
-    ZEPHYR_VARIANT_ESP32_C3: {
-        2: {"clk": 63, "miso": 64, "mosi": 65, "hd": 66, "wp": 67}
-    },
-    ZEPHYR_VARIANT_ESP32_C5: {
-        2: {"clk": 56, "miso": 57, "mosi": 58, "hd": 59, "wp": 60}
-    },
-    ZEPHYR_VARIANT_ESP32_C6: {
-        2: {"clk": 63, "miso": 64, "mosi": 65, "hd": 66, "wp": 67}
-    },
-    ZEPHYR_VARIANT_ESP32_H2: {
-        2: {"clk": 63, "miso": 64, "mosi": 65, "hd": 66, "wp": 67}
-    },
-    ZEPHYR_VARIANT_ESP32_S3: {
+    VARIANT_ESP32C3: {2: {"clk": 63, "miso": 64, "mosi": 65, "hd": 66, "wp": 67}},
+    VARIANT_ESP32C5: {2: {"clk": 56, "miso": 57, "mosi": 58, "hd": 59, "wp": 60}},
+    VARIANT_ESP32C6: {2: {"clk": 63, "miso": 64, "mosi": 65, "hd": 66, "wp": 67}},
+    VARIANT_ESP32H2: {2: {"clk": 63, "miso": 64, "mosi": 65, "hd": 66, "wp": 67}},
+    VARIANT_ESP32S3: {
         2: {"clk": 101, "miso": 102, "mosi": 103, "hd": 104, "wp": 105},
         3: {"clk": 66, "miso": 67, "mosi": 68, "hd": 69, "wp": 70},
     },

@@ -1,6 +1,7 @@
 import logging
 
 import esphome.codegen as cg
+from esphome.components.rp2.const import VARIANT_RP2040
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ADVANCED,
@@ -19,7 +20,6 @@ from ..const import (
     CONF_BOOTLOADER,
     CONF_RUNNER,
     KEY_BOOTLOADER,
-    ZEPHYR_VARIANT_RP2040,
 )
 from ..partitions import BootLayout
 from . import (
@@ -58,7 +58,7 @@ _ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(BOOTLOADER_SCHEMA).extend(
 # and rpi-pico-rp2040-pinctrl.h's ADC_CH0_P26..ADC_CH3_P29 macros.
 _ADC_CHANNEL_MAP = {26: 0, 27: 1, 28: 2, 29: 3}
 
-VARIANT_NAME = ZEPHYR_VARIANT_RP2040
+VARIANT_NAME = VARIANT_RP2040
 VARIANT = ZephyrVariant(
     # The first 256 bytes hold boot2, built into the first image; that image starts
     # after it (rpi_pico-common.dtsi second_stage_bootloader@0, code_partition@100).

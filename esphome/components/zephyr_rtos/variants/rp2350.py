@@ -1,6 +1,7 @@
 import logging
 
 import esphome.codegen as cg
+from esphome.components.rp2.const import VARIANT_RP2350
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ADVANCED,
@@ -19,7 +20,6 @@ from ..const import (
     CONF_BOOTLOADER,
     CONF_RUNNER,
     KEY_BOOTLOADER,
-    ZEPHYR_VARIANT_RP2350,
 )
 from ..partitions import BootLayout
 from . import (
@@ -51,7 +51,7 @@ _ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(BOOTLOADER_SCHEMA).extend(
 # RP2040's header).
 _ADC_CHANNEL_MAP = {26: 0, 27: 1, 28: 2, 29: 3}
 
-VARIANT_NAME = ZEPHYR_VARIANT_RP2350
+VARIANT_NAME = VARIANT_RP2350
 VARIANT = ZephyrVariant(
     # ROM boots from the start of flash (rpi_pico2, partitions_4M_sysbuild.dtsi).
     boot=BootLayout(0x0),

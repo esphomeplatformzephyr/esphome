@@ -6,6 +6,7 @@ from esphome import pins
 import esphome.codegen as cg
 from esphome.components.esp32 import (
     KEY_ESP32,
+    VARIANT_ESP32,
     VARIANT_ESP32C2,
     VARIANT_ESP32C3,
     VARIANT_ESP32C5,
@@ -30,15 +31,7 @@ from esphome.components.zephyr import (
     zephyr_setup_spi_pinctrl,
     zephyr_variant,
 )
-from esphome.components.zephyr.const import (
-    KEY_BOARD,
-    ZEPHYR_VARIANT_ESP32,
-    ZEPHYR_VARIANT_ESP32_C3,
-    ZEPHYR_VARIANT_ESP32_C5,
-    ZEPHYR_VARIANT_ESP32_C6,
-    ZEPHYR_VARIANT_ESP32_H2,
-    ZEPHYR_VARIANT_ESP32_S3,
-)
+from esphome.components.zephyr.const import KEY_BOARD
 from esphome.config_helpers import filter_source_files_from_platform
 import esphome.config_validation as cv
 from esphome.const import (
@@ -493,12 +486,12 @@ SPI_SINGLE_SCHEMA = cv.All(
 # Zephyr variants with quad WP/HD pinctrl support (zephyr_setup_spi_pinctrl()). No
 # Zephyr variant exposes octal's D4-D7 signals, so octal stays ESP-IDF only.
 _ZEPHYR_QUAD_VARIANTS = (
-    ZEPHYR_VARIANT_ESP32,
-    ZEPHYR_VARIANT_ESP32_C3,
-    ZEPHYR_VARIANT_ESP32_C5,
-    ZEPHYR_VARIANT_ESP32_C6,
-    ZEPHYR_VARIANT_ESP32_H2,
-    ZEPHYR_VARIANT_ESP32_S3,
+    VARIANT_ESP32,
+    VARIANT_ESP32C3,
+    VARIANT_ESP32C5,
+    VARIANT_ESP32C6,
+    VARIANT_ESP32H2,
+    VARIANT_ESP32S3,
 )
 
 

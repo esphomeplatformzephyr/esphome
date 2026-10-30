@@ -5,6 +5,7 @@ import subprocess
 
 from esphome import pins
 import esphome.codegen as cg
+from esphome.components.nrf.const import VARIANT_NRF52
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ADVANCED,
@@ -33,7 +34,6 @@ from ..const import (
     CONF_RUNNER,
     KEY_BOOTLOADER,
     KEY_MODULE_REQUESTS,
-    ZEPHYR_VARIANT_NRF52,
     zephyr_rtos_ns,
 )
 from ..partitions import BootLayout
@@ -142,7 +142,7 @@ _ADC_AIN_MAP = {
 _GPIO_MATRIX_PINS = frozenset(range(48))
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = ZEPHYR_VARIANT_NRF52
+VARIANT_NAME = VARIANT_NRF52
 VARIANT = ZephyrVariant(
     # Resets from the start of flash (nordic/nrf52840_partition.dtsi). An Adafruit
     # bootloader moves this; see to_code().

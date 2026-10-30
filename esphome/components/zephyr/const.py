@@ -4,24 +4,7 @@ from typing import TYPE_CHECKING, Any, Final
 import esphome.codegen as cg
 
 if TYPE_CHECKING:
-    from ..zephyr_rtos.const import (  # noqa: F401
-        KEY_FRAMEWORK_TYPE,
-        KEY_SINGLE_SLOT,
-        SEGGER_RTT_UART,
-        ZEPHYR_VARIANT_EFR32BG27,
-        ZEPHYR_VARIANT_EFR32MG24,
-        ZEPHYR_VARIANT_ESP32,
-        ZEPHYR_VARIANT_ESP32_C3,
-        ZEPHYR_VARIANT_ESP32_C5,
-        ZEPHYR_VARIANT_ESP32_C6,
-        ZEPHYR_VARIANT_ESP32_H2,
-        ZEPHYR_VARIANT_ESP32_S3,
-        ZEPHYR_VARIANT_NRF52,
-        ZEPHYR_VARIANT_NRF54L15,
-        ZEPHYR_VARIANT_NRF54LM20A,
-        ZEPHYR_VARIANT_RP2040,
-        ZEPHYR_VARIANT_RP2350,
-    )
+    from ..zephyr_rtos.const import KEY_FRAMEWORK_TYPE, KEY_SINGLE_SLOT, SEGGER_RTT_UART  # noqa: F401
 
 BOOTLOADER_MCUBOOT = "mcuboot"
 
@@ -47,6 +30,6 @@ _ZEPHYR_RTOS_CONSTS = frozenset(
 
 
 def __getattr__(name: str) -> Any:
-    if name in _ZEPHYR_RTOS_CONSTS or name.startswith("ZEPHYR_VARIANT_"):
+    if name in _ZEPHYR_RTOS_CONSTS:
         return getattr(import_module("..zephyr_rtos.const", __package__), name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

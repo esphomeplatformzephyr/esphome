@@ -7,8 +7,8 @@ import re
 import pytest
 
 from esphome.components.logger import uart_selection, validate_task_log_buffer_alignment
+from esphome.components.nrf.const import VARIANT_NRF52
 from esphome.components.zephyr.const import KEY_ZEPHYR_RTOS
-from esphome.components.zephyr_rtos.const import ZEPHYR_VARIANT_NRF52
 from esphome.config_validation import Invalid
 from esphome.const import PlatformFramework
 from esphome.core import CORE
@@ -188,7 +188,7 @@ def test_any_uart_number_accepted_on_zephyr(
     set_core_config(
         PlatformFramework.ZEPHYR_ZEPHYR,
     )
-    CORE.data[KEY_ZEPHYR_RTOS] = {"variant": ZEPHYR_VARIANT_NRF52, "family": "nordic"}
+    CORE.data[KEY_ZEPHYR_RTOS] = {"variant": VARIANT_NRF52, "family": "nordic"}
     assert uart_selection("uart3") == "UART3"
     assert uart_selection("UART12") == "UART12"
 
@@ -220,7 +220,7 @@ def test_debug_probe_outputs_accepted_on_zephyr(
     set_core_config(
         PlatformFramework.ZEPHYR_ZEPHYR,
     )
-    CORE.data[KEY_ZEPHYR_RTOS] = {"variant": ZEPHYR_VARIANT_NRF52, "family": "nordic"}
+    CORE.data[KEY_ZEPHYR_RTOS] = {"variant": VARIANT_NRF52, "family": "nordic"}
     assert uart_selection(value) == value.upper()
 
 
@@ -249,7 +249,7 @@ def test_semihost_warns(
     set_core_config(
         PlatformFramework.ZEPHYR_ZEPHYR,
     )
-    CORE.data[KEY_ZEPHYR_RTOS] = {"variant": ZEPHYR_VARIANT_NRF52, "family": "nordic"}
+    CORE.data[KEY_ZEPHYR_RTOS] = {"variant": VARIANT_NRF52, "family": "nordic"}
     uart_selection("SEMIHOST")
     assert "no debugger is attached" in caplog.text
 
@@ -311,6 +311,6 @@ def test_rtt3_not_a_logger_keyword(set_core_config: SetCoreConfigCallable) -> No
     set_core_config(
         PlatformFramework.ZEPHYR_ZEPHYR,
     )
-    CORE.data[KEY_ZEPHYR_RTOS] = {"variant": ZEPHYR_VARIANT_NRF52, "family": "nordic"}
+    CORE.data[KEY_ZEPHYR_RTOS] = {"variant": VARIANT_NRF52, "family": "nordic"}
     with pytest.raises(Invalid):
         uart_selection("RTT3")

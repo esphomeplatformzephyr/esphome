@@ -1,4 +1,5 @@
 import esphome.codegen as cg
+from esphome.components.nxp.const import VARIANT_MCXN236
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ADVANCED,
@@ -18,7 +19,6 @@ from ..const import (
     CONF_BOOTLOADER,
     CONF_RUNNER,
     KEY_BOOTLOADER,
-    ZEPHYR_VARIANT_MCXN236,
 )
 from ..partitions import BootLayout
 from . import (
@@ -42,7 +42,7 @@ _ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
 )
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = ZEPHYR_VARIANT_MCXN236
+VARIANT_NAME = VARIANT_MCXN236
 VARIANT = ZephyrVariant(
     # Resets from the start of flash (frdm_mcxn236.dts boot_partition@0).
     boot=BootLayout(0x0),

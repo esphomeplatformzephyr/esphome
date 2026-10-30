@@ -135,6 +135,7 @@ def to_code(config: ConfigType) -> None:
     (`xiao_rp2350/rp2350a/m33`), so its devicetree overlay silently never
     applies there, and CONFIG_RETENTION_BOOT_MODE gets silently dropped for
     lack of the "zephyr,boot-mode" chosen node it depends on."""
+    from esphome.components.rp2.const import VARIANT_RP2040  # noqa: PLC0415
     from esphome.const import CONF_AP, CONF_LOG_LEVEL, CONF_WIFI  # noqa: PLC0415
 
     from .. import (  # noqa: PLC0415 -- avoids circular import at module load
@@ -143,12 +144,12 @@ def to_code(config: ConfigType) -> None:
         zephyr_rtos_data,
         zephyr_variant,
     )
-    from ..const import BOOTLOADER_MCUBOOT, KEY_BOOTLOADER, ZEPHYR_VARIANT_RP2040  # noqa: PLC0415
+    from ..const import BOOTLOADER_MCUBOOT, KEY_BOOTLOADER  # noqa: PLC0415
 
     zephyr_add_prj_conf("CPP", True)
     zephyr_add_prj_conf("REQUIRES_FULL_LIBCPP", True)
     # rp2040 is Cortex-M0+, no hardware FPU; rp2350 is Cortex-M33, which has one.
-    if zephyr_variant() != ZEPHYR_VARIANT_RP2040:
+    if zephyr_variant() != VARIANT_RP2040:
         zephyr_add_prj_conf("FPU", True)
     # No ENTROPY_GENERATOR here: rp2040 has no hardware RNG at all; rp2350's does
     # exist but Zephyr's driver for it hangs the whole boot sequence (unbounded
@@ -168,7 +169,7 @@ def to_code(config: ConfigType) -> None:
 
     boot_mode_dtsi = (
         "rp2040-boot-mode-retention"
-        if zephyr_variant() == ZEPHYR_VARIANT_RP2040
+        if zephyr_variant() == VARIANT_RP2040
         else "rp2350-boot-mode-retention"
     )
     boot_mode_overlay = f"#include <vendor/raspberrypi/{boot_mode_dtsi}.dtsi>"

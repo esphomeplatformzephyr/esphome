@@ -1,4 +1,5 @@
 import esphome.codegen as cg
+from esphome.components.stm32.const import VARIANT_STM32L4
 from esphome.const import (
     CONF_ADVANCED,
     CONF_BOARD,
@@ -16,7 +17,6 @@ from ..const import (
     CONF_BOOTLOADER,
     CONF_RUNNER,
     KEY_BOOTLOADER,
-    ZEPHYR_VARIANT_STM32L4,
 )
 from ..partitions import BootLayout
 from . import (
@@ -38,7 +38,7 @@ _DEFAULT_BOARD = "nucleo_l476rg"
 _ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(BOOTLOADER_SCHEMA)
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = ZEPHYR_VARIANT_STM32L4
+VARIANT_NAME = VARIANT_STM32L4
 VARIANT = ZephyrVariant(
     # Resets from the start of flash (nucleo_l476rg.dts has no code partition).
     boot=BootLayout(0x0),

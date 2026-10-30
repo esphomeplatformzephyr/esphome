@@ -1,4 +1,5 @@
 import esphome.codegen as cg
+from esphome.components.esp32.const import VARIANT_ESP32, VARIANT_ESP32S3
 from esphome.components.nrf52 import NRF52840_FLASH_SIZE, TESTING_FLASH_SIZE
 from esphome.components.nrf52.boards import BOARDS_ZEPHYR, BOOTLOADER_CONFIG
 from esphome.components.zephyr import (
@@ -15,8 +16,6 @@ from esphome.components.zephyr.const import (
     KEY_BOARD,
     KEY_BOOTLOADER,
     KEY_PM_STATIC,
-    ZEPHYR_VARIANT_ESP32,
-    ZEPHYR_VARIANT_ESP32_S3,
 )
 import esphome.config_validation as cv
 from esphome.const import CONF_ID, KEY_CORE, KEY_FRAMEWORK_VERSION, PLATFORM_NRF52
@@ -37,7 +36,7 @@ SP_FIX_MIN_VERSION = cv.Version(3, 0, 0)
 PARTITION_SIZE = 0x8000
 
 # Xtensa has no ARCH_SUPPORTS_COREDUMP_THREADS, so only the faulting thread is stored
-XTENSA_VARIANTS = (ZEPHYR_VARIANT_ESP32, ZEPHYR_VARIANT_ESP32_S3)
+XTENSA_VARIANTS = (VARIANT_ESP32, VARIANT_ESP32S3)
 
 
 CONFIG_SCHEMA = cv.All(

@@ -1,4 +1,5 @@
 import esphome.codegen as cg
+from esphome.components.esp32.const import VARIANT_ESP32C5
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ADVANCED,
@@ -10,12 +11,7 @@ from esphome.const import (
 )
 from esphome.types import ConfigType
 
-from ..const import (
-    ADVANCED_SCHEMA,
-    BOOTLOADER_MCUBOOT,
-    CONF_RUNNER,
-    ZEPHYR_VARIANT_ESP32_C5,
-)
+from ..const import ADVANCED_SCHEMA, BOOTLOADER_MCUBOOT, CONF_RUNNER
 from ..partitions import BootLayout
 from . import (
     MAINLINE,
@@ -35,7 +31,7 @@ _ADVANCED_SCHEMA = ADVANCED_SCHEMA
 _GPIO_MATRIX_PINS = frozenset(range(29)) - frozenset(range(16, 23))
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = ZEPHYR_VARIANT_ESP32_C5
+VARIANT_NAME = VARIANT_ESP32C5
 VARIANT = ZephyrVariant(
     # ROM loads the first image at 0x2000 (espressif/partitions_0x2000_*.dtsi).
     boot=BootLayout(0x2000),

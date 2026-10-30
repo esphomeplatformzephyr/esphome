@@ -1,4 +1,5 @@
 import esphome.codegen as cg
+from esphome.components.silabs.const import VARIANT_SIMG301
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_BOARD,
@@ -9,7 +10,7 @@ from esphome.const import (
 )
 from esphome.types import ConfigType
 
-from ..const import BOOTLOADER_MCUBOOT, ZEPHYR_VARIANT_SIMG301
+from ..const import BOOTLOADER_MCUBOOT
 from ..partitions import BootLayout
 from . import (
     MAINLINE,
@@ -27,7 +28,7 @@ _DEFAULT_BOARD = "simg301_ek2719a"
 _EUSART0_PINS = frozenset([*range(9), *range(16, 20)])
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = ZEPHYR_VARIANT_SIMG301
+VARIANT_NAME = VARIANT_SIMG301
 VARIANT = ZephyrVariant(
     # Resets from the start of flash (simg301_ek2719a.dts boot_partition@0).
     boot=BootLayout(0x0),

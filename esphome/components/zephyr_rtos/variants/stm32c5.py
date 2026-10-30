@@ -3,6 +3,7 @@ from pathlib import Path
 import time
 
 import esphome.codegen as cg
+from esphome.components.stm32.const import VARIANT_STM32C5
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ADVANCED,
@@ -24,7 +25,6 @@ from ..const import (
     CONF_RUNNER,
     KEY_BOARD,
     KEY_BOOTLOADER,
-    ZEPHYR_VARIANT_STM32C5,
     zephyr_rtos_ns,
 )
 from ..partitions import BootLayout
@@ -44,7 +44,7 @@ _DEFAULT_BOARD = "nucleo_c5a3zg"
 _ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(BOOTLOADER_SCHEMA)
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = ZEPHYR_VARIANT_STM32C5
+VARIANT_NAME = VARIANT_STM32C5
 VARIANT = ZephyrVariant(
     boot=BootLayout(0x0),
     # Seeed's TinyUF2 bootloader keeps 0x0-0x8000.

@@ -12,7 +12,6 @@ import logging
 import esphome.config_validation as cv
 from esphome.core import EsphomeError
 
-from .const import ZEPHYR_VARIANT_ESP32
 from .gpio import pin_summary
 from .variants import VARIANTS
 
@@ -429,6 +428,8 @@ def zephyr_setup_i2c_pinctrl(
     own name (e.g. "GPIO37, PC5") for whichever pin was actually given, "board default" for
     whichever wasn't (independently, not all-or-nothing: giving only one remaps
     just that signal, leaving the other at the board's own existing wiring)."""
+    from esphome.components.esp32.const import VARIANT_ESP32  # noqa: PLC0415
+
     from . import (  # noqa: PLC0415 -- avoids circular import at module load
         zephyr_add_overlay,
         zephyr_rtos_data,
@@ -457,7 +458,7 @@ def zephyr_setup_i2c_pinctrl(
     elif family == "esp32":
         from .variants import esp32_family as family_module
 
-        if zephyr_variant() == ZEPHYR_VARIANT_ESP32 and (sda is None) != (scl is None):
+        if zephyr_variant() == VARIANT_ESP32 and (sda is None) != (scl is None):
             # Original ESP32's software bus-clear needs a real sda-gpios/scl-gpios
             # pair below -- it can't express "leave it as-is" as a GPIO phandle.
             raise EsphomeError(
@@ -521,7 +522,7 @@ def zephyr_setup_i2c_pinctrl(
         value_role_decoder,
         VARIANTS[variant_name].pinctrl_node_label,
     )
-    if family == "esp32" and zephyr_variant() == ZEPHYR_VARIANT_ESP32:
+    if family == "esp32" and zephyr_variant() == VARIANT_ESP32:
         # sda/scl are both real ints here (raised above otherwise).
         sda_ctlr, sda_pin = ("gpio1", sda - 32) if sda >= 32 else ("gpio0", sda)
         scl_ctlr, scl_pin = ("gpio1", scl - 32) if scl >= 32 else ("gpio0", scl)

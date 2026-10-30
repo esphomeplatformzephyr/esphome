@@ -2,6 +2,11 @@ import logging
 
 from esphome import pins
 import esphome.codegen as cg
+from esphome.components.nrf.const import (
+    VARIANT_NRF52,
+    VARIANT_NRF54L15,
+    VARIANT_NRF54LM20A,
+)
 from esphome.components.nrf52.boards import BOOTLOADER_CONFIG, MCUMGR_OTA_BOOTLOADERS
 from esphome.components.nrf52.framework import include_west_project
 from esphome.components.ota import (
@@ -10,6 +15,8 @@ from esphome.components.ota import (
     OTAComponent,
     ota_to_code,
 )
+from esphome.components.rp2.const import VARIANT_RP2040, VARIANT_RP2350
+from esphome.components.silabs.const import VARIANT_EFR32BG27, VARIANT_EFR32MG24
 from esphome.components.zephyr import (
     VARIANTS,
     HexValue,
@@ -31,13 +38,6 @@ from esphome.components.zephyr.const import (
     KEY_BOOTLOADER,
     KEY_PM_STATIC,
     KEY_SYSBUILD,
-    ZEPHYR_VARIANT_EFR32BG27,
-    ZEPHYR_VARIANT_EFR32MG24,
-    ZEPHYR_VARIANT_NRF52,
-    ZEPHYR_VARIANT_NRF54L15,
-    ZEPHYR_VARIANT_NRF54LM20A,
-    ZEPHYR_VARIANT_RP2040,
-    ZEPHYR_VARIANT_RP2350,
 )
 from esphome.components.zephyr_ble_server import request_ble_l2cap_mtu
 import esphome.config_validation as cv
@@ -92,13 +92,13 @@ def _validate_transport(conf: ConfigType) -> ConfigType:
 # against. platform: zephyr on other variants has its own hardened OTA path
 # instead, ota_backend_zephyr.cpp, reached via platform: esphome.
 ZEPHYR_VARIANTS = (
-    ZEPHYR_VARIANT_NRF52,
-    ZEPHYR_VARIANT_NRF54L15,
-    ZEPHYR_VARIANT_NRF54LM20A,
-    ZEPHYR_VARIANT_EFR32MG24,
-    ZEPHYR_VARIANT_EFR32BG27,
-    ZEPHYR_VARIANT_RP2040,
-    ZEPHYR_VARIANT_RP2350,
+    VARIANT_NRF52,
+    VARIANT_NRF54L15,
+    VARIANT_NRF54LM20A,
+    VARIANT_EFR32MG24,
+    VARIANT_EFR32BG27,
+    VARIANT_RP2040,
+    VARIANT_RP2350,
 )
 
 # Families whose boards actually have a USB peripheral this CDC-ACM transport can

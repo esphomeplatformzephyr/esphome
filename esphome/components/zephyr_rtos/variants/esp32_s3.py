@@ -1,6 +1,7 @@
 import logging
 
 import esphome.codegen as cg
+from esphome.components.esp32.const import VARIANT_ESP32S3
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ADVANCED,
@@ -17,7 +18,6 @@ from ..const import (
     BOOTLOADER_MCUBOOT,
     CONF_KCONFIG_OPTIONS,
     CONF_RUNNER,
-    ZEPHYR_VARIANT_ESP32_S3,
 )
 from ..partitions import BootLayout
 from . import (
@@ -41,7 +41,7 @@ _ADVANCED_SCHEMA = ADVANCED_SCHEMA
 _GPIO_MATRIX_PINS = frozenset(range(22)) | frozenset(range(33, 49))
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = ZEPHYR_VARIANT_ESP32_S3
+VARIANT_NAME = VARIANT_ESP32S3
 VARIANT = ZephyrVariant(
     # ROM loads the first image at 0x0 (espressif/partitions_0x0_*.dtsi).
     boot=BootLayout(0x0),

@@ -1,4 +1,5 @@
 import esphome.codegen as cg
+from esphome.components.renesas.const import VARIANT_RA4M1
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ADVANCED,
@@ -17,7 +18,6 @@ from ..const import (
     CONF_BOOTLOADER,
     CONF_RUNNER,
     KEY_BOOTLOADER,
-    ZEPHYR_VARIANT_RA4M1,
 )
 from ..partitions import BootLayout
 from . import (
@@ -80,7 +80,7 @@ _PWM_PIN_MAP = {
 }
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = ZEPHYR_VARIANT_RA4M1
+VARIANT_NAME = VARIANT_RA4M1
 VARIANT = ZephyrVariant(
     # Resets from the start of flash (ek_ra4m1.dts has no code partition).
     boot=BootLayout(0x0),

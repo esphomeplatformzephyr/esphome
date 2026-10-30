@@ -1,4 +1,5 @@
 import esphome.codegen as cg
+from esphome.components.silabs.const import VARIANT_SIWX917
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ADVANCED,
@@ -10,12 +11,7 @@ from esphome.const import (
 )
 from esphome.types import ConfigType
 
-from ..const import (
-    ADVANCED_SCHEMA,
-    CONF_COMMANDER_VERSION,
-    CONF_RUNNER,
-    ZEPHYR_VARIANT_SIWX917,
-)
+from ..const import ADVANCED_SCHEMA, CONF_COMMANDER_VERSION, CONF_RUNNER
 from ..partitions import BootLayout
 from . import (
     MAINLINE,
@@ -69,7 +65,7 @@ _SPI_MOSI_MACROS = {p: f"GSPI_MOSI_HP{p}" for p in (6, 12, 27, 48, 57)}
 _SPI_MISO_MACROS = {p: f"GSPI_MISO_HP{p}" for p in (11, 26, 47, 56)}
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = ZEPHYR_VARIANT_SIWX917
+VARIANT_NAME = VARIANT_SIWX917
 VARIANT = ZephyrVariant(
     # The ROM/TA bootloader and network processor firmware sit below 0x202000
     # (siwx917_dk2605a.dts code_partition@202000).

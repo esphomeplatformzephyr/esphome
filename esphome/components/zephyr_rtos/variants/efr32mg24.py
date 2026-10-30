@@ -1,4 +1,5 @@
 import esphome.codegen as cg
+from esphome.components.silabs.const import VARIANT_EFR32MG24
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ADVANCED,
@@ -15,7 +16,6 @@ from ..const import (
     BOOTLOADER_MCUBOOT,
     CONF_COMMANDER_VERSION,
     CONF_RUNNER,
-    ZEPHYR_VARIANT_EFR32MG24,
 )
 from ..partitions import BootLayout
 from . import (
@@ -52,7 +52,7 @@ _GPIO_MATRIX_PINS = frozenset(
 )
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = ZEPHYR_VARIANT_EFR32MG24
+VARIANT_NAME = VARIANT_EFR32MG24
 VARIANT = ZephyrVariant(
     # Resets from the start of flash (xg24_ek2703a.dts boot_partition@0).
     boot=BootLayout(0x0),

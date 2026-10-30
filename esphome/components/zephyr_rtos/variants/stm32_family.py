@@ -23,19 +23,19 @@ def to_code(config: ConfigType) -> None:
     """REQUIRES_FULL_LIBCPP selects GLIBCXX_LIBCPP; without it Zephyr defaults
     to MINIMAL_LIBCPP, which has no STL and breaks ESPHome's C++ headers."""
     import esphome.codegen as cg  # noqa: PLC0415
+    from esphome.components.stm32.const import (  # noqa: PLC0415
+        VARIANT_STM32C5,
+        VARIANT_STM32F1,
+        VARIANT_STM32F4,
+    )
     from esphome.const import CONF_FRAMEWORK, CONF_LOG_LEVEL  # noqa: PLC0415
 
     from .. import zephyr_add_prj_conf, zephyr_variant  # noqa: PLC0415 -- avoids circular import at module load
-    from ..const import (  # noqa: PLC0415
-        ZEPHYR_VARIANT_STM32C5,
-        ZEPHYR_VARIANT_STM32F1,
-        ZEPHYR_VARIANT_STM32F4,
-    )
 
     zephyr_add_prj_conf("CPP", True)
     zephyr_add_prj_conf("REQUIRES_FULL_LIBCPP", True)
     # STM32F1 is Cortex-M3, which has no FPU.
-    if zephyr_variant() != ZEPHYR_VARIANT_STM32F1:
+    if zephyr_variant() != VARIANT_STM32F1:
         zephyr_add_prj_conf("FPU", True)
     # random_bytes() uses sys_rand_get(), which requires the entropy subsystem.
     # STM32F4 is a whole chip family, not a single SoC -- RNG presence varies per
@@ -45,9 +45,9 @@ def to_code(config: ConfigType) -> None:
     # at all), so stm32f1.py always uses TEST_RANDOM_GENERATOR unconditionally.
     # STM32C5's SoC dtsi has no RNG node either; stm32c5.py looks it up per board.
     if zephyr_variant() not in (
-        ZEPHYR_VARIANT_STM32C5,
-        ZEPHYR_VARIANT_STM32F1,
-        ZEPHYR_VARIANT_STM32F4,
+        VARIANT_STM32C5,
+        VARIANT_STM32F1,
+        VARIANT_STM32F4,
     ):
         zephyr_add_prj_conf("ENTROPY_GENERATOR", True)
     # ARM Cortex-M's ARCH_HAS_STACKWALK only defaults on when EXTRA_EXCEPTION_INFO
