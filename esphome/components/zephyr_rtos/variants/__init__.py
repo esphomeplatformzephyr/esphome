@@ -86,7 +86,7 @@ class ZephyrSDK:
 
 
 # A fully resolved, ready-to-fetch additive west module -- identical shape whether it
-# came from a component's capability request or a user's own `zephyr: modules:` entry.
+# came from a component's capability request or a user's own `framework: modules:` entry.
 @dataclass
 class ZephyrModule:
     name: str  # west project/module name
@@ -111,7 +111,7 @@ class ZephyrModuleTemplate:
     blobs: tuple[str, str, str] | None = None
     # Lowest version this module is known to work at all -- independent of
     # default_versions' per-root-version pairing, this just rejects an obviously
-    # too-old zephyr: modules: override at config time instead of failing much later
+    # too-old framework: modules: override at config time instead of failing much later
     # inside `west update`. None = not enforced (e.g. a module with no numbered
     # releases at all).
     min_version: cv.Version | None = None
@@ -126,7 +126,7 @@ class ZephyrModuleTemplate:
             raise EsphomeError(
                 f"Module '{self.name}' has no known compatible version for "
                 f"framework version {root_version.major}.{root_version.minor} -- "
-                "specify it explicitly under zephyr: modules:."
+                "specify it explicitly under framework: modules:."
             )
         tag = version
         try:
@@ -140,7 +140,7 @@ class ZephyrModuleTemplate:
                     f"Got {version}."
                 )
             # default_versions/explicit_version are bare "X.Y.Z" (for the comparison
-            # above and for a user typing zephyr: modules: version: without having to
+            # above and for a user typing framework: modules: version: without having to
             # know the tag scheme), but the actual git tag needs the "v" -- same
             # normalization the root SDK's own ver_tag already does.
             if not tag.startswith("v"):
@@ -156,7 +156,7 @@ class ZephyrModuleTemplate:
 @dataclass
 class ZephyrVariant:
     sdk: ZephyrSDK
-    # `zephyr: framework: type:` key naming this variant's default `sdk` above. Every
+    # `framework: type:` key naming this variant's default `sdk` above. Every
     # variant needs one, even single-SDK ones -- it's what the framework: schema validates
     # `type:` against.
     sdk_name: str = "zephyr"
@@ -335,7 +335,7 @@ class ZephyrVariant:
 def resolve_sdk(
     variant: ZephyrVariant, framework_type: str | None
 ) -> tuple[str, ZephyrSDK]:
-    """Resolve a `zephyr: framework: type:` value to (type_name, ZephyrSDK).
+    """Resolve a `framework: type:` value to (type_name, ZephyrSDK).
 
     None (framework: type: omitted) resolves to the variant's own default sdk/sdk_name.
     Raises KeyError for an unknown type -- callers validate against
@@ -402,7 +402,7 @@ def qualify_board(
 def resolve_framework_version(
     variant: ZephyrVariant, variant_name: str, config: ConfigType, requires_reason: str
 ) -> tuple[str, cv.Version, str, ZephyrSDK]:
-    """Resolve and validate `zephyr: framework:` for a variant's config_schema().
+    """Resolve and validate `framework:` for a variant's config_schema().
 
     Handles `type:` selection (the variant's default sdk, or one of its alt_sdks),
     `version:`/`source:` mutual exclusion, `source:` version discovery, and min_version

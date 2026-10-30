@@ -6,14 +6,7 @@ from typing import TYPE_CHECKING, Any, NamedTuple, TypedDict
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.const import (
-    CONF_BOARD,
-    CONF_VARIANT,
-    KEY_CORE,
-    KEY_FRAMEWORK_VERSION,
-    KEY_TARGET_PLATFORM,
-    PLATFORM_ZEPHYR,
-)
+from esphome.const import CONF_BOARD, KEY_CORE, KEY_FRAMEWORK_VERSION
 from esphome.core import CORE, CoroPriority, coroutine_with_priority
 from esphome.helpers import copy_file_if_changed, write_file_if_changed
 from esphome.types import ConfigType
@@ -62,7 +55,6 @@ from .rtos import (  # noqa: F401
     zephyr_framework_type,
     zephyr_raise_prj_conf_min,
     zephyr_require_partition,
-    zephyr_rtos_platform,
     zephyr_setup_i2c_pinctrl,
     zephyr_setup_spi_pinctrl,
     zephyr_setup_uart_pinctrl,
@@ -78,61 +70,6 @@ if TYPE_CHECKING:
 CODEOWNERS = ["@tomaszduda23"]
 DOMAIN = "zephyr"
 
-# The zephyr: key forwards to zephyr_rtos until each platform owns its own key.
-IS_TARGET_PLATFORM = True
-
-
-def AUTO_LOAD(config: ConfigType) -> list[str]:
-    return ["preferences", "zephyr_rtos"] if CONF_VARIANT in config else []
-
-
-def CONFIG_SCHEMA(config: ConfigType) -> ConfigType:
-    # Auto-loaded by nrf52, which owns the target platform
-    target_platform = CORE.data.get(KEY_CORE, {}).get(KEY_TARGET_PLATFORM)
-    if target_platform not in (None, PLATFORM_ZEPHYR):
-        return config
-    from ..zephyr_rtos import zephyr_rtos_config_schema
-    from ..zephyr_rtos.variants import VARIANTS
-
-    families = frozenset(info.family for info in VARIANTS.values())
-    return zephyr_rtos_config_schema(
-        _nest_flat_config(config), families, PLATFORM_ZEPHYR
-    )
-
-
-# Keys the flat zephyr: block keeps at the top level; the rest move under framework:
-_PLATFORM_KEYS = ("variant", "board", "watchdog_timeout", "framework")
-# Flat zephyr: keys that move under framework: advanced:
-_ADVANCED_KEYS = ("west_version", "ninja_version")
-
-
-def _nest_flat_config(config: ConfigType) -> ConfigType:
-    """Move the flat zephyr: block's Zephyr-only options under framework:."""
-    if not isinstance(config, dict):
-        return config
-    nested = {key: value for key, value in config.items() if key in _PLATFORM_KEYS}
-    framework = dict(nested.get("framework") or {})
-    advanced = dict(config.get("advanced") or {})
-    for key, value in config.items():
-        if key in _ADVANCED_KEYS:
-            advanced[key] = value
-        elif key not in _PLATFORM_KEYS and key != "advanced":
-            framework[key] = value
-    if advanced:
-        framework["advanced"] = advanced
-    nested["framework"] = framework
-    return nested
-
-
-_ZEPHYR_RTOS_HOOKS = frozenset(
-    {
-        "upload_program",
-        "run_compile",
-        "process_stacktrace",
-        "STACKTRACE_ZEPHYR_PC_LR_RE",
-    }
-)
-
 # zephyr_rtos data, loaded on first use since zephyr_rtos imports this package
 _ZEPHYR_RTOS_DATA = {
     "VARIANTS": "variants",
@@ -142,8 +79,6 @@ _ZEPHYR_RTOS_DATA = {
 
 
 def __getattr__(name: str) -> Any:
-    if name in _ZEPHYR_RTOS_HOOKS:
-        return getattr(import_module("..zephyr_rtos", __package__), name)
     if (module := _ZEPHYR_RTOS_DATA.get(name)) is not None:
         return getattr(import_module(f"..zephyr_rtos.{module}", __package__), name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
@@ -430,11 +365,6 @@ def _write_file_if_changed_or_remove_when_empty(path: Path, content: str) -> boo
 
 
 def copy_files() -> None:
-    if KEY_ZEPHYR_RTOS in CORE.data:
-        from ..zephyr_rtos import copy_files as rtos_copy_files
-
-        rtos_copy_files()
-        return
     for builder_func in zephyr_data()[KEY_OVERLAY_BUILDER]:
         overlay_contents = builder_func()
         zephyr_add_overlay(overlay_contents)

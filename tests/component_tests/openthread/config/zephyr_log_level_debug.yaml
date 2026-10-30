@@ -1,9 +1,10 @@
 esphome:
   name: test
 
-zephyr:
+nrf:
   variant: NRF52
-  log_level: DEBUG
+  framework:
+    log_level: DEBUG
 
 network:
   enable_ipv6: true

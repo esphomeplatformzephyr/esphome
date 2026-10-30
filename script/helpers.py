@@ -880,7 +880,7 @@ def load_idedata(environment: str) -> dict[str, Any]:
     platformio_ini = Path(root_path) / "platformio.ini"
     # Check zephyr-* environments before the "esp32" substring check below --
     # "zephyr-esp32-h2-tidy" contains "esp32" and would otherwise be misrouted
-    # to the ESP-IDF loader (esp32_h2 under platform: zephyr uses mainline
+    # to the ESP-IDF loader (esp32_h2 with framework: type: zephyr uses mainline
     # Zephyr/west, not ESP-IDF).
     if "esp32" in environment and "zephyr" not in environment:
         from esphome.espidf.clang_tidy import load_idedata as idf_load_idedata

@@ -14,7 +14,6 @@ from esphome.const import (
     PLATFORM_RENESAS,
     PLATFORM_SILABS,
     PLATFORM_STM32,
-    PLATFORM_ZEPHYR,
 )
 from esphome.core import EsphomeError
 
@@ -250,6 +249,5 @@ for _platform in (
     PLATFORM_RENESAS,
     PLATFORM_SILABS,
     PLATFORM_STM32,
-    PLATFORM_ZEPHYR,
 ):
     pins.PIN_SCHEMA_REGISTRY.register(_platform, ZEPHYR_PIN_SCHEMA)(zephyr_pin_to_code)

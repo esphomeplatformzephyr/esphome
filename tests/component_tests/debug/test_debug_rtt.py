@@ -58,9 +58,7 @@ def test_rtt_console_rejected_without_rtt_family(
 ) -> None:
     from esphome.components.debug import CONF_ENABLE_RTT_CONSOLE, _validate_rtt_console  # noqa: PLC0415
 
-    set_core_config(
-        PlatformFramework.ZEPHYR_ZEPHYR,
-    )
+    set_core_config(PlatformFramework.ESP32_ZEPHYR)
     CORE.data[KEY_ZEPHYR_RTOS] = {"variant": "ESP32", "family": "esp32"}
     with pytest.raises(Invalid, match="needs SEGGER RTT"):
         _validate_rtt_console({CONF_ENABLE_RTT_CONSOLE: True})
@@ -95,7 +93,7 @@ def test_debug_wins_rtt0_in_either_order(
 ) -> None:
     from esphome.components.zephyr_rtos.rtt import DEBUG_OWNER, claim_rtt_channel  # noqa: PLC0415
 
-    set_core_config(PlatformFramework.ZEPHYR_ZEPHYR)
+    set_core_config(PlatformFramework.NRF_ZEPHYR)
     CORE.data[KEY_ZEPHYR_RTOS] = {"rtt_channels": {}}
     owners = [DEBUG_OWNER, "logger"] if debug_first else ["logger", DEBUG_OWNER]
     claim_rtt_channel(0, owners[0])

@@ -30,7 +30,7 @@ from esphome.const import (
     KEY_CORE,
     KEY_TARGET_FRAMEWORK,
     KEY_TARGET_PLATFORM,
-    PLATFORM_ZEPHYR,
+    PLATFORM_NRF,
     Toolchain,
 )
 from esphome.core import CORE
@@ -80,7 +80,7 @@ def test_zephyr_mcuboot_check_skips_adafruit_ble(
     """adafruit_ble's update runs in the Adafruit bootloader; only the OTA
     platforms that write MCUboot's secondary slot require MCUboot."""
     CORE.data[KEY_CORE] = {
-        KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR,
+        KEY_TARGET_PLATFORM: PLATFORM_NRF,
         KEY_TARGET_FRAMEWORK: "zephyr",
     }
     CORE.data[KEY_ZEPHYR] = {

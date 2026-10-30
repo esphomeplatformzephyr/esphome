@@ -1,4 +1,4 @@
-"""The native build backend of the platform: zephyr sdk-zephyr toolchain.
+"""The native build backend of the Zephyr RTOS sdk-zephyr toolchain.
 
 The build itself runs from the platform's ``run_compile`` hook; this module
 gives the binutils, the linked image and idedata of that build.

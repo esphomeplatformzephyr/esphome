@@ -74,8 +74,8 @@ def _only_on_pwm_hardware(value):
         if family == "renesas" and _pwm_pin_map():
             return value
     raise cv.Invalid(
-        "zephyr_pwm is only available on nrf52 (platform: nrf52, or platform: zephyr "
-        "with a variant that has PWM hardware wired up)"
+        "zephyr_pwm is only available on nrf52 (platform: nrf52, or a Zephyr RTOS "
+        "build with a variant that has PWM hardware wired up)"
     )
 
 

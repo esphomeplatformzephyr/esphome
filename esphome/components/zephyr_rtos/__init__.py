@@ -44,14 +44,6 @@ from esphome.const import (
     KEY_FRAMEWORK_VERSION,
     KEY_TARGET_FRAMEWORK,
     KEY_TARGET_PLATFORM,
-    PLATFORM_ESP32,
-    PLATFORM_NRF,
-    PLATFORM_NXP,
-    PLATFORM_RENESAS,
-    PLATFORM_RP2,
-    PLATFORM_SILABS,
-    PLATFORM_STM32,
-    PLATFORM_ZEPHYR,
     TYPE_GIT,
     TYPE_LOCAL,
 )
@@ -158,14 +150,12 @@ _ZEPHYR_LOG_LEVEL_TO_INT = {
 
 class ZephyrRtosData(ZephyrData):
     board_root: Path | None  # resolved zephyr: board_source: dir, or None if unset
-    sdk_source: (
-        ConfigType | None
-    )  # resolved zephyr: framework: source:, or None if unset
+    sdk_source: ConfigType | None  # resolved framework: source:, or None if unset
     variant: str | None
     family: (
         str | None
     )  # variant's ZephyrVariant.family (e.g. "esp32"), or None if unfamilied
-    framework_type: str  # resolved zephyr: framework: type: (e.g. "zephyr", "ncs")
+    framework_type: str  # resolved framework: type: (e.g. "zephyr", "ncs")
     sysbuild_conf: dict[str, tuple[PrjConfValueType, bool]]
     # (label, reason) partitions components need; see partitions.zephyr_require_partition()
     partition_requirements: list[tuple[str, str]]
@@ -198,11 +188,11 @@ class ZephyrRtosData(ZephyrData):
         Path | None
     )  # resolved zephyr: snippet_source: dir, or board_root, or None
     # capability -> template, requested via request_zephyr_module(). Not yet resolved
-    # to a version -- a zephyr: modules: override (module_overrides) may still apply
+    # to a version -- a framework: modules: override (module_overrides) may still apply
     # before final resolution in run_compile(), so resolving eagerly here could raise
     # for a version gap the user's own override was going to fill.
     module_requests: dict[str, ZephyrModuleTemplate]
-    # module name -> a full user-authored ZephyrModule (zephyr: modules: with source:),
+    # module name -> a full user-authored ZephyrModule (framework: modules: with source:),
     # or a plain version string overriding a component-requested module's default.
     module_overrides: dict[str, ZephyrModule | str]
     # (west_module, allow_regex, sentinel_name) entries added via zephyr_add_blobs() --
@@ -223,7 +213,7 @@ def zephyr_variant() -> str | None:
 
 
 def zephyr_framework_type() -> str | None:
-    """Return the active `zephyr: framework: type:` (e.g. "zephyr", "ncs"), or None if
+    """Return the active `framework: type:` (e.g. "zephyr", "ncs"), or None if
     not yet set."""
     return zephyr_rtos_data().get(KEY_FRAMEWORK_TYPE)
 
@@ -231,26 +221,6 @@ def zephyr_framework_type() -> str | None:
 def zephyr_variant_family() -> str | None:
     """Return the active variant's silicon family (e.g. "esp32"), or None if unset/unfamilied."""
     return zephyr_rtos_data().get("family")
-
-
-# Temporary: the zephyr: key has no platform of its own, so its variant family picks one.
-_ZEPHYR_KEY_FAMILY_PLATFORMS = {
-    "esp32": PLATFORM_ESP32,
-    "nordic": PLATFORM_NRF,
-    "nxp": PLATFORM_NXP,
-    "renesas": PLATFORM_RENESAS,
-    "rpi_pico": PLATFORM_RP2,
-    "silabs": PLATFORM_SILABS,
-    "silabs_siwx91x": PLATFORM_SILABS,
-    "stm32": PLATFORM_STM32,
-}
-
-
-def zephyr_rtos_platform() -> str:
-    """The platform the build's per-platform defaults are looked up under."""
-    if CORE.target_platform == PLATFORM_ZEPHYR:
-        return _ZEPHYR_KEY_FAMILY_PLATFORMS[zephyr_variant_family()]
-    return CORE.target_platform
 
 
 def zephyr_only_on_variant(*variant_names: str):
@@ -310,7 +280,7 @@ def zephyr_set_sysbuild_conf_override(name: str, value: PrjConfValueType) -> Non
 def request_zephyr_module(capability: str) -> None:
     """Component-facing: record that `capability` (e.g. "zigbee") is needed as an
     additive west module. Not resolved to a concrete version here -- a user's
-    `zephyr: modules:` override may still apply, so failing on a missing default
+    `framework: modules:` override may still apply, so failing on a missing default
     version has to wait until resolve_zephyr_modules() (see there for why)."""
     _, sdk = resolve_sdk(VARIANTS[zephyr_variant()], zephyr_framework_type())
     template = sdk.modules.get(capability)
@@ -328,7 +298,7 @@ def request_zephyr_module(capability: str) -> None:
 
 
 def zephyr_set_module_override(name: str, override: ZephyrModule | str) -> None:
-    """Unconditionally record a `zephyr: modules:` override, replacing anything a
+    """Unconditionally record a `framework: modules:` override, replacing anything a
     component requested. `override` is a full ZephyrModule (source: given -- a
     brand-new or replaced module) or a plain version string (version-only tweak of a
     component-requested module). Always wins -- same precedent as
@@ -340,7 +310,7 @@ def zephyr_set_module_override(name: str, override: ZephyrModule | str) -> None:
 def resolve_zephyr_modules() -> list[ZephyrModule]:
     """Combine module_requests with any module_overrides into the final set of
     modules to fetch. Called once, from run_compile() -- by then every component's
-    to_code() and the zephyr: modules: override job have both already run, so an
+    to_code() and the framework: modules: override job have both already run, so an
     override is guaranteed visible before a request's version gets resolved."""
     root_version = CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]
     overrides = dict(zephyr_rtos_data()[KEY_MODULE_OVERRIDES])
@@ -370,7 +340,7 @@ def resolve_zephyr_modules() -> list[ZephyrModule]:
                     f"capability name (currently requested: {', '.join(requested_names)})"
                 )
             raise EsphomeError(
-                f"zephyr: modules: '{name}' has no source and wasn't requested by "
+                f"framework: modules: '{name}' has no source and wasn't requested by "
                 f"any component{hint}"
             )
         resolved[name] = override
@@ -578,7 +548,7 @@ def _watchdog_to_code(config: ConfigType) -> None:
 @coroutine_with_priority(CoroPriority.FINAL)
 async def _modules_to_code(config: ConfigType) -> None:
     # Runs at the lowest priority so every component has already requested its own
-    # modules -- a user-supplied zephyr: modules: entry must always win, and a
+    # modules -- a user-supplied framework: modules: entry must always win, and a
     # version-only override needs every request already recorded to have something to
     # attach to (final resolution happens later still, in resolve_zephyr_modules()).
     _apply_module_overrides(config[CONF_FRAMEWORK][CONF_MODULES])

@@ -46,10 +46,6 @@ def zephyr_framework_type() -> str | None:
     return rtos.zephyr_framework_type() if (rtos := _zephyr_rtos()) else None
 
 
-def zephyr_rtos_platform() -> str | None:
-    return rtos.zephyr_rtos_platform() if (rtos := _zephyr_rtos()) else None
-
-
 def zephyr_family_uart_drivers() -> frozenset[str]:
     return (
         rtos.zephyr_family_uart_drivers() if (rtos := _zephyr_rtos()) else frozenset()

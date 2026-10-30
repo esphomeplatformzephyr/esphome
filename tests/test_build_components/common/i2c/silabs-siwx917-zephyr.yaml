@@ -1,4 +1,4 @@
-# Common I2C configuration for platform: zephyr, variant: siwx917 tests
+# Common I2C configuration for silabs-siwx917-zephyr tests
 # No sda/scl: siwx917 doesn't support I2C pin remapping (see siwx917.py's own
 # comment) -- the board's default I2C bus (ulpi2c, aliased zephyr_i2c) is
 # already wired by the board's own DTS. Confirmed on real hardware: an HTU21D

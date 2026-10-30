@@ -21,7 +21,7 @@ from esphome.const import (
     KEY_CORE,
     KEY_FRAMEWORK_VERSION,
     KEY_TARGET_PLATFORM,
-    PLATFORM_ZEPHYR,
+    PLATFORM_STM32,
 )
 from esphome.core import CORE, EsphomeError
 from esphome.upload_targets import PortType
@@ -37,7 +37,7 @@ def _state(tmp_path: Path, board: str = XIAO) -> None:
     CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant="STM32C5", board=board)
     CORE.data[KEY_CORE] = {
         KEY_FRAMEWORK_VERSION: "4.5.0",
-        KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR,
+        KEY_TARGET_PLATFORM: PLATFORM_STM32,
     }
     CORE.config_path = tmp_path / "test.yaml"
     CORE.build_path = tmp_path / "build"
@@ -226,7 +226,7 @@ def test_upload_program_uses_tinyuf2_on_the_xiao(tmp_path: Path) -> None:
         patch("esphome.components.zephyr_rtos.build_zephyr.check_bootloader_built"),
         patch.object(stm32c5, "upload_program", return_value=True) as mock_upload,
     ):
-        assert upload_program({PLATFORM_ZEPHYR: {CONF_FRAMEWORK: {}}}, object(), PORT)
+        assert upload_program({PLATFORM_STM32: {CONF_FRAMEWORK: {}}}, object(), PORT)
     mock_upload.assert_called_once_with(PORT)
 
 
@@ -238,7 +238,7 @@ def test_reset_over_usb_touches_the_xiao_at_2001_baud(
     ports = MagicMock(
         side_effect=[[SimpleNamespace(path=PORT)], [], [SimpleNamespace(path=PORT)]]
     )
-    config = {PLATFORM_ZEPHYR: {"variant": "STM32C5", "framework": {"advanced": {}}}}
+    config = {PLATFORM_STM32: {"variant": "STM32C5", "framework": {"advanced": {}}}}
     with (
         patch("serial.Serial") as mock_serial,
         patch("esphome.util.get_serial_ports", ports),

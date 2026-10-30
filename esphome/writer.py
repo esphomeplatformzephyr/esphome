@@ -565,7 +565,7 @@ def clean_cmake_cache():
     # PlatformIO keeps it under .pioenvs/<name>/; the native ESP-IDF toolchain
     # keeps it under build/ (where espidf's has_outdated_files() treats a
     # missing CMakeCache.txt as stale); the native west/CMake toolchain
-    # (platform: zephyr) keeps the sysbuild superproject's cache under .west_build/ --
+    # (Zephyr RTOS) keeps the sysbuild superproject's cache under .west_build/ --
     # deleting it makes west's own --pristine=auto reconfigure from scratch, which
     # regenerates the nested per-image caches too. Only one of these three exists
     # for a given build.

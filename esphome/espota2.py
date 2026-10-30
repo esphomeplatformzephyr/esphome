@@ -29,7 +29,6 @@ from esphome.const import (
     PLATFORM_RTL87XX,
     PLATFORM_SILABS,
     PLATFORM_STM32,
-    PLATFORM_ZEPHYR,
 )
 from esphome.core import EsphomeError
 from esphome.helpers import ProgressBar, resolve_ip_address
@@ -49,7 +48,6 @@ DEFAULT_OTA_PORTS: dict[str, int] = {
     PLATFORM_RENESAS: 4232,
     PLATFORM_SILABS: 4232,
     PLATFORM_STM32: 4232,
-    PLATFORM_ZEPHYR: 4232,
 }
 
 OTA_TYPE_UPDATE_APP = 0x00

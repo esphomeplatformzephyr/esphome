@@ -16,6 +16,9 @@ from esphome.const import (
 )
 from esphome.core import CORE
 from tests.component_tests.types import SetCoreConfigCallable
+from tests.unit_tests.components.zephyr_rtos.zephyr_state import (
+    zephyr_platform_framework,
+)
 
 
 def test_hidden_folded_into_networks() -> None:
@@ -59,7 +62,7 @@ def test_hidden_without_ssid_rejected(set_core_config: SetCoreConfigCallable) ->
 
 def _set_zephyr_with_ap(set_core_config: SetCoreConfigCallable, variant: str) -> None:
     set_core_config(
-        PlatformFramework.ZEPHYR_ZEPHYR,
+        zephyr_platform_framework(variant),
         full_config={"wifi": {CONF_AP: {}}},
     )
     CORE.data[KEY_ZEPHYR_RTOS] = {"variant": variant, "board": "some_board"}

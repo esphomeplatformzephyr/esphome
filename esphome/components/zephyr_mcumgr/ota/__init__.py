@@ -64,7 +64,7 @@ DEPENDENCIES = ["zephyr"]
 
 def AUTO_LOAD() -> list[str]:
     # Legacy platform: nrf52 doesn't touch the shared ota component's own backend
-    # file at all -- this OTAComponent is entirely separate. platform: zephyr does:
+    # file at all -- this OTAComponent is entirely separate. Zephyr RTOS does:
     # it always compiles ota_backend_zephyr.cpp regardless of which ota: platform
     # is selected (see ota's own AUTO_LOAD()), and that backend needs sha256 (NCS's
     # PSA crypto drivers, and mainline's default crypto backend, can't do MD5).
@@ -89,7 +89,7 @@ def _validate_transport(conf: ConfigType) -> ConfigType:
 
 
 # Platform: zephyr variants this MCUboot image-manager path has been validated
-# against. platform: zephyr on other variants has its own hardened OTA path
+# against. Zephyr RTOS on other variants has its own hardened OTA path
 # instead, ota_backend_zephyr.cpp, reached via platform: esphome.
 ZEPHYR_VARIANTS = (
     VARIANT_NRF52,
@@ -121,7 +121,7 @@ CDC_IDS = {"CDC": 0, "CDC1": 1}
 
 def _validate_platform(conf: ConfigType) -> ConfigType:
     # Two ways to end up on a supported chip: the legacy platform: nrf52
-    # component, or platform: zephyr with one of ZEPHYR_VARIANTS (a separate,
+    # component, or Zephyr RTOS with one of ZEPHYR_VARIANTS (a separate,
     # mainline/NCS-based port).
     if not (
         CORE.is_nrf52
@@ -129,7 +129,7 @@ def _validate_platform(conf: ConfigType) -> ConfigType:
     ):
         raise cv.Invalid(
             "This feature is only available on nrf52 (platform: nrf52, or "
-            "platform: zephyr with variant: nrf52, nrf54l15, nrf54lm20a, efr32mg24, "
+            "a Zephyr RTOS build with variant: nrf52, nrf54l15, nrf54lm20a, efr32mg24, "
             "rp2040, or rp2350)."
         )
     hw_uart = conf[CONF_TRANSPORT].get(CONF_HARDWARE_UART)
@@ -340,7 +340,7 @@ async def to_code(config: ConfigType) -> None:
         # matches what it produces:
         #   MCUboot sits immediately after the SoftDevice, then slot0, then slot1,
         #   which ends at the lowest section reserved above (bootloader, coredump).
-        # platform: zephyr's nrf52 variant never registers PM static sections
+        # the Zephyr RTOS nrf52 variant never registers PM static sections
         sections = zephyr_data()[KEY_PM_STATIC] or BOOTLOADER_CONFIG[bootloader]
         mcuboot_size = 0x9000
         sd_end = next(s.end_address for s in sections if "SoftDevice" in s.name)

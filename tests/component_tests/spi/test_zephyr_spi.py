@@ -1,4 +1,4 @@
-"""Tests for SPI on platform: zephyr (quad-mode gate, interface selection, pin checks)."""
+"""Tests for SPI on Zephyr RTOS builds (quad-mode gate, interface selection, pin checks)."""
 
 import pytest
 
@@ -19,12 +19,17 @@ import esphome.config_validation as cv
 from esphome.const import CONF_NUMBER, KEY_VARIANT, PlatformFramework
 from esphome.core import CORE
 from tests.component_tests.types import SetCoreConfigCallable
-from tests.unit_tests.components.zephyr_rtos.zephyr_state import empty_zephyr_data
+from tests.unit_tests.components.zephyr_rtos.zephyr_state import (
+    empty_zephyr_data,
+    zephyr_platform_framework,
+)
 
 
 def _zephyr(set_core_config: SetCoreConfigCallable, variant: str | None = None) -> None:
     set_core_config(
-        PlatformFramework.ZEPHYR_ZEPHYR,
+        zephyr_platform_framework(variant)
+        if variant is not None
+        else PlatformFramework.NRF_ZEPHYR
     )
     CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant=variant)
 

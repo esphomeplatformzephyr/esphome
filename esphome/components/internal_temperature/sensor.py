@@ -65,7 +65,7 @@ async def to_code(config: ConfigType) -> None:
     if CORE.is_nrf52 or (CORE.using_zephyr and zephyr_variant_family() == "nordic"):
         # Same physical TEMP peripheral (nrf52840.dtsi's `temp` node is status = "okay"
         # by default -- no overlay needed) whether this is platform: nrf52 or
-        # platform: zephyr's nordic-family variant.
+        # a Zephyr RTOS build of a nordic-family variant.
         zephyr_add_prj_conf("SENSOR", True)
         zephyr_add_prj_conf("TEMP_NRF5", True)
     elif (
@@ -105,7 +105,6 @@ FILTER_SOURCE_FILES = filter_source_files_from_platform(
             PlatformFramework.RP2_ZEPHYR,
             PlatformFramework.SILABS_ZEPHYR,
             PlatformFramework.STM32_ZEPHYR,
-            PlatformFramework.ZEPHYR_ZEPHYR,
         },
     }
 )

@@ -1,4 +1,4 @@
-# Common SPI configuration for platform: zephyr, variant: siwx917 tests
+# Common SPI configuration for silabs-siwx917-zephyr tests
 # Unlike EFR32's free-mux USART, SiWx91x's GSPI only has a handful of
 # enumerated candidate pins per signal (see siwx917.py's spi_pin_macros) --
 # these three are real, valid options for clk/mosi/miso respectively.

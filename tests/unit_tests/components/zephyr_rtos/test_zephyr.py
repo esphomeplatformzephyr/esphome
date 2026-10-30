@@ -90,18 +90,28 @@ from esphome.const import (
     KEY_TARGET_FRAMEWORK,
     KEY_TARGET_PLATFORM,
     PLATFORM_ESP32,
-    PLATFORM_ZEPHYR,
+    PLATFORM_NRF,
+    PLATFORM_STM32,
     TYPE_GIT,
     TYPE_LOCAL,
 )
 from esphome.core import CORE, ID, EsphomeError
-from tests.unit_tests.components.zephyr_rtos.zephyr_state import empty_zephyr_data
+from tests.unit_tests.components.zephyr_rtos.zephyr_state import (
+    empty_zephyr_data,
+    zephyr_platform_framework,
+)
 
 _ALL_FAMILIES = frozenset(info.family for info in VARIANTS.values())
 
 
 def _validate(config: dict) -> dict:
-    return zephyr_rtos_config_schema(config, _ALL_FAMILIES, PLATFORM_ZEPHYR)
+    variant = config.get(CONF_VARIANT)
+    platform = (
+        zephyr_platform_framework(variant).value[0].value
+        if variant in VARIANTS and VARIANTS[variant].family is not None
+        else PLATFORM_NRF
+    )
+    return zephyr_rtos_config_schema(config, _ALL_FAMILIES, platform)
 
 
 def test_empty_zephyr_data_has_every_zephyr_data_key() -> None:
@@ -1603,16 +1613,6 @@ def _init_variant_schema_core() -> None:
     CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data()
 
 
-def test_variant_config_schema_skips_validation_when_owned_by_other_platform() -> None:
-    # nrf52 sets target_platform itself before auto-loading zephyr as a dependency
-    # -- zephyr's CONFIG_SCHEMA must not try to validate nrf52's config shape.
-    from esphome.components.zephyr import CONFIG_SCHEMA  # noqa: PLC0415
-
-    CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: "nrf52"}
-    config = {"some_nrf52_only_key": 123}
-    assert CONFIG_SCHEMA(config) == config
-
-
 def test_variant_config_schema_rejects_mac_address() -> None:
     _init_variant_schema_core()
     with pytest.raises(cv.Invalid, match="mac_address"):
@@ -1852,7 +1852,7 @@ def test_variant_config_schema_raises_for_unregistered_variant(
 # ---------------------------------------------------------------------------
 # zephyr_rtos_config_schema -- round-trip regression for #42: `esphome
 # upload`/`logs` can skip full validation via the validated-config cache and
-# re-run CONFIG_SCHEMA on the already-validated, cached zephyr: block in a
+# re-run CONFIG_SCHEMA on the already-validated, cached <platform>: block in a
 # fresh process (see upload_program()) -- each variant's config_schema() must
 # return a dict that validates cleanly when fed back through the platform schema a
 # second time. Covers every variant fixed by #43 (removal of the dead
@@ -1901,7 +1901,7 @@ def test_upload_program_resolves_variant_and_flashes(tmp_path: Path) -> None:
     CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant="ESP32H2")
     CORE.data[KEY_CORE] = {
         KEY_FRAMEWORK_VERSION: "4.4.1",
-        KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR,
+        KEY_TARGET_PLATFORM: PLATFORM_ESP32,
     }
     CORE.config_path = tmp_path / "test.yaml"
     CORE.build_path = tmp_path / "build"
@@ -1919,7 +1919,7 @@ def test_upload_program_resolves_variant_and_flashes(tmp_path: Path) -> None:
         ) as mock_flash,
     ):
         result = upload_program(
-            {PLATFORM_ZEPHYR: {CONF_FRAMEWORK: {CONF_REFRESH: "1d"}}},
+            {PLATFORM_ESP32: {CONF_FRAMEWORK: {CONF_REFRESH: "1d"}}},
             object(),
             "/dev/ttyACM0",
         )
@@ -2077,23 +2077,21 @@ def test_upload_program_restore_reapplies_user_module_overrides(
 def test_upload_program_raises_when_framework_version_not_restored() -> None:
     CORE.data.pop(KEY_ZEPHYR_RTOS, None)
     CORE.data[KEY_CORE] = {
-        KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR,
+        KEY_TARGET_PLATFORM: PLATFORM_ESP32,
         KEY_TARGET_FRAMEWORK: "zephyr",
     }
 
     with pytest.raises(EsphomeError, match="re-validate and recompile"):
-        upload_program(
-            {PLATFORM_ZEPHYR: {CONF_VARIANT: "ESP32"}}, object(), "some_host"
-        )
+        upload_program({PLATFORM_ESP32: {CONF_VARIANT: "ESP32"}}, object(), "some_host")
 
 
 def test_upload_program_raises_when_zephyr_config_missing_from_cache() -> None:
     CORE.data.pop(KEY_ZEPHYR_RTOS, None)
     CORE.data[KEY_CORE] = {
-        KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR,
+        KEY_TARGET_PLATFORM: PLATFORM_STM32,
         KEY_TARGET_FRAMEWORK: "zephyr",
     }
-    config = {}  # no PLATFORM_ZEPHYR block to re-validate against
+    config = {}  # no stm32: block to re-validate against
 
     with pytest.raises(EsphomeError, match="re-validate and recompile"):
         upload_program(config, object(), "some_host")
@@ -2276,7 +2274,7 @@ def test_resolve_zephyr_modules_raises_without_override_or_table_match() -> None
 def test_resolve_zephyr_modules_version_override_avoids_table_miss() -> None:
     # The scenario a plain table-miss error would otherwise block: a root SDK version
     # with no known-compatible module version still works once the user names one
-    # explicitly via zephyr: modules:, without needing to touch the request itself.
+    # explicitly via framework: modules:, without needing to touch the request itself.
     CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(
         variant="NRF52", framework_type="ncs"
     )
@@ -2347,7 +2345,7 @@ def test_resolve_zephyr_modules_raises_when_two_capabilities_collide_on_module_n
 
 
 # ---------------------------------------------------------------------------
-# _MODULE_SCHEMA -- zephyr: modules: entries
+# _MODULE_SCHEMA -- framework: modules: entries
 # ---------------------------------------------------------------------------
 
 
@@ -2401,7 +2399,7 @@ def test_module_schema_rejects_name_alone() -> None:
 
 def _set_zephyr_ota(variant: str, ota: list[dict]) -> None:
     CORE.data[KEY_CORE] = {
-        KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR,
+        KEY_TARGET_PLATFORM: zephyr_platform_framework(variant).value[0].value,
         KEY_TARGET_FRAMEWORK: "zephyr",
     }
     CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant=variant)
@@ -2430,7 +2428,7 @@ def test_zephyr_skip_bootloader_unsupported_on_other_platform() -> None:
 
 def test_reject_swap_method_off_zephyr_raises() -> None:
     CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: PLATFORM_ESP32}
-    with pytest.raises(cv.Invalid, match="only supported on platform: zephyr"):
+    with pytest.raises(cv.Invalid, match="only supported on Zephyr RTOS builds"):
         reject_swap_method_off_zephyr({"swap_method": "move"})
 
 
@@ -2441,7 +2439,7 @@ def test_reject_swap_method_off_zephyr_allows_unset() -> None:
 
 def test_reject_swap_method_off_zephyr_allows_zephyr() -> None:
     CORE.data[KEY_CORE] = {
-        KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR,
+        KEY_TARGET_PLATFORM: PLATFORM_NRF,
         KEY_TARGET_FRAMEWORK: "zephyr",
     }
     conf = {"swap_method": "move"}
@@ -2449,13 +2447,13 @@ def test_reject_swap_method_off_zephyr_allows_zephyr() -> None:
 
 
 # ---------------------------------------------------------------------------
-# CDC ACM ports on platform: zephyr
+# CDC ACM ports on Zephyr RTOS builds
 # ---------------------------------------------------------------------------
 
 
 def _zephyr_cdc_core(board_label: str | None) -> object:
     CORE.data[KEY_CORE] = {
-        KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR,
+        KEY_TARGET_PLATFORM: PLATFORM_NRF,
         KEY_TARGET_FRAMEWORK: "zephyr",
     }
     CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant="NRF52")
@@ -2543,7 +2541,7 @@ def test_usb_cdc_acm_only_on_zephyr_usb(variant: str, ok: bool) -> None:
     from esphome.components.usb_cdc_acm import _only_on_zephyr_usb
 
     CORE.data[KEY_CORE] = {
-        KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR,
+        KEY_TARGET_PLATFORM: zephyr_platform_framework(variant).value[0].value,
         KEY_TARGET_FRAMEWORK: "zephyr",
     }
     CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant=variant)

@@ -25,7 +25,7 @@ from esphome.const import (
     KEY_CORE,
     KEY_TARGET_FRAMEWORK,
     KEY_TARGET_PLATFORM,
-    PLATFORM_ZEPHYR,
+    PLATFORM_NRF,
     Toolchain,
 )
 from esphome.core import CORE, ID, KEY_CONTROLLER_REGISTRY_CONTROLLERS, config
@@ -163,11 +163,11 @@ def test_loop_interval_zephyr_watchdog(
 ) -> None:
     """With the Zephyr watchdog disabled the loop sleep is not capped."""
     CORE.data[KEY_CORE] = {
-        KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR,
+        KEY_TARGET_PLATFORM: PLATFORM_NRF,
         KEY_TARGET_FRAMEWORK: "zephyr",
     }
     token = fv.full_config.set(
-        {PLATFORM_ZEPHYR: {CONF_WATCHDOG_TIMEOUT: watchdog_timeout}}
+        {PLATFORM_NRF: {CONF_WATCHDOG_TIMEOUT: watchdog_timeout}}
     )
     try:
         validate_loop_interval({CONF_LOOP_INTERVAL: cv.TimePeriod(seconds=7)})

@@ -68,10 +68,10 @@ SWAP_METHOD_SCHEMA = {
 
 
 def reject_swap_method_off_zephyr(config: ConfigType) -> ConfigType:
-    """swap_method: is only applied on platform: zephyr; reject it elsewhere."""
+    """swap_method: is only applied on Zephyr RTOS builds; reject it elsewhere."""
     if not CORE.using_zephyr_rtos and CONF_SWAP_METHOD in config:
         raise cv.Invalid(
-            f"'{CONF_SWAP_METHOD}' is only supported on platform: zephyr",
+            f"'{CONF_SWAP_METHOD}' is only supported on Zephyr RTOS builds",
             path=[CONF_SWAP_METHOD],
         )
     return config
@@ -101,7 +101,7 @@ def _ota_final_validate(config: ConfigType) -> None:
         raise cv.Invalid(
             f"At least one platform must be specified for '{CONF_OTA}'; add '{CONF_PLATFORM}: {CONF_ESPHOME}' for original OTA functionality"
         )
-    # CORE.using_zephyr_rtos is the `platform: zephyr` variant dispatch (esp32_h2, esp32_c6, ...);
+    # CORE.using_zephyr_rtos is the Zephyr RTOS variant dispatch (esp32_h2, esp32_c6, ...);
     # it excludes nrf52, which also builds on Zephyr but validates its own bootloader separately.
     if CORE.using_zephyr_rtos and _mcuboot_slot_writers(config):
         from esphome.components.zephyr import zephyr_data  # noqa: PLC0415
@@ -283,7 +283,6 @@ _filter_backend_source_files = filter_source_files_from_platform(
             PlatformFramework.RP2_ZEPHYR,
             PlatformFramework.SILABS_ZEPHYR,
             PlatformFramework.STM32_ZEPHYR,
-            PlatformFramework.ZEPHYR_ZEPHYR,
         },
     }
 )
@@ -292,7 +291,7 @@ _filter_backend_source_files = filter_source_files_from_platform(
 # USE_OTA_SIGNED_VERIFICATION_MULTI_KEY is set only on ESP32/IDF;
 # USE_OTA_PARTITIONS is set by the esphome OTA platform when
 # allow_partition_access is enabled.
-# USE_OTA_MCUBOOT is set on platform: zephyr when an OTA platform writes MCUboot's slot.
+# USE_OTA_MCUBOOT is set on Zephyr RTOS builds when an OTA platform writes MCUboot's slot.
 _filter_define_source_files = filter_source_files_from_defines(
     {
         "ota_signature_esp_idf.cpp": "USE_OTA_SIGNED_VERIFICATION_MULTI_KEY",

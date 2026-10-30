@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from importlib import import_module
 from typing import Any
 
 import pytest
@@ -250,12 +251,18 @@ def test_module_template_resolve_ignores_min_version_for_non_semver_ref() -> Non
 @pytest.mark.parametrize("variant", sorted(VARIANTS))
 def test_validated_config_round_trips_through_config_schema(variant: str) -> None:
     """upload/logs feed the cached validated config back through CONFIG_SCHEMA."""
-    from esphome.components.zephyr import CONFIG_SCHEMA  # noqa: PLC0415
-    from esphome.const import CONF_VARIANT, KEY_CORE  # noqa: PLC0415
+    from esphome.const import CONF_TYPE, CONF_VARIANT, KEY_CORE  # noqa: PLC0415
     from esphome.core import CORE  # noqa: PLC0415
+    from tests.unit_tests.components.zephyr_rtos.zephyr_state import (  # noqa: PLC0415
+        zephyr_platform_framework,
+    )
 
+    platform = zephyr_platform_framework(variant).value[0].value
+    CONFIG_SCHEMA = import_module(f"esphome.components.{platform}").CONFIG_SCHEMA
     CORE.data[KEY_CORE] = {}
-    validated = CONFIG_SCHEMA({CONF_VARIANT: variant})
+    validated = CONFIG_SCHEMA(
+        {CONF_VARIANT: variant, CONF_FRAMEWORK: {CONF_TYPE: "zephyr"}}
+    )
     re_validated = CONFIG_SCHEMA(validated)
     assert re_validated[CONF_VARIANT] == variant
     assert set(re_validated) == set(validated)
@@ -267,7 +274,7 @@ def test_validated_config_round_trips_through_config_schema(variant: str) -> Non
 
 
 def _simg301_schema(framework: dict) -> dict:
-    from esphome.components.zephyr import CONFIG_SCHEMA  # noqa: PLC0415
+    from esphome.components.silabs import CONFIG_SCHEMA  # noqa: PLC0415
     from esphome.const import CONF_VARIANT, KEY_CORE  # noqa: PLC0415
     from esphome.core import CORE  # noqa: PLC0415
 

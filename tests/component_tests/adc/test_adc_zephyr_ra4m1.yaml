@@ -1,7 +1,7 @@
 esphome:
   name: test
 
-zephyr:
+renesas:
   variant: RA4M1
   board: arduino_uno_r4@wifi
 

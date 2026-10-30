@@ -21,9 +21,7 @@ from tests.component_tests.types import SetCoreConfigCallable
 
 
 def _zephyr(set_core_config: SetCoreConfigCallable, variant: str) -> None:
-    set_core_config(
-        PlatformFramework.ZEPHYR_ZEPHYR,
-    )
+    set_core_config(PlatformFramework.NRF_ZEPHYR)
     CORE.data[KEY_ZEPHYR_RTOS] = {"variant": variant, "family": "nordic"}
 
 
@@ -42,9 +40,7 @@ def test_rtt3_port_rejected(set_core_config: SetCoreConfigCallable) -> None:
 def test_rtt_port_rejected_on_family_without_rtt(
     set_core_config: SetCoreConfigCallable,
 ) -> None:
-    set_core_config(
-        PlatformFramework.ZEPHYR_ZEPHYR,
-    )
+    set_core_config(PlatformFramework.ESP32_ZEPHYR)
     CORE.data[KEY_ZEPHYR_RTOS] = {"variant": "ESP32", "family": "esp32"}
     with pytest.raises(Invalid, match="esp32 does not support"):
         uart.validate_port("RTT1")

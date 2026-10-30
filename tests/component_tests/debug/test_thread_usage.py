@@ -1,4 +1,4 @@
-"""Tests for the per-thread CPU usage statistics debug enables on nRF52 and platform: zephyr."""
+"""Tests for the per-thread CPU usage statistics debug enables on nRF52 and Zephyr RTOS builds."""
 
 from collections.abc import Callable
 from pathlib import Path

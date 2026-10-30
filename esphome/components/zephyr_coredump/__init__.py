@@ -74,7 +74,7 @@ def _partition_address() -> int:
 
 
 def _final_validate(config: ConfigType) -> ConfigType:
-    # platform: zephyr takes the partition from the devicetree instead
+    # Zephyr RTOS takes the partition from the devicetree instead
     if CORE.is_nrf52:
         _partition_address()
     return config
@@ -124,7 +124,7 @@ async def to_code(config: ConfigType) -> None:
 
 
 async def _zephyr_to_code(config: ConfigType) -> None:
-    """platform: zephyr: every supported SDK is Zephyr 4.x, so the stack pointer fix is never needed,
+    """Zephyr RTOS: every supported SDK is Zephyr 4.x, so the stack pointer fix is never needed,
     and the user's devicetree provides the partition."""
     if zephyr_variant() in XTENSA_VARIANTS:
         zephyr_add_prj_conf("DEBUG_COREDUMP_MEMORY_DUMP_MIN", True)

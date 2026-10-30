@@ -1,4 +1,4 @@
-# Common I2C configuration for platform: zephyr, variant: efr32bg27 tests
+# Common I2C configuration for silabs-efr32bg27-zephyr tests
 # No sda/scl: this variant doesn't support I2C pin remapping -- the board's default
 # I2C bus (i2c0, pins PD2/PD3) is already wired by the board's own DTS. Confirmed on
 # real hardware: an HTU21D (Si7021) at 0x40 and a VEML7700 (VEML6035) at 0x29 both

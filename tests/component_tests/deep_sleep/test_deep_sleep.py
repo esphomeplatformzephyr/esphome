@@ -11,6 +11,9 @@ from esphome.components.zephyr.const import KEY_ZEPHYR_RTOS
 from esphome.components.zephyr_rtos.variants import VARIANTS
 from esphome.const import CONF_WAKEUP_PIN, PlatformFramework
 from esphome.core import CORE
+from tests.unit_tests.components.zephyr_rtos.zephyr_state import (
+    zephyr_platform_framework,
+)
 
 from ..types import SetCoreConfigCallable
 
@@ -226,7 +229,7 @@ def test_deep_sleep_esp32_wakeup_pin_mode_at_both_levels_rejected(
 def test_deep_sleep_zephyr_wakeup_pin(
     generate_main: Callable[[str | Path], str],
 ) -> None:
-    """platform: zephyr arms the pin before sys_poweroff() and keeps the mode."""
+    """Zephyr RTOS arms the pin before sys_poweroff() and keeps the mode."""
     main_cpp = generate_main(
         "tests/component_tests/deep_sleep/test_deep_sleep_zephyr_wakeup_pin.yaml"
     )
@@ -237,9 +240,7 @@ def test_deep_sleep_zephyr_wakeup_pin(
 
 
 def _set_zephyr_variant(set_core_config: SetCoreConfigCallable, variant: str) -> None:
-    set_core_config(
-        PlatformFramework.ZEPHYR_ZEPHYR,
-    )
+    set_core_config(zephyr_platform_framework(variant))
     CORE.data[KEY_ZEPHYR_RTOS] = {
         "variant": variant,
         "family": VARIANTS[variant].family,

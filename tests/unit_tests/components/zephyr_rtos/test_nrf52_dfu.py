@@ -19,7 +19,7 @@ from esphome.const import (
     KEY_CORE,
     KEY_FRAMEWORK_VERSION,
     KEY_TARGET_PLATFORM,
-    PLATFORM_ZEPHYR,
+    PLATFORM_NRF,
 )
 from esphome.core import CORE, EsphomeError
 from esphome.upload_targets import PortType
@@ -35,7 +35,7 @@ def _nrf52_state(tmp_path: Path, bootloader: str = V6) -> None:
     )
     CORE.data[KEY_CORE] = {
         KEY_FRAMEWORK_VERSION: "4.4.1",
-        KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR,
+        KEY_TARGET_PLATFORM: PLATFORM_NRF,
     }
     CORE.config_path = tmp_path / "test.yaml"
     CORE.build_path = tmp_path / "build"
@@ -212,7 +212,7 @@ def test_upload_program_uses_serial_dfu_for_adafruit_nrf52(tmp_path: Path) -> No
         patch.object(nrf52, "upload_serial_dfu", return_value=True) as mock_dfu,
     ):
         result = upload_program(
-            {PLATFORM_ZEPHYR: {CONF_FRAMEWORK: {}}}, object(), "/dev/ttyACM0"
+            {PLATFORM_NRF: {CONF_FRAMEWORK: {}}}, object(), "/dev/ttyACM0"
         )
     assert result is True
     mock_dfu.assert_called_once_with("/dev/ttyACM0")
@@ -225,7 +225,7 @@ def test_upload_program_uses_adafruit_ble_dfu(tmp_path: Path) -> None:
     _nrf52_state(tmp_path)
     with patch.object(nrf52, "_upload_adafruit_ble", new=AsyncMock()) as mock_ble:
         result = upload_program(
-            {PLATFORM_ZEPHYR: {CONF_FRAMEWORK: {}}, **ADAFRUIT_BLE_OTA}, object(), "BLE"
+            {PLATFORM_NRF: {CONF_FRAMEWORK: {}}, **ADAFRUIT_BLE_OTA}, object(), "BLE"
         )
     assert result is True
     mock_ble.assert_awaited_once_with("BLE")
@@ -271,7 +271,7 @@ def test_upload_adafruit_ble_scans_then_hands_over_to_the_bootloader(
 
 def _reset_config(variant: str, advanced: dict | None = None) -> dict:
     return {
-        PLATFORM_ZEPHYR: {"variant": variant, "framework": {"advanced": advanced or {}}}
+        PLATFORM_NRF: {"variant": variant, "framework": {"advanced": advanced or {}}}
     }
 
 
@@ -340,7 +340,7 @@ def test_reset_over_usb_does_nothing_when_the_build_data_is_missing(
     tmp_path: Path,
 ) -> None:
     """A reset request must not fail just because the build data cannot be restored."""
-    CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR}
+    CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: PLATFORM_NRF}
     with patch("serial.Serial") as mock_serial:
         assert reset_over_usb({}, "/dev/ttyACM0") is False
     mock_serial.assert_not_called()

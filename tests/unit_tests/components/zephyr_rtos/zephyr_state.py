@@ -4,12 +4,30 @@ from __future__ import annotations
 
 from typing import Any
 
+from esphome.components import esp32, nrf, nxp, renesas, rp2, silabs, stm32
 from esphome.components.zephyr_rtos import ZephyrRtosData
 from esphome.components.zephyr_rtos.const import KEY_ZEPHYR_RTOS
 from esphome.components.zephyr_rtos.variants import VARIANTS, set_core_data
 import esphome.config_validation as cv
-from esphome.const import KEY_CORE
+from esphome.const import KEY_CORE, Framework, Platform, PlatformFramework
 from esphome.core import CORE
+
+_PLATFORM_FAMILIES = {
+    Platform.ESP32: esp32.ZEPHYR_FAMILIES,
+    Platform.NRF: nrf.FAMILIES,
+    Platform.NXP: nxp.FAMILIES,
+    Platform.RENESAS: renesas.FAMILIES,
+    Platform.RP2: rp2.ZEPHYR_FAMILIES,
+    Platform.SILABS: silabs.FAMILIES,
+    Platform.STM32: stm32.FAMILIES,
+}
+
+
+def zephyr_platform_framework(variant: str) -> PlatformFramework:
+    """The <platform>_ZEPHYR pair whose platform builds variant."""
+    family = VARIANTS[variant].family
+    platform = next(p for p, fams in _PLATFORM_FAMILIES.items() if family in fams)
+    return PlatformFramework((platform, Framework.ZEPHYR))
 
 
 def empty_zephyr_data(

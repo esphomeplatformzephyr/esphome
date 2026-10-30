@@ -1,8 +1,10 @@
 esphome:
   name: test
 
-zephyr:
+esp32:
   variant: ESP32
+  framework:
+    type: zephyr
 
 debug:
 

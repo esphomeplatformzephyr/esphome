@@ -32,10 +32,12 @@ from esphome.const import (
     KEY_FRAMEWORK_VERSION,
     KEY_TARGET_FRAMEWORK,
     KEY_TARGET_PLATFORM,
-    PLATFORM_ZEPHYR,
 )
 from esphome.core import CORE, ID
-from tests.unit_tests.components.zephyr_rtos.zephyr_state import empty_zephyr_data
+from tests.unit_tests.components.zephyr_rtos.zephyr_state import (
+    empty_zephyr_data,
+    zephyr_platform_framework,
+)
 
 
 def _core_data(
@@ -123,9 +125,10 @@ def test_mcumgr_warns_that_the_slots_move(
 
 
 def _zephyr_core_data(variant: str) -> None:
+    platform, framework = zephyr_platform_framework(variant).value
     CORE.data[KEY_CORE] = {
-        KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR,
-        KEY_TARGET_FRAMEWORK: "zephyr",
+        KEY_TARGET_PLATFORM: platform.value,
+        KEY_TARGET_FRAMEWORK: framework.value,
     }
     CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant=variant)
 
@@ -146,7 +149,7 @@ def test_zephyr_platform_accepted(variant: str) -> None:
     ],
 )
 def test_zephyr_to_code(variant: str, dump_option: str) -> None:
-    """platform: zephyr requires a devicetree partition instead of placing one."""
+    """Zephyr RTOS requires a devicetree partition instead of placing one."""
     _zephyr_core_data(variant)
     with (
         patch("esphome.codegen.new_Pvariable"),

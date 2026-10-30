@@ -387,7 +387,7 @@ def _check_and_install(
     if is_local:
         if git_modules:
             raise EsphomeError(
-                "zephyr: modules: can't be combined with sdk_source: local: -- "
+                "framework: modules: can't be combined with sdk_source: local: -- "
                 "local: points at your own checkout, which ESPHome can't safely "
                 "graft additional projects onto."
             )
@@ -563,7 +563,7 @@ def _check_and_install(
         if not is_local and not grow_only:
             # A patched tracked file can block west update's checkout.
             _restore_gen_defines(zephyr_dir)
-        # With `zephyr: modules:`, a fetch that hasn't finished can't load its manifest
+        # With `framework: modules:`, a fetch that hasn't finished can't load its manifest
         check_first = not git_modules or not (needs_init or incomplete)
         if hal_filter is not None:
             if check_first:

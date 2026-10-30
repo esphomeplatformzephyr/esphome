@@ -185,9 +185,7 @@ def test_nrf52_usb_cdc_leaves_label_to_cpp_fallback(
 def test_any_uart_number_accepted_on_zephyr(
     set_core_config: SetCoreConfigCallable,
 ) -> None:
-    set_core_config(
-        PlatformFramework.ZEPHYR_ZEPHYR,
-    )
+    set_core_config(PlatformFramework.NRF_ZEPHYR)
     CORE.data[KEY_ZEPHYR_RTOS] = {"variant": VARIANT_NRF52, "family": "nordic"}
     assert uart_selection("uart3") == "UART3"
     assert uart_selection("UART12") == "UART12"
@@ -217,9 +215,7 @@ def test_zephyr_uart3_codegen(
 def test_debug_probe_outputs_accepted_on_zephyr(
     set_core_config: SetCoreConfigCallable, value: str
 ) -> None:
-    set_core_config(
-        PlatformFramework.ZEPHYR_ZEPHYR,
-    )
+    set_core_config(PlatformFramework.NRF_ZEPHYR)
     CORE.data[KEY_ZEPHYR_RTOS] = {"variant": VARIANT_NRF52, "family": "nordic"}
     assert uart_selection(value) == value.upper()
 
@@ -227,9 +223,7 @@ def test_debug_probe_outputs_accepted_on_zephyr(
 def test_rtt_rejected_on_family_without_rtt(
     set_core_config: SetCoreConfigCallable,
 ) -> None:
-    set_core_config(
-        PlatformFramework.ZEPHYR_ZEPHYR,
-    )
+    set_core_config(PlatformFramework.ESP32_ZEPHYR)
     CORE.data[KEY_ZEPHYR_RTOS] = {"variant": "ESP32", "family": "esp32"}
     with pytest.raises(Invalid, match="esp32 does not support"):
         uart_selection("RTT0")
@@ -246,9 +240,7 @@ def test_debug_probe_outputs_rejected_off_zephyr(
 def test_semihost_warns(
     set_core_config: SetCoreConfigCallable, caplog: pytest.LogCaptureFixture
 ) -> None:
-    set_core_config(
-        PlatformFramework.ZEPHYR_ZEPHYR,
-    )
+    set_core_config(PlatformFramework.NRF_ZEPHYR)
     CORE.data[KEY_ZEPHYR_RTOS] = {"variant": VARIANT_NRF52, "family": "nordic"}
     uart_selection("SEMIHOST")
     assert "no debugger is attached" in caplog.text
@@ -308,9 +300,7 @@ def test_zephyr_rtt_reuses_board_node(
 
 def test_rtt3_not_a_logger_keyword(set_core_config: SetCoreConfigCallable) -> None:
     """Channel 3 needs SEGGER's buffer counts raised; it is only reachable as "&rtt3"."""
-    set_core_config(
-        PlatformFramework.ZEPHYR_ZEPHYR,
-    )
+    set_core_config(PlatformFramework.NRF_ZEPHYR)
     CORE.data[KEY_ZEPHYR_RTOS] = {"variant": VARIANT_NRF52, "family": "nordic"}
     with pytest.raises(Invalid):
         uart_selection("RTT3")

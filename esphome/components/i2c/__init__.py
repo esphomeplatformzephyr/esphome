@@ -547,7 +547,6 @@ _platform_filter = filter_source_files_from_platform(
             PlatformFramework.RP2_ZEPHYR,
             PlatformFramework.SILABS_ZEPHYR,
             PlatformFramework.STM32_ZEPHYR,
-            PlatformFramework.ZEPHYR_ZEPHYR,
         },
         "i2c_bus_host.cpp": {PlatformFramework.HOST_NATIVE},
     }

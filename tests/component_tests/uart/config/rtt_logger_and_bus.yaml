@@ -1,7 +1,7 @@
 esphome:
   name: test
 
-zephyr:
+nrf:
   variant: NRF52
   board: adafruit_feather_nrf52840
 

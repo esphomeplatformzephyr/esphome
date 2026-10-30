@@ -401,7 +401,6 @@ _ENABLE_IPV6_FRAMEWORK_VERSION_VALIDATOR = cv.require_framework_version(
     rp2_zephyr=cv.Version(0, 0, 0),
     silabs_zephyr=cv.Version(0, 0, 0),
     stm32_zephyr=cv.Version(0, 0, 0),
-    zephyr_zephyr=cv.Version(0, 0, 0),
 )
 
 

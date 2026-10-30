@@ -28,7 +28,6 @@ from esphome.const import (
     PLATFORM_RTL87XX,
     PLATFORM_SILABS,
     PLATFORM_STM32,
-    PLATFORM_ZEPHYR,
 )
 from esphome.core import EsphomeError
 
@@ -40,7 +39,6 @@ _ZEPHYR_RTOS_PLATFORMS = (
     PLATFORM_RENESAS,
     PLATFORM_SILABS,
     PLATFORM_STM32,
-    PLATFORM_ZEPHYR,
 )
 
 # Real dump lines per registered platform; the gate must fire on each.

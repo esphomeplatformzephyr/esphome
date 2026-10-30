@@ -1,7 +1,7 @@
 esphome:
   name: test
 
-zephyr:
+silabs:
   variant: EFR32MG24
 
 sensor:

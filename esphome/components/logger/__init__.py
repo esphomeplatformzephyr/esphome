@@ -75,7 +75,7 @@ UART0_SWAP = "UART0_SWAP"
 USB_SERIAL_JTAG = "USB_SERIAL_JTAG"
 USB_CDC = "USB_CDC"
 DEFAULT = "DEFAULT"
-# RAM and SEMIHOST: platform: zephyr logger outputs that a debugger reads; RTT channels
+# RAM and SEMIHOST: Zephyr RTOS logger outputs that a debugger reads; RTT channels
 # are in zephyr/rtt.py. Each enables the <name>_CONSOLE Kconfig option, fed by printk().
 SEMIHOST = "SEMIHOST"
 CONSOLE_BACKENDS = ("RAM", SEMIHOST)
@@ -1060,7 +1060,6 @@ FILTER_SOURCE_FILES = filter_source_files_from_platform(
             PlatformFramework.RP2_ZEPHYR,
             PlatformFramework.SILABS_ZEPHYR,
             PlatformFramework.STM32_ZEPHYR,
-            PlatformFramework.ZEPHYR_ZEPHYR,
         },
         "task_log_buffer_esp32.cpp": {
             PlatformFramework.ESP32_ARDUINO,
@@ -1082,7 +1081,6 @@ FILTER_SOURCE_FILES = filter_source_files_from_platform(
             PlatformFramework.RP2_ZEPHYR,
             PlatformFramework.SILABS_ZEPHYR,
             PlatformFramework.STM32_ZEPHYR,
-            PlatformFramework.ZEPHYR_ZEPHYR,
         },
     }
 )

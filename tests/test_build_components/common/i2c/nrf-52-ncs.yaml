@@ -1,4 +1,4 @@
-# Common I2C configuration for platform: zephyr, variant: nrf52 tests
+# Common I2C configuration for nrf-52-ncs tests
 # nRF52's TWIM has fully flexible pin muxing (no board-fixed I2C pins the way
 # esp32-h2's board DTS has) -- these match the board's own i2c0_default
 # pinctrl node (adafruit_feather_nrf52840-pinctrl.dtsi: TWIM_SDA P0.12,

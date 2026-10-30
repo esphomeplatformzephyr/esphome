@@ -80,8 +80,7 @@ def validate_config(config: ConfigType) -> ConfigType:
         CORE.is_esp32 or (CORE.using_zephyr_rtos and zephyr_variant_family() == "esp32")
     ):
         raise cv.Invalid(
-            "attenuation is only valid on esp32 or platform: zephyr with an "
-            "esp32-family variant",
+            "attenuation is only valid on esp32",
             path=[CONF_ATTENUATION],
         )
 
@@ -281,7 +280,7 @@ def _next_zephyr_io_channel_index() -> int:
     """Return the next position in `zephyr_user`'s `io-channels` property.
 
     ADC_DT_SPEC_GET_BY_IDX() indexes by append position, not silicon channel, so
-    every platform: zephyr branch must share this counter.
+    every Zephyr RTOS branch must share this counter.
     platform: nrf52 can't build alongside them and keeps its own.
     """
     data = _get_data()
@@ -731,7 +730,6 @@ FILTER_SOURCE_FILES = filter_source_files_from_platform(
             PlatformFramework.RP2_ZEPHYR,
             PlatformFramework.SILABS_ZEPHYR,
             PlatformFramework.STM32_ZEPHYR,
-            PlatformFramework.ZEPHYR_ZEPHYR,
         },
     }
 )

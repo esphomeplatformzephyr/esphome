@@ -39,7 +39,7 @@ def _validate_rtt_console(config: ConfigType) -> ConfigType:
         return config
     if not CORE.using_zephyr or CORE.is_nrf52:
         raise cv.Invalid(
-            f"{CONF_ENABLE_RTT_CONSOLE} is only available on platform: zephyr",
+            f"{CONF_ENABLE_RTT_CONSOLE} is only available on Zephyr RTOS builds",
             path=[CONF_ENABLE_RTT_CONSOLE],
         )
     if SEGGER_RTT_UART not in zephyr_family_uart_drivers():
@@ -99,7 +99,7 @@ async def to_code(config: ConfigType) -> None:
                 zephyr_add_prj_conf("THREAD_RUNTIME_STATS", True)
                 zephyr_add_prj_conf("SCHED_THREAD_USAGE_ANALYSIS", True)
         else:
-            # platform: zephyr only -- nrf52 keeps its original dev behavior above,
+            # Zephyr RTOS only -- nrf52 keeps its original dev behavior above,
             # unchanged by these newer debug features.
             zephyr_add_prj_conf("FLASH_MAP", True)
             zephyr_add_prj_conf("THREAD_MONITOR", True)
@@ -119,7 +119,7 @@ async def to_code(config: ConfigType) -> None:
                 # mode drops nothing while a probe reads, and stops the device when none does.
                 claim_rtt_channel(0, DEBUG_OWNER)
                 zephyr_add_prj_conf("USE_SEGGER_RTT", True)
-                # RTT_CONSOLE only exists with CONSOLE, which platform: zephyr turns off
+                # RTT_CONSOLE only exists with CONSOLE, which Zephyr RTOS turns off
                 zephyr_add_prj_conf("CONSOLE", True)
                 zephyr_add_prj_conf("RTT_CONSOLE", True)
                 zephyr_add_prj_conf("LOG", True)
@@ -155,7 +155,6 @@ FILTER_SOURCE_FILES = filter_source_files_from_platform(
             PlatformFramework.RP2_ZEPHYR,
             PlatformFramework.SILABS_ZEPHYR,
             PlatformFramework.STM32_ZEPHYR,
-            PlatformFramework.ZEPHYR_ZEPHYR,
         },
     }
 )

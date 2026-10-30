@@ -35,7 +35,6 @@ from esphome.const import (
     PLATFORM_RTL87XX,
     PLATFORM_SILABS,
     PLATFORM_STM32,
-    PLATFORM_ZEPHYR,
     Platform,
 )
 
@@ -54,7 +53,6 @@ _ZEPHYR_RTOS_PLATFORMS: Final = (
     PLATFORM_RENESAS,
     PLATFORM_SILABS,
     PLATFORM_STM32,
-    PLATFORM_ZEPHYR,
 )
 
 # Platforms whose firmware prints the crash handler report share one gate.

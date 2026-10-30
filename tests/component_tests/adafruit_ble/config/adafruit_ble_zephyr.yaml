@@ -1,11 +1,12 @@
 esphome:
   name: adafruitbletest
 
-zephyr:
+nrf:
   variant: NRF52
   board: promicro_nrf52840/nrf52840/uf2
-  advanced:
-    bootloader: adafruit_nrf52_sd140_v6
+  framework:
+    advanced:
+      bootloader: adafruit_nrf52_sd140_v6
 
 logger:
 

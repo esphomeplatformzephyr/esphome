@@ -70,7 +70,7 @@ ZigbeeNumber = zigbee_ns.class_("ZigbeeNumber", cg.Component)
 
 
 def zigbee_zephyr_supported() -> bool:
-    """True on platform: nrf52, or on platform: zephyr when the active variant has
+    """True on platform: nrf52, or on Zephyr RTOS builds when the active variant has
     zigbee radio support and the active root SDK actually offers a "zigbee" module.
     ncs-zigbee (ZBOSS) is Nordic-proprietary; as of NCS 3.4.0 it lives only in the
     separate ncs-zigbee add-on module, not in plain framework: type: ncs anymore --
@@ -93,7 +93,7 @@ def requires_zigbee_zephyr_supported(value):
     """Raise a clear error if ZBOSS zigbee isn't usable here -- see zigbee_zephyr_supported()."""
     if not zigbee_zephyr_supported():
         raise cv.Invalid(
-            "This option requires platform: nrf52, or platform: zephyr with a "
+            "This option requires platform: nrf52, or a Zephyr RTOS build with a "
             "zigbee-capable variant"
         )
     return value
@@ -111,7 +111,7 @@ async def zephyr_to_code(config: ConfigType) -> "MockObj":
 
     # Top-level Zigbee-stack-enable Kconfig symbol: "ZIGBEE" for platform: nrf52's
     # legacy inline stack, "ZIGBEE_ADD_ON" for the separate ncs-zigbee module (the
-    # only option on platform: zephyr -- see zigbee_zephyr_supported()).
+    # only option on Zephyr RTOS -- see zigbee_zephyr_supported()).
     zigbee_enable_symbol = (
         "ZIGBEE" if "nrf52" in CORE.loaded_integrations else "ZIGBEE_ADD_ON"
     )

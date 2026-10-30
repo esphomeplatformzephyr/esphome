@@ -71,7 +71,6 @@ class Platform(StrEnum):
     RTL87XX = "rtl87xx"
     SILABS = "silabs"
     STM32 = "stm32"
-    ZEPHYR = "zephyr"
 
 
 class Framework(StrEnum):
@@ -140,7 +139,6 @@ class PlatformFramework(Enum):
     RP2_ZEPHYR = (Platform.RP2, Framework.ZEPHYR)
     SILABS_ZEPHYR = (Platform.SILABS, Framework.ZEPHYR)
     STM32_ZEPHYR = (Platform.STM32, Framework.ZEPHYR)
-    ZEPHYR_ZEPHYR = (Platform.ZEPHYR, Framework.ZEPHYR)
 
     # Host platform (native)
     HOST_NATIVE = (Platform.HOST, Framework.NATIVE)
@@ -164,7 +162,6 @@ PLATFORM_RP2040 = Platform.RP2040
 PLATFORM_RTL87XX = Platform.RTL87XX
 PLATFORM_SILABS = Platform.SILABS
 PLATFORM_STM32 = Platform.STM32
-PLATFORM_ZEPHYR = Platform.ZEPHYR
 
 
 BUNDLE_EXTENSION = ".esphomebundle.tar.gz"

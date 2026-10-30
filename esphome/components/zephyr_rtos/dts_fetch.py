@@ -614,7 +614,7 @@ async def fetch_board_dts(
 ) -> None:
     """Populate ZephyrRtosData dts_base_path with the local Zephyr tree.
 
-    `sdk`/`sdk_name` are the already-resolved `zephyr: framework: type:` selection
+    `sdk`/`sdk_name` are the already-resolved `framework: type:` selection
     (VARIANTS[variant]'s own default sdk, or one of its alt_sdks) -- not necessarily
     the variant's default. A local sdk_source (a fork/checkout on disk) is used
     directly -- there's no version tag to clone by, and the checkout already has
