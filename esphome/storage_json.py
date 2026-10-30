@@ -208,7 +208,7 @@ class StorageJSON:
         """
         hardware = esph.target_platform.upper()
         framework_version: str | None = None
-        if esph.is_esp32 and not esph.using_zephyr_rtos:
+        if esph.is_esp32:
             from esphome.components import esp32
 
             hardware = esp32.get_esp32_variant(esph)

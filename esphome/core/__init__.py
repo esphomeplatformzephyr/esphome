@@ -967,7 +967,8 @@ class EsphomeCore:
 
     @property
     def is_esp32(self):
-        return self.target_platform == PLATFORM_ESP32
+        """ESP32 on ESP-IDF or Arduino; false for framework: type: zephyr."""
+        return self.target_platform == PLATFORM_ESP32 and not self.using_zephyr_rtos
 
     @property
     def is_rp2(self):
@@ -978,8 +979,9 @@ class EsphomeCore:
         For variant-specific gating (RP2040 vs RP2350), use
         ``rp2.get_rp2040_variant()`` or ``rp2.only_on_variant(...)`` from
         the rp2 component — variant detection doesn't belong on ``CORE``.
+        False for framework: type: zephyr.
         """
-        return self.target_platform == PLATFORM_RP2
+        return self.target_platform == PLATFORM_RP2 and not self.using_zephyr_rtos
 
     @property
     def is_rp2040(self):

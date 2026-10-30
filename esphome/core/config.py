@@ -215,7 +215,7 @@ def validate_loop_interval(config: ConfigType) -> ConfigType:
     if CONF_LOOP_INTERVAL in config and not (CORE.is_host or CORE.is_esp8266):
         # max_loop interval is calculated from WDT_FEED_INTERVAL_MS. Make sure to align with application.h
         max_loop = 600  # 2 * 300ms default for other platforms
-        if CORE.is_esp32 and not CORE.using_zephyr_rtos:
+        if CORE.is_esp32:
             max_loop = (
                 2
                 * fv.full_config.get()[PLATFORM_ESP32][
@@ -240,7 +240,7 @@ def validate_loop_interval(config: ConfigType) -> ConfigType:
                 max_loop,
                 max_loop,
                 " Raise esp32.watchdog_timeout to sleep longer."
-                if CORE.is_esp32 and not CORE.using_zephyr_rtos
+                if CORE.is_esp32
                 else " Raise zephyr.watchdog_timeout to sleep longer."
                 if CORE.using_zephyr_rtos
                 else "",
@@ -297,7 +297,7 @@ def _sbom_supplier(value: str) -> str:
 
 def _sbom_platform(value: ConfigType) -> ConfigType:
     # Only ESP-IDF builds produce the manifests esp-idf-sbom reads
-    if not CORE.is_esp32 or CORE.using_zephyr_rtos:
+    if not CORE.is_esp32:
         raise cv.Invalid(
             f"SBOM details are only used on ESP32, not on {CORE.target_platform}"
         )
@@ -377,7 +377,11 @@ def validate_area_config(config: dict | str) -> dict[str, str | core.ID]:
 
 def _validate_suspend_loop(value: bool) -> bool:
     # host and RP2 platforms have unwakeable delay fallbacks, so suspending the main loop is unsafe
-    if value and CORE.target_platform in [PLATFORM_HOST, PLATFORM_RP2]:
+    if (
+        value
+        and CORE.target_platform in [PLATFORM_HOST, PLATFORM_RP2]
+        and not CORE.using_zephyr_rtos
+    ):
         raise cv.Invalid(
             f"Suspend loop is not available on {CORE.target_platform} platform"
         )

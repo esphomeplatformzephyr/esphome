@@ -58,11 +58,7 @@ async def to_code(config: ConfigType) -> None:
     var = await sensor.new_sensor(config)
     await cg.register_component(var, config)
 
-    if (
-        CORE.is_esp32
-        and not CORE.using_zephyr_rtos
-        and get_esp32_variant() == VARIANT_ESP32
-    ):
+    if CORE.is_esp32 and get_esp32_variant() == VARIANT_ESP32:
         # temprature_sens_read() lives in the esp_phy blob, which is excluded by default
         include_builtin_idf_component("esp_phy")
 

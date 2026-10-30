@@ -203,7 +203,7 @@ def __dir__() -> list[str]:
 
 
 def uart_selection(value: Any) -> str:
-    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
+    if CORE.is_esp32:
         from esphome.components.esp32 import get_esp32_variant
 
         uart_selection_esp32 = _uart_selection_esp32()
@@ -212,7 +212,7 @@ def uart_selection(value: Any) -> str:
             return cv.one_of(*uart_selection_esp32[variant], upper=True)(value)
     if CORE.is_esp8266:
         return cv.one_of(*UART_SELECTION_ESP8266, upper=True)(value)
-    if CORE.is_rp2 and not CORE.using_zephyr_rtos:
+    if CORE.is_rp2:
         return cv.one_of(*UART_SELECTION_RP2040, upper=True)(value)
     if CORE.is_libretiny:
         from esphome.components.libretiny import (
@@ -357,7 +357,7 @@ def warn_ram_log_strings(config: ConfigType) -> ConfigType:
 
 def validate_task_log_buffer_alignment(value: int) -> int:
     # ESP-IDF rejects a no-split ring buffer whose size is not a multiple of 4
-    if CORE.is_esp32 and not CORE.using_zephyr_rtos and value % 4:
+    if CORE.is_esp32 and value % 4:
         raise cv.Invalid(
             f"{CONF_TASK_LOG_BUFFER_SIZE} must be a multiple of 4 on ESP32"
         )
@@ -607,7 +607,7 @@ async def to_code(config: ConfigType) -> None:
             cg.add_define("USE_LOGGER_BOOT_LOG_PER_TAG_LEVELS")
             for tag, log_level in boot_logs_config.items():
                 cg.add(log.set_boot_log_level(tag, LOG_LEVELS[log_level]))
-    if (CORE.is_esp32 and not CORE.using_zephyr_rtos) or CORE.is_host:
+    if CORE.is_esp32 or CORE.is_host:
         cg.add(log.create_pthread_key())
     # set_uart_selection() must be called before pre_setup() because
     # pre_setup() switches on uart_ to decide which hardware to initialize
@@ -690,11 +690,7 @@ async def _late_logger_init(config: ConfigType) -> None:
             cg.add_define("USE_ESP8266_LOGGER_SERIAL1")
             enable_serial1()
 
-    if (
-        (CORE.is_esp8266 or (CORE.is_rp2 and not CORE.using_zephyr_rtos))
-        and has_serial_logging
-        and is_at_least_verbose
-    ):
+    if (CORE.is_esp8266 or CORE.is_rp2) and has_serial_logging and is_at_least_verbose:
         debug_serial_port = HARDWARE_UART_TO_SERIAL[CORE.target_platform][
             config.get(CONF_HARDWARE_UART)
         ]
@@ -714,11 +710,11 @@ async def _late_logger_init(config: ConfigType) -> None:
         }
         for comp in DEBUG_COMPONENTS:
             cg.add_build_flag(f"-DDEBUG_ESP_{comp}")
-    if CORE.is_esp32 and not CORE.using_zephyr_rtos and is_at_least_verbose:
+    if CORE.is_esp32 and is_at_least_verbose:
         cg.add_build_flag("-DCORE_DEBUG_LEVEL=5")
-    if CORE.is_esp32 and not CORE.using_zephyr_rtos and is_at_least_very_verbose:
+    if CORE.is_esp32 and is_at_least_very_verbose:
         cg.add_build_flag("-DENABLE_I2C_DEBUG_BUFFER")
-    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
+    if CORE.is_esp32:
         from esphome.components.esp32 import (
             VARIANT_ESP32C2,
             VARIANT_ESP32S2,
@@ -757,7 +753,6 @@ async def _late_logger_init(config: ConfigType) -> None:
         # Enable secondary USB serial JTAG console so the VFS functions are available.
         if (
             CORE.is_esp32
-            and not CORE.using_zephyr_rtos
             and config[CONF_HARDWARE_UART] != USB_SERIAL_JTAG
             and has_serial_logging
         ):

@@ -78,15 +78,11 @@ def _require_network_interface(config: ConfigType) -> None:
     window. Reject at config time rather than silently producing a component
     that never initializes.
     """
-    if config.get(CONF_DISABLED) or not (
-        CORE.is_esp8266 or (CORE.is_rp2 and not CORE.using_zephyr_rtos)
-    ):
+    if config.get(CONF_DISABLED) or not (CORE.is_esp8266 or CORE.is_rp2):
         return
     full_config = fv.full_config.get()
     has_wifi = "wifi" in full_config
-    has_ethernet = (
-        CORE.is_rp2 and not CORE.using_zephyr_rtos and "ethernet" in full_config
-    )
+    has_ethernet = CORE.is_rp2 and "ethernet" in full_config
     if not (has_wifi or has_ethernet):
         options = "'wifi'" if CORE.is_esp8266 else "'wifi' or 'ethernet'"
         raise cv.Invalid(
@@ -214,7 +210,6 @@ def request_service_enable_disable() -> bool:
         mdns_config is None
         or mdns_config[CONF_DISABLED]
         or not CORE.is_esp32
-        or CORE.using_zephyr_rtos
         or _openthread_srp_registers_services()
     ):
         return False
@@ -234,23 +229,23 @@ async def to_code(config: ConfigType) -> None:
             cg.add_library("ESP8266mDNS", None)
             # No MDNS global in the build; mdns_esp8266.cpp owns a guarded MDNSResponder
             cg.add_build_flag("-DNO_GLOBAL_MDNS")
-        elif CORE.is_rp2 and not CORE.using_zephyr_rtos:
+        elif CORE.is_rp2:
             cg.add_library("LEAmDNS", None)
 
         # Subscribe to the network IP state listener(s) so MDNS.update() is only
         # scheduled during the probe+announce phase. Same on_ip_state() override
         # serves both WiFi and Ethernet (signatures match).
-        if CORE.is_esp8266 or (CORE.is_rp2 and not CORE.using_zephyr_rtos):
+        if CORE.is_esp8266 or CORE.is_rp2:
             if "wifi" in CORE.config:
                 from esphome.components import wifi
 
                 wifi.request_wifi_ip_state_listener()
-            if CORE.is_rp2 and not CORE.using_zephyr_rtos and "ethernet" in CORE.config:
+            if CORE.is_rp2 and "ethernet" in CORE.config:
                 from esphome.components import ethernet
 
                 ethernet.request_ethernet_ip_state_listener()
 
-    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
+    if CORE.is_esp32:
         add_idf_component(name="espressif/mdns", ref="1.14.0")
         # ESPHome only advertises; the browse APIs are unused
         add_idf_sdkconfig_option("CONFIG_MDNS_ENABLE_BROWSE", False)

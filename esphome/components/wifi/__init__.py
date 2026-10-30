@@ -404,7 +404,7 @@ def wifi_network_ap(value):
         )
     if ap_mode != WIFI_AP_MODE_WISP and CONF_DNS_SERVERS in config:
         raise cv.Invalid("dns_servers requires ap_mode: WISP", path=[CONF_DNS_SERVERS])
-    if CONF_MANUAL_IP in config and CORE.is_rp2 and not CORE.using_zephyr_rtos:
+    if CONF_MANUAL_IP in config and CORE.is_rp2:
         raise cv.Invalid(
             "Manual AP IP configuration is not supported on RP2040. "
             "The AP uses the default IP 192.168.4.1"
@@ -423,11 +423,11 @@ WIFI_NETWORK_STA = WIFI_NETWORK_BASE.extend(
 
 
 def validate_variant(_):
-    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
+    if CORE.is_esp32:
         variant = get_esp32_variant()
         if variant in NO_WIFI_VARIANTS and "esp32_hosted" not in fv.full_config.get():
             raise cv.Invalid(f"WiFi requires component esp32_hosted on {variant}")
-    if CORE.is_rp2 and not CORE.using_zephyr_rtos:
+    if CORE.is_rp2:
         from esphome.components.rp2 import board_has_wifi, get_board
 
         if not board_has_wifi():
@@ -472,9 +472,7 @@ def _validate_min_auth_mode(value: str) -> str:
 
 def _apply_min_auth_mode_default(config):
     """Apply platform-specific default for min_auth_mode."""
-    if CONF_MIN_AUTH_MODE not in config and (
-        CORE.is_esp8266 or (CORE.is_esp32 and not CORE.using_zephyr_rtos)
-    ):
+    if CONF_MIN_AUTH_MODE not in config and (CORE.is_esp8266 or CORE.is_esp32):
         config[CONF_MIN_AUTH_MODE] = VALIDATE_WIFI_MIN_AUTH_MODE("WPA2")
     return config
 
@@ -594,12 +592,7 @@ def _consume_wifi_sockets(config: ConfigType) -> ConfigType:
     DHCP/DNS). On ESP32, CONFIG_LWIP_MAX_SOCKETS only controls the POSIX socket
     layer — DHCP/DNS use raw udp_new() which bypasses it entirely.
     """
-    if not (
-        CORE.is_bk72xx
-        or CORE.is_rtl87xx
-        or CORE.is_ln882x
-        or (CORE.is_rp2 and not CORE.using_zephyr_rtos)
-    ):
+    if not (CORE.is_bk72xx or CORE.is_rtl87xx or CORE.is_ln882x or CORE.is_rp2):
         return config
     from esphome.components import socket
 
@@ -967,12 +960,12 @@ async def to_code(config):
         if CORE.is_ln882x:
             cg.add_define("USE_WIFI_AP_EXCLUSIVE")
         # The Pico W driver drops the AP station events; wifi_component_pico_w.cpp counts them
-        if CORE.is_rp2 and not CORE.using_zephyr_rtos:
+        if CORE.is_rp2:
             cg.add_build_flag("-Wl,--wrap=cyw43_cb_process_async_event")
 
     # ESP32: register the WiFi stack with the esp32 sdkconfig reconciler, which
     # drops SoftAP support / the LWIP DHCP server when AP mode is unused.
-    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
+    if CORE.is_esp32:
         request_wifi(ap=CONF_AP in config)
 
     if (dpp := config.get(CONF_DPP)) is not None:
@@ -988,7 +981,7 @@ async def to_code(config):
         cg.add_define("USE_WIFI_DPP")
 
     # Disable Enterprise WiFi support if no EAP is configured
-    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
+    if CORE.is_esp32:
         add_idf_sdkconfig_option("CONFIG_ESP_WIFI_ENTERPRISE_SUPPORT", has_eap)
         if has_eap:
             # The supplicant's Kconfig select cannot override the IDF 5 TLS
@@ -1043,7 +1036,7 @@ async def to_code(config):
         cg.add(var.set_passive_scan(True))
     if CONF_OUTPUT_POWER in config:
         cg.add(var.set_output_power(config[CONF_OUTPUT_POWER]))
-        if CORE.is_esp32 and not CORE.using_zephyr_rtos:
+        if CORE.is_esp32:
             # Set PHY max TX power to match output_power so calibration also uses
             # reduced power. This prevents brownout during PHY init on marginal
             # power supplies, which is critical for OTA updates with rollback enabled.
@@ -1072,7 +1065,7 @@ async def to_code(config):
         if CONF_PHY_MODE in config:
             cg.add_define("USE_WIFI_PHY_MODE")
             cg.add(var.set_phy_mode(config[CONF_PHY_MODE]))
-    elif CORE.is_rp2 and not CORE.using_zephyr_rtos:
+    elif CORE.is_rp2:
         cg.add_library("WiFi", None)
     elif CORE.using_zephyr_rtos:
         from esphome.components.zephyr import (
@@ -1114,7 +1107,7 @@ async def to_code(config):
             zephyr_add_prj_conf("NET_DHCPV4_SERVER", True)
         cg.add_optional(var.set_min_scan_rssi, config.get(CONF_MIN_RSSI))
 
-    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
+    if CORE.is_esp32:
         if config[CONF_ENABLE_BTM] or config[CONF_ENABLE_RRM]:
             add_idf_sdkconfig_option("CONFIG_WPA_11KV_SUPPORT", True)
             cg.add_define("USE_WIFI_11KV_SUPPORT")
@@ -1128,7 +1121,7 @@ async def to_code(config):
         add_idf_sdkconfig_option("CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP", True)
 
     # Apply high performance WiFi settings if a component asked for them
-    if CORE.is_esp32 and not CORE.using_zephyr_rtos and has_high_performance_wifi():
+    if CORE.is_esp32 and has_high_performance_wifi():
         # Check if PSRAM is guaranteed (set by psram component during final validation)
         psram_guaranteed = psram_is_guaranteed()
 

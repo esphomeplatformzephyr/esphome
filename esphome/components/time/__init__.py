@@ -105,7 +105,7 @@ def _extract_tz_string(tzfile: bytes) -> str:
 
 
 def detect_tz() -> str | None:
-    if CORE.target_platform not in {
+    if CORE.using_zephyr_rtos or CORE.target_platform not in {
         PLATFORM_ESP8266,
         PLATFORM_ESP32,
         PLATFORM_RP2040,

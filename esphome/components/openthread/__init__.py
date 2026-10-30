@@ -155,7 +155,7 @@ OT_CORE_OPTION_NAME = re.compile(r"[A-Z0-9_]+")
 
 
 def _validate_txpower(value: Any) -> int | float:
-    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
+    if CORE.is_esp32:
         variant = get_esp32_variant()
 
         # HW limits: Datasheet section "802.15.4 RF Transmitter (TX) Characteristics"
@@ -344,7 +344,7 @@ def _validate(config: ConfigType) -> ConfigType:
 def _require_vfs(config: ConfigType) -> ConfigType:
     """Register VFS requirements during config validation."""
     # OpenThread uses esp_vfs_eventfd which requires VFS select support (ESP32 only)
-    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
+    if CORE.is_esp32:
         require_vfs_select()
         if _get_rcp(config) is not None:
             require_vfs_dir()
@@ -564,7 +564,7 @@ async def to_code(config: ConfigType) -> None:
     rcp = _get_rcp(config)
 
     # Re-enable openthread IDF component (excluded by default)
-    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
+    if CORE.is_esp32:
         include_builtin_idf_component("openthread")
         # OPENTHREAD_CONFIG_ECDSA_ENABLE: the SRP client host key uses mbedtls_ecdsa_*
         require_mbedtls_ecp()
@@ -613,7 +613,7 @@ async def to_code(config: ConfigType) -> None:
 
     cg.add_optional(ot.set_output_power, config.get(CONF_OUTPUT_POWER))
 
-    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
+    if CORE.is_esp32:
         set_sdkconfig_options(config)
         _write_custom_header(config)
     elif CORE.using_zephyr:

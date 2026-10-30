@@ -221,7 +221,7 @@ def validate_zephyr_config(config):
 
 
 def validate_rx_buffer_size(config):
-    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
+    if CORE.is_esp32:
         # ESP32 UART hardware FIFO is 128 bytes (LP UART is 16 bytes, but we use 128 as safe minimum)
         # rx_buffer_size must be greater than the hardware FIFO length
         min_buffer_size = 128
@@ -238,9 +238,9 @@ def validate_rx_buffer_size(config):
 def _uart_declare_type(value):
     if CORE.is_esp8266:
         return cv.declare_id(ESP8266UartComponent)(value)
-    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
+    if CORE.is_esp32:
         return cv.declare_id(IDFUARTComponent)(value)
-    if CORE.is_rp2 and not CORE.using_zephyr_rtos:
+    if CORE.is_rp2:
         return cv.declare_id(RP2UartComponent)(value)
     if CORE.is_libretiny:
         return cv.declare_id(LibreTinyUARTComponent)(value)
@@ -521,7 +521,7 @@ async def to_code(config):
         else:
             cg.add(var.set_name(config[CONF_PORT]))
     cg.add(var.set_rx_buffer_size(config[CONF_RX_BUFFER_SIZE]))
-    if CORE.is_esp32 and not CORE.using_zephyr_rtos:
+    if CORE.is_esp32:
         if CONF_RX_FULL_THRESHOLD not in config:
             # Calculate rx_full_threshold to be 10ms
             bytelength = config[CONF_DATA_BITS] + config[CONF_STOP_BITS] + 1
@@ -758,9 +758,7 @@ automation.register_apply_action(
 @coroutine_with_priority(CoroPriority.FINAL)
 async def final_step():
     """Final code generation step to configure optional UART features."""
-    if (
-        (CORE.is_esp32 and not CORE.using_zephyr_rtos) or CORE.is_esp8266
-    ) and CORE.has_networking:
+    if (CORE.is_esp32 or CORE.is_esp8266) and CORE.has_networking:
         # Wake-on-RX is essentially free (just an ISR function pointer
         # registration on ESP32, an inline flag set on ESP8266 software
         # serial) — enable by default to reduce RX buffer overflow risk by

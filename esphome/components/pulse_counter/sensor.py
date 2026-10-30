@@ -49,7 +49,6 @@ def validate_internal_filter(value: ConfigType) -> ConfigType:
 
     if (
         CORE.is_esp32
-        and not CORE.using_zephyr_rtos
         and use_pcnt
         and value.get(CONF_INTERNAL_FILTER).total_microseconds > 13
     ):
@@ -126,7 +125,7 @@ CONFIG_SCHEMA = cv.All(
 
 async def to_code(config: ConfigType) -> None:
     use_pcnt = config.get(CONF_USE_PCNT)
-    if CORE.is_esp32 and not CORE.using_zephyr_rtos and use_pcnt:
+    if CORE.is_esp32 and use_pcnt:
         include_builtin_idf_component("esp_driver_pcnt")
 
     var = await sensor.new_sensor(config, use_pcnt)

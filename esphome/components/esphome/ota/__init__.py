@@ -132,9 +132,7 @@ def ota_esphome_final_validate(config: ConfigType) -> None:
                 merged_ota_esphome_configs_by_port[conf_port] = merge_config(
                     merged_ota_esphome_configs_by_port[conf_port], ota_conf
                 )
-            if ota_conf.get(CONF_ALLOW_PARTITION_ACCESS) and (
-                not CORE.is_esp32 or CORE.using_zephyr_rtos
-            ):
+            if ota_conf.get(CONF_ALLOW_PARTITION_ACCESS) and not CORE.is_esp32:
                 raise cv.Invalid(
                     f"{CONF_ALLOW_PARTITION_ACCESS} is only supported on the esp32"
                 )
@@ -419,7 +417,7 @@ async def to_code(config: ConfigType) -> None:
         cg.add_define("USE_OTA_PARTITIONS")
 
     # ESP8266 and RP2040 inflate gzip at reboot; the rest inflate on the fly
-    if not (CORE.is_esp8266 or (CORE.is_rp2 and not CORE.using_zephyr_rtos)):
+    if not (CORE.is_esp8266 or CORE.is_rp2):
         enable_deflate()
 
     # One key per device: an api encryption block supplies it (static or
