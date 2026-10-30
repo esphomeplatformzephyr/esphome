@@ -19,7 +19,6 @@ from esphome.const import (
     PLATFORM_LN882X,
     PLATFORM_NRF52,
     PLATFORM_RP2,
-    PLATFORM_ZEPHYR,
     STATE_CLASS_MEASUREMENT,
     UNIT_CELSIUS,
     PlatformFramework,
@@ -41,14 +40,13 @@ CONFIG_SCHEMA = cv.All(
         state_class=STATE_CLASS_MEASUREMENT,
         entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
     ).extend(cv.polling_component_schema("60s")),
-    cv.only_on(
+    cv.only_on_or_zephyr_rtos(
         [
             PLATFORM_ESP32,
             PLATFORM_RP2,
             PLATFORM_BK72XX,
             PLATFORM_NRF52,
             PLATFORM_LN882X,
-            PLATFORM_ZEPHYR,
         ]
     ),
 )

@@ -80,7 +80,7 @@ def zigbee_zephyr_supported() -> bool:
     """
     if "nrf52" in CORE.loaded_integrations:
         return True
-    if not CORE.is_zephyr:
+    if not CORE.using_zephyr_rtos:
         return False
     variant = VARIANTS.get(zephyr_variant())
     if variant is None or "zigbee" not in variant.transports:
@@ -100,7 +100,7 @@ def requires_zigbee_zephyr_supported(value):
 
 
 async def zephyr_to_code(config: ConfigType) -> "MockObj":
-    if CORE.is_zephyr:
+    if CORE.using_zephyr_rtos:
         # zigbee_zephyr_supported() already confirmed the active SDK offers a
         # "zigbee" module (see there) -- this can't fail.
         request_zephyr_module("zigbee")

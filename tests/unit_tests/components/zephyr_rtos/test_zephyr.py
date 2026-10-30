@@ -2059,7 +2059,10 @@ def test_upload_program_restore_reapplies_user_module_overrides(
 
 def test_upload_program_raises_when_framework_version_not_restored() -> None:
     CORE.data.pop(KEY_ZEPHYR_RTOS, None)
-    CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR}
+    CORE.data[KEY_CORE] = {
+        KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR,
+        KEY_TARGET_FRAMEWORK: "zephyr",
+    }
 
     with pytest.raises(EsphomeError, match="re-validate and recompile"):
         upload_program(
@@ -2069,7 +2072,10 @@ def test_upload_program_raises_when_framework_version_not_restored() -> None:
 
 def test_upload_program_raises_when_zephyr_config_missing_from_cache() -> None:
     CORE.data.pop(KEY_ZEPHYR_RTOS, None)
-    CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR}
+    CORE.data[KEY_CORE] = {
+        KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR,
+        KEY_TARGET_FRAMEWORK: "zephyr",
+    }
     config = {}  # no PLATFORM_ZEPHYR block to re-validate against
 
     with pytest.raises(EsphomeError, match="re-validate and recompile"):
@@ -2377,7 +2383,10 @@ def test_module_schema_rejects_name_alone() -> None:
 
 
 def _set_zephyr_ota(variant: str, ota: list[dict]) -> None:
-    CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR}
+    CORE.data[KEY_CORE] = {
+        KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR,
+        KEY_TARGET_FRAMEWORK: "zephyr",
+    }
     CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant=variant)
     CORE.config = {"ota": ota}
 
@@ -2414,7 +2423,10 @@ def test_reject_swap_method_off_zephyr_allows_unset() -> None:
 
 
 def test_reject_swap_method_off_zephyr_allows_zephyr() -> None:
-    CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR}
+    CORE.data[KEY_CORE] = {
+        KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR,
+        KEY_TARGET_FRAMEWORK: "zephyr",
+    }
     conf = {"swap_method": "move"}
     assert reject_swap_method_off_zephyr(conf) == conf
 
@@ -2425,7 +2437,10 @@ def test_reject_swap_method_off_zephyr_allows_zephyr() -> None:
 
 
 def _zephyr_cdc_core(board_label: str | None) -> object:
-    CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR}
+    CORE.data[KEY_CORE] = {
+        KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR,
+        KEY_TARGET_FRAMEWORK: "zephyr",
+    }
     CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant="NRF52")
     return patch(
         "esphome.components.zephyr_rtos.dts_lookup.get_existing_cdc_acm_uart_label",
@@ -2510,7 +2525,10 @@ def test_zephyr_usb_baud_rate_shares_port_0(other: tuple[str, dict]) -> None:
 def test_usb_cdc_acm_only_on_zephyr_usb(variant: str, ok: bool) -> None:
     from esphome.components.usb_cdc_acm import _only_on_zephyr_usb
 
-    CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR}
+    CORE.data[KEY_CORE] = {
+        KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR,
+        KEY_TARGET_FRAMEWORK: "zephyr",
+    }
     CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant=variant)
     if ok:
         assert _only_on_zephyr_usb({}) == {}

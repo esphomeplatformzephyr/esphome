@@ -63,7 +63,7 @@ SWAP_METHOD_SCHEMA = {
 
 def reject_swap_method_off_zephyr(config: ConfigType) -> ConfigType:
     """swap_method: is only applied on platform: zephyr; reject it elsewhere."""
-    if not CORE.is_zephyr and CONF_SWAP_METHOD in config:
+    if not CORE.using_zephyr_rtos and CONF_SWAP_METHOD in config:
         raise cv.Invalid(
             f"'{CONF_SWAP_METHOD}' is only supported on platform: zephyr",
             path=[CONF_SWAP_METHOD],
@@ -95,9 +95,9 @@ def _ota_final_validate(config: ConfigType) -> None:
         raise cv.Invalid(
             f"At least one platform must be specified for '{CONF_OTA}'; add '{CONF_PLATFORM}: {CONF_ESPHOME}' for original OTA functionality"
         )
-    # CORE.is_zephyr is the `platform: zephyr` variant dispatch (esp32_h2, esp32_c6, ...);
+    # CORE.using_zephyr_rtos is the `platform: zephyr` variant dispatch (esp32_h2, esp32_c6, ...);
     # it excludes nrf52, which also builds on Zephyr but validates its own bootloader separately.
-    if CORE.is_zephyr and _mcuboot_slot_writers(config):
+    if CORE.using_zephyr_rtos and _mcuboot_slot_writers(config):
         from esphome.components.zephyr import zephyr_data  # noqa: PLC0415
         from esphome.components.zephyr.const import (  # noqa: PLC0415
             BOOTLOADER_MCUBOOT,
@@ -186,7 +186,7 @@ async def to_code(config: ConfigType) -> None:
     if CORE.is_rp2 and CORE.using_arduino:
         cg.add_library("Updater", None)
 
-    if CORE.is_zephyr and _mcuboot_slot_writers(config):
+    if CORE.using_zephyr_rtos and _mcuboot_slot_writers(config):
         from esphome.components.zephyr import (  # noqa: PLC0415
             zephyr_add_prj_conf,
             zephyr_add_sysbuild_conf,

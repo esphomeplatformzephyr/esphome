@@ -463,7 +463,7 @@ async def to_code(config):
         if CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION] >= cv.Version(2, 8, 0):
             zephyr_add_prj_conf("POSIX_SINGLE_PROCESS", True)
             zephyr_add_prj_conf("XSI_SINGLE_PROCESS", True)
-    elif CORE.is_zephyr:
+    elif CORE.using_zephyr_rtos:
         # platform:zephyr variants (>= 4.4.0) are above the
         # Zephyr 4.x threshold where POSIX_CLOCK was removed; POSIX_API covers
         # clock_gettime() instead, and implies XSI_SINGLE_PROCESS for gettimeofday().

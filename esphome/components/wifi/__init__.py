@@ -435,7 +435,7 @@ def validate_variant(_):
                 f"Board '{get_board()}' does not have WiFi support (no CYW43 wireless chip). "
                 f"Use a WiFi-capable board like 'rpipicow' or 'rpipico2w'."
             )
-    if CORE.is_zephyr:
+    if CORE.using_zephyr_rtos:
         from esphome.components.zephyr import VARIANTS, zephyr_data, zephyr_variant
         from esphome.components.zephyr.const import KEY_BOARD
 
@@ -699,7 +699,7 @@ def _not_on_zephyr(value):
     # Zephyr's net_mgmt WiFi API has no TX power control request at all (checked the full
     # NET_REQUEST_WIFI_CMD_* enum in wifi_mgmt.h) -- reject at config time instead of
     # silently accepting and ignoring the setting.
-    if CORE.is_zephyr:
+    if CORE.using_zephyr_rtos:
         raise cv.Invalid("output_power is not supported on Zephyr")
     return value
 
@@ -722,7 +722,7 @@ def _lease_cache_schema(value: Any) -> ConfigType:
     if not isinstance(value, dict):
         value = {CONF_ENABLED: value}
     value = LEASE_CACHE_SCHEMA(value)
-    if value[CONF_ENABLED] and CORE.is_zephyr:
+    if value[CONF_ENABLED] and CORE.using_zephyr_rtos:
         # Zephyr has no RTC preferences
         value.setdefault(CONF_STORAGE, preferences.STORAGE_FLASH)
     elif value[CONF_ENABLED]:
@@ -808,7 +808,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_MIN_RSSI): cv.All(
                 cv.decibel,
                 cv.int_range(min=-100, max=-20),
-                cv.only_on(Platform.ZEPHYR),
+                cv.only_on_zephyr_rtos,
             ),
         }
     ),
@@ -1061,7 +1061,7 @@ async def to_code(config):
             cg.add(var.set_phy_mode(config[CONF_PHY_MODE]))
     elif CORE.is_rp2:
         cg.add_library("WiFi", None)
-    elif CORE.is_zephyr:
+    elif CORE.using_zephyr_rtos:
         from esphome.components.zephyr import (
             VARIANTS,
             zephyr_add_blobs,

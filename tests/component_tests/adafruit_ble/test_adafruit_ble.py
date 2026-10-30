@@ -28,6 +28,7 @@ from esphome.const import (
     CONF_PLATFORM,
     CONF_SAFE_MODE,
     KEY_CORE,
+    KEY_TARGET_FRAMEWORK,
     KEY_TARGET_PLATFORM,
     PLATFORM_ZEPHYR,
     Toolchain,
@@ -78,7 +79,10 @@ def test_zephyr_mcuboot_check_skips_adafruit_ble(
 ) -> None:
     """adafruit_ble's update runs in the Adafruit bootloader; only the OTA
     platforms that write MCUboot's secondary slot require MCUboot."""
-    CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR}
+    CORE.data[KEY_CORE] = {
+        KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR,
+        KEY_TARGET_FRAMEWORK: "zephyr",
+    }
     CORE.data[KEY_ZEPHYR] = {
         KEY_BOOTLOADER: "adafruit_nrf52_sd140_v6",
         KEY_SINGLE_SLOT: False,

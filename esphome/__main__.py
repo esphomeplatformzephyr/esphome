@@ -381,7 +381,7 @@ def choose_upload_log_host(
                 or (
                     _find_picotool_zephyr()
                     if (
-                        CORE.is_zephyr
+                        CORE.using_zephyr_rtos
                         and CORE.data.get("zephyr", {}).get("family") == "rpi_pico"
                     )
                     else None
@@ -437,7 +437,7 @@ def choose_upload_log_host(
         and (
             CORE.is_rp2
             or (
-                CORE.is_zephyr
+                CORE.using_zephyr_rtos
                 and CORE.data.get("zephyr", {}).get("family") == "rpi_pico"
             )
         )
@@ -728,7 +728,7 @@ def run_miniterm(config: ConfigType, port: str, args) -> int:
     # Decoder resolution, crash isolation, and disable-after-failure
     # all live in LogLineProcessor, shared with the API log path.
     processor = LogLineProcessor(config, CORE.target_platform)
-    if args.reset and CORE.is_zephyr:
+    if args.reset and CORE.using_zephyr_rtos:
         from esphome.components.zephyr import reset_over_usb  # noqa: PLC0415
 
         reset_over_usb(config, port)
@@ -861,7 +861,7 @@ def write_cpp_file() -> int:
 def _skip_bootloader_supported() -> bool:
     if CORE.is_esp32 and CORE.using_toolchain_esp_idf:
         return True
-    if CORE.is_zephyr:
+    if CORE.using_zephyr_rtos:
         from esphome.components.zephyr import zephyr_skip_bootloader_supported  # noqa: PLC0415
 
         return zephyr_skip_bootloader_supported()
@@ -2073,7 +2073,10 @@ def command_run(args: ArgsProtocol, config: ConfigType) -> int | None:
     # so it shows up in the log chooser
     if successful_device is None and (
         CORE.is_rp2
-        or (CORE.is_zephyr and CORE.data.get("zephyr", {}).get("family") == "rpi_pico")
+        or (
+            CORE.using_zephyr_rtos
+            and CORE.data.get("zephyr", {}).get("family") == "rpi_pico"
+        )
     ):
         _wait_for_serial_port(known_ports=pre_upload_ports)
         # If exactly one new serial port appeared, use it directly

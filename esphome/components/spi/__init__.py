@@ -59,7 +59,7 @@ from esphome.const import (
     PLATFORM_ESP8266,
     PLATFORM_NRF52,
     PLATFORM_RP2,
-    PLATFORM_ZEPHYR,
+    PLATFORM_ZEPHYR as PLATFORM_ZEPHYR,
     PlatformFramework,
 )
 from esphome.core import CORE, CoroPriority, coroutine_with_priority
@@ -121,7 +121,7 @@ _ZEPHYR_SPI_SANITY_MAX_HZ = 80e6
 
 
 def _frequency_validator(value: Any) -> float:
-    if CORE.is_zephyr:
+    if CORE.using_zephyr_rtos:
         value = cv.frequency(value)
         if value < 1000:
             raise cv.Invalid("The configured SPI data rate must be at least 1000Hz")
@@ -271,7 +271,7 @@ def one_of_interface_validator(additional_values: list[str] | None = None) -> An
         additional_values = []
 
     def validator(value: Any) -> str:
-        if CORE.is_zephyr:
+        if CORE.using_zephyr_rtos:
             # Checked against the board DTS by resolve_zephyr_bus() in to_code()
             return normalize_dts_label(cv.string(value))
         return cv.one_of(
@@ -379,14 +379,14 @@ def _validate_zephyr_spi_pins(
 def _validate_clk_pin_required(value: ConfigType) -> ConfigType:
     """clk_pin is optional on Zephyr hardware SPI, where the board's pinctrl supplies a default."""
     if CONF_CLK_PIN in value or (
-        CORE.is_zephyr and value[CONF_INTERFACE] != "software"
+        CORE.using_zephyr_rtos and value[CONF_INTERFACE] != "software"
     ):
         return value
     raise cv.Invalid("required key not provided", path=[CONF_CLK_PIN])
 
 
 def validate_spi_config(config: list[ConfigType]) -> list[ConfigType]:
-    if CORE.is_zephyr:
+    if CORE.using_zephyr_rtos:
         from esphome.components.zephyr import VARIANTS  # noqa: PLC0415
 
         # interface: <bus label> picks one of the board's SPI buses; "hardware" and
@@ -480,13 +480,12 @@ SPI_SINGLE_SCHEMA = cv.All(
     ),
     _validate_clk_pin_required,
     cv.has_at_least_one_key(CONF_MISO_PIN, CONF_MOSI_PIN),
-    cv.only_on(
+    cv.only_on_or_zephyr_rtos(
         [
             PLATFORM_ESP32,
             PLATFORM_ESP8266,
             PLATFORM_NRF52,
             PLATFORM_RP2,
-            PLATFORM_ZEPHYR,
         ]
     ),
 )
@@ -505,7 +504,7 @@ _ZEPHYR_QUAD_VARIANTS = (
 
 
 def _quad_platform_validator(value):
-    if CORE.is_zephyr:
+    if CORE.using_zephyr_rtos:
         variant = zephyr_variant()
         if variant not in _ZEPHYR_QUAD_VARIANTS:
             raise cv.Invalid(f"Quad SPI is not available on Zephyr variant {variant!r}")
@@ -648,7 +647,7 @@ async def to_code(configs: list[ConfigType]) -> None:
         if data_pins := spi.get(CONF_DATA_PINS):
             cg.add(var.set_data_pins(data_pins))
         if (index := spi.get(CONF_INTERFACE_INDEX)) is not None:
-            if CORE.is_zephyr:
+            if CORE.using_zephyr_rtos:
                 interface, bus_label = _zephyr_setup_spi(spi, resolved_zephyr_buses)
                 cg.add(var.set_interface(cg.RawExpression(interface)))
                 cg.add(var.set_interface_name(bus_label))

@@ -30,6 +30,7 @@ from esphome.const import (
     CONF_ID,
     KEY_CORE,
     KEY_FRAMEWORK_VERSION,
+    KEY_TARGET_FRAMEWORK,
     KEY_TARGET_PLATFORM,
     PLATFORM_ZEPHYR,
 )
@@ -122,7 +123,10 @@ def test_mcumgr_warns_that_the_slots_move(
 
 
 def _zephyr_core_data(variant: str) -> None:
-    CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR}
+    CORE.data[KEY_CORE] = {
+        KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR,
+        KEY_TARGET_FRAMEWORK: "zephyr",
+    }
     CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant=variant)
 
 

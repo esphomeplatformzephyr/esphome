@@ -15,7 +15,7 @@ CONFIG_SCHEMA = cv.Schema({})
 async def to_code(config: ConfigType) -> None:
     cg.add_define("USE_SHA256")
 
-    if CORE.is_zephyr:
+    if CORE.using_zephyr_rtos:
         from esphome.components.zephyr import zephyr_add_prj_conf, zephyr_variant_family
 
         # All platform:zephyr variants (>= 4.4.0) are above the PSA crypto threshold.

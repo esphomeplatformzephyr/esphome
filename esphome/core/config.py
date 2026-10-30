@@ -226,7 +226,7 @@ def validate_loop_interval(config: ConfigType) -> ConfigType:
             )
         elif CORE.is_bk72xx:
             max_loop = 4000  # 10000ms / 5 * 2 default value
-        elif CORE.is_zephyr:
+        elif CORE.using_zephyr_rtos:
             # No watchdog (watchdog_timeout: 0): the loop sleep is not capped
             wdt = fv.full_config.get()[PLATFORM_ZEPHYR].get(CONF_WATCHDOG_TIMEOUT)
             if wdt is None or wdt.total_milliseconds == 0:
@@ -243,7 +243,7 @@ def validate_loop_interval(config: ConfigType) -> ConfigType:
                 " Raise esp32.watchdog_timeout to sleep longer."
                 if CORE.is_esp32
                 else " Raise zephyr.watchdog_timeout to sleep longer."
-                if CORE.is_zephyr
+                if CORE.using_zephyr_rtos
                 else "",
             )
     return config

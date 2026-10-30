@@ -162,7 +162,10 @@ def test_loop_interval_zephyr_watchdog(
     caplog: pytest.LogCaptureFixture, watchdog_timeout: cv.TimePeriod, warns: bool
 ) -> None:
     """With the Zephyr watchdog disabled the loop sleep is not capped."""
-    CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR}
+    CORE.data[KEY_CORE] = {
+        KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR,
+        KEY_TARGET_FRAMEWORK: "zephyr",
+    }
     token = fv.full_config.set(
         {PLATFORM_ZEPHYR: {CONF_WATCHDOG_TIMEOUT: watchdog_timeout}}
     )

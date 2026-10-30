@@ -28,7 +28,7 @@ from esphome.const import (
     PLATFORM_NRF52,
     PLATFORM_RP2,
     PLATFORM_RTL87XX,
-    PLATFORM_ZEPHYR,
+    PLATFORM_ZEPHYR as PLATFORM_ZEPHYR,
     PlatformFramework,
 )
 from esphome.core import CORE, ID, CoroPriority, Lambda, coroutine_with_priority
@@ -232,7 +232,7 @@ def uart_selection(value: Any) -> str:
         raise cv.Invalid("Uart selection not valid for host platform")
     if CORE.is_nrf52:
         return cv.one_of(*UART_SELECTION_NRF52, upper=True)(value)
-    if CORE.is_zephyr:
+    if CORE.using_zephyr_rtos:
         from esphome.components.zephyr import (
             RTT_PORTS,
             validate_rtt_port,
@@ -426,14 +426,13 @@ CONFIG_SCHEMA = cv.All(
                 nrf52=768,
                 zephyr=768,
             ): cv.All(
-                cv.only_on(
+                cv.only_on_or_zephyr_rtos(
                     [
                         PLATFORM_ESP32,
                         PLATFORM_BK72XX,
                         PLATFORM_LN882X,
                         PLATFORM_RTL87XX,
                         PLATFORM_NRF52,
-                        PLATFORM_ZEPHYR,
                     ]
                 ),
                 cv.validate_bytes,
@@ -476,7 +475,7 @@ CONFIG_SCHEMA = cv.All(
                 zephyr_rp2040=USB_CDC,
                 zephyr_rp2350=USB_CDC,
             ): cv.All(
-                cv.only_on(
+                cv.only_on_or_zephyr_rtos(
                     [
                         PLATFORM_ESP8266,
                         PLATFORM_ESP32,
@@ -485,7 +484,6 @@ CONFIG_SCHEMA = cv.All(
                         PLATFORM_LN882X,
                         PLATFORM_RTL87XX,
                         PLATFORM_NRF52,
-                        PLATFORM_ZEPHYR,
                     ]
                 ),
                 uart_selection,
@@ -598,7 +596,10 @@ async def to_code(config: ConfigType) -> None:
     # goes for UART2 and up, which have no UART_SELECTION_* of their own on Zephyr.
     if hardware_uart is not None and (
         hardware_uart.startswith("&")
-        or (CORE.is_zephyr and hardware_uart not in (UART1, USB_CDC, USB_SERIAL_JTAG))
+        or (
+            CORE.using_zephyr_rtos
+            and hardware_uart not in (UART1, USB_CDC, USB_SERIAL_JTAG)
+        )
     ):
         hardware_uart = UART0
     if hardware_uart is not None and hardware_uart != cpp_default_uart:
@@ -765,7 +766,7 @@ async def _late_logger_init(config: ConfigType) -> None:
             if config[CONF_HARDWARE_UART] == USB_CDC:
                 cg.add_define("USE_LOGGER_UART_SELECTION_USB_CDC")
                 zephyr_add_prj_conf("UART_LINE_CTRL", True)
-    if CORE.is_zephyr and has_serial_logging:
+    if CORE.using_zephyr_rtos and has_serial_logging:
         from esphome.components.zephyr import (
             VARIANTS,
             claim_rtt_channel,

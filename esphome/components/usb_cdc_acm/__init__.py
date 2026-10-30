@@ -25,7 +25,7 @@ from esphome.const import (
     CONF_RX_BUFFER_SIZE,
     CONF_TX_BUFFER_SIZE,
     PLATFORM_NRF52,
-    PLATFORM_ZEPHYR,
+    PLATFORM_ZEPHYR as PLATFORM_ZEPHYR,
 )
 from esphome.core import CORE
 from esphome.cpp_generator import MockObj
@@ -56,7 +56,7 @@ INTERFACE_SCHEMA = cv.Schema(
         cv.GenerateID(): cv.All(cv.declare_id(USBCDCACMInstance), uart.mark_unclocked),
         cv.Optional(CONF_DEBUG): maybe_empty_debug,
         cv.Optional(CONF_DISABLED): cv.All(
-            cv.boolean, cv.only_on([PLATFORM_NRF52, PLATFORM_ZEPHYR])
+            cv.boolean, cv.only_on_or_zephyr_rtos([PLATFORM_NRF52])
         ),
     }
 )
@@ -73,7 +73,7 @@ ZEPHYR_USB_FAMILIES = {"nordic", "rpi_pico", "renesas", "stm32", "nxp"}
 
 
 def _only_on_zephyr_usb(config: ConfigType) -> ConfigType:
-    if not CORE.is_zephyr or zephyr_variant_family() not in ZEPHYR_USB_FAMILIES:
+    if not CORE.using_zephyr_rtos or zephyr_variant_family() not in ZEPHYR_USB_FAMILIES:
         raise cv.Invalid(
             "This feature is only available on platform: zephyr variants with USB"
         )
@@ -145,7 +145,7 @@ async def to_code(config: ConfigType) -> None:
             args = (
                 MockObj(f"DEVICE_DT_GET_OR_NULL(DT_NODELABEL(cdc_acm_uart{index}))"),
             )
-        elif CORE.is_zephyr:
+        elif CORE.using_zephyr_rtos:
             label = zephyr_cdc_acm_label(index)
             args = (
                 MockObj(f"DEVICE_DT_GET_OR_NULL(DT_NODELABEL({label}))"),

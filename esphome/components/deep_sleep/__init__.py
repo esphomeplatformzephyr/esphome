@@ -40,7 +40,7 @@ from esphome.const import (
     PLATFORM_ESP32,
     PLATFORM_ESP8266,
     PLATFORM_NRF52,
-    PLATFORM_ZEPHYR,
+    PLATFORM_ZEPHYR as PLATFORM_ZEPHYR,
     PlatformFramework,
 )
 from esphome.core import CORE, ID
@@ -168,7 +168,11 @@ _WAKEUP_PIN_MODE_BOTH_LEVELS = (
 
 def validate_config(config: ConfigType) -> ConfigType:
     # sys_poweroff() needs HAS_POWEROFF, which only these families select.
-    if CORE.is_zephyr and zephyr_variant_family() not in ("esp32", "nordic", "stm32"):
+    if CORE.using_zephyr_rtos and zephyr_variant_family() not in (
+        "esp32",
+        "nordic",
+        "stm32",
+    ):
         raise cv.Invalid(
             f"deep_sleep is not supported on the Zephyr {zephyr_variant()} variant"
         )
@@ -314,11 +318,11 @@ CONFIG_SCHEMA = cv.All(
                 _validate_sleep_duration,
             ),
             cv.Optional(CONF_WAKEUP_PIN): cv.All(
-                cv.only_on([PLATFORM_ESP32, PLATFORM_BK72XX, PLATFORM_ZEPHYR]),
+                cv.only_on_or_zephyr_rtos([PLATFORM_ESP32, PLATFORM_BK72XX]),
                 validate_wakeup_pin,
             ),
             cv.Optional(CONF_WAKEUP_PIN_MODE): cv.All(
-                cv.only_on([PLATFORM_ESP32, PLATFORM_BK72XX, PLATFORM_ZEPHYR]),
+                cv.only_on_or_zephyr_rtos([PLATFORM_ESP32, PLATFORM_BK72XX]),
                 cv.enum(WAKEUP_PIN_MODES, upper=True),
             ),
             cv.Optional(CONF_ESP32_EXT1_WAKEUP): cv.All(
@@ -362,13 +366,12 @@ CONFIG_SCHEMA = cv.All(
             ),
         }
     ).extend(cv.COMPONENT_SCHEMA),
-    cv.only_on(
+    cv.only_on_or_zephyr_rtos(
         [
             PLATFORM_ESP32,
             PLATFORM_ESP8266,
             PLATFORM_BK72XX,
             PLATFORM_NRF52,
-            PLATFORM_ZEPHYR,
         ]
     ),
     cv.key_requires(CONF_WAKEUP_PIN_MODE, CONF_WAKEUP_PIN),
@@ -395,7 +398,7 @@ async def to_code(config: ConfigType) -> None:
                 )
         else:
             await cg.add_pin(var.set_wakeup_pin, wakeup_pins[0][CONF_PIN])
-            if CORE.is_zephyr:
+            if CORE.using_zephyr_rtos:
                 cg.add_define("USE_DEEP_SLEEP_ZEPHYR_WAKEUP_PIN")
                 if zephyr_variant_family() == "stm32":
                     # Maps the pin to its PWR wake-up line

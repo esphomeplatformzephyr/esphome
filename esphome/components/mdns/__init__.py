@@ -259,7 +259,7 @@ async def to_code(config: ConfigType) -> None:
 
     cg.add_define("USE_MDNS")
 
-    if CORE.is_zephyr:
+    if CORE.using_zephyr_rtos:
         from esphome.components.zephyr import zephyr_add_prj_conf, zephyr_framework_type
 
         # OpenThread's SRP client is the discovery path when present (matches mdns_esp32.cpp's

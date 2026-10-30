@@ -24,7 +24,7 @@ from esphome.const import (
     KEY_CORE,
     KEY_FRAMEWORK_VERSION,
     PLATFORM_NRF52,
-    PLATFORM_ZEPHYR,
+    PLATFORM_ZEPHYR as PLATFORM_ZEPHYR,
 )
 from esphome.core import CORE, CoroPriority, coroutine_with_priority
 from esphome.types import ConfigType
@@ -48,7 +48,7 @@ XTENSA_VARIANTS = (ZEPHYR_VARIANT_ESP32, ZEPHYR_VARIANT_ESP32_S3)
 
 CONFIG_SCHEMA = cv.All(
     cv.Schema({cv.GenerateID(): cv.declare_id(Coredump)}).extend(cv.COMPONENT_SCHEMA),
-    cv.only_on([PLATFORM_NRF52, PLATFORM_ZEPHYR]),
+    cv.only_on_or_zephyr_rtos([PLATFORM_NRF52]),
 )
 
 

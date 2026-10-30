@@ -68,7 +68,7 @@ def AUTO_LOAD() -> list[str]:
     # it always compiles ota_backend_zephyr.cpp regardless of which ota: platform
     # is selected (see ota's own AUTO_LOAD()), and that backend needs sha256 (NCS's
     # PSA crypto drivers, and mainline's default crypto backend, can't do MD5).
-    return ["sha256"] if CORE.is_zephyr else []
+    return ["sha256"] if CORE.using_zephyr_rtos else []
 
 
 ZephyrMcumgrOTAComponent = cg.esphome_ns.namespace("zephyr_mcumgr").class_(
@@ -123,7 +123,10 @@ def _validate_platform(conf: ConfigType) -> ConfigType:
     # Two ways to end up on a supported chip: the legacy platform: nrf52
     # component, or platform: zephyr with one of ZEPHYR_VARIANTS (a separate,
     # mainline/NCS-based port).
-    if not (CORE.is_nrf52 or (CORE.is_zephyr and zephyr_variant() in ZEPHYR_VARIANTS)):
+    if not (
+        CORE.is_nrf52
+        or (CORE.using_zephyr_rtos and zephyr_variant() in ZEPHYR_VARIANTS)
+    ):
         raise cv.Invalid(
             "This feature is only available on nrf52 (platform: nrf52, or "
             "platform: zephyr with variant: nrf52, nrf54l15, nrf54lm20a, efr32mg24, "
@@ -245,7 +248,7 @@ async def to_code(config: ConfigType) -> None:
     zephyr_add_prj_conf("IMG_ERASE_PROGRESSIVELY", True)
 
     zephyr_add_prj_conf("BOOTLOADER_MCUBOOT", True)
-    if not CORE.is_nrf52:
+    if CORE.using_zephyr_rtos:
         zephyr_add_sysbuild_conf("BOOTLOADER_MCUBOOT", True)
 
     zephyr_add_prj_conf("MCUMGR_MGMT_NOTIFICATION_HOOKS", True)

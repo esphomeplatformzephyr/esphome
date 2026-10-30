@@ -55,7 +55,7 @@ from esphome.const import (
     PLATFORM_HOST,
     PLATFORM_NRF52,
     PLATFORM_RP2,
-    PLATFORM_ZEPHYR,
+    PLATFORM_ZEPHYR as PLATFORM_ZEPHYR,
     PlatformFramework,
 )
 from esphome.core import CORE, ID, CoroPriority, coroutine_with_priority
@@ -254,11 +254,11 @@ CONFIG_SCHEMA = cv.All(
                 cv.only_on(PLATFORM_HOST), validate_device
             ),
             cv.Optional(CONF_DTS_NODE_OVERRIDE): cv.All(
-                cv.only_on([PLATFORM_ZEPHYR]), cv.string_strict, normalize_dts_label
+                cv.only_on_zephyr_rtos, cv.string_strict, normalize_dts_label
             ),
         }
     ).extend(cv.COMPONENT_SCHEMA),
-    cv.only_on(
+    cv.only_on_or_zephyr_rtos(
         [
             PLATFORM_BK72XX,
             PLATFORM_ESP32,
@@ -266,7 +266,6 @@ CONFIG_SCHEMA = cv.All(
             PLATFORM_RP2,
             PLATFORM_NRF52,
             PLATFORM_HOST,
-            PLATFORM_ZEPHYR,
         ]
     ),
     validate_config,

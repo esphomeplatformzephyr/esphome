@@ -1072,6 +1072,14 @@ class EsphomeCore:
     def using_zephyr(self):
         return self.target_framework == "zephyr"
 
+    @property
+    def using_zephyr_rtos(self):
+        """Zephyr built by zephyr_rtos: every Zephyr platform except nrf52."""
+        return (
+            self.data[KEY_CORE].get(KEY_TARGET_FRAMEWORK) == "zephyr"
+            and not self.is_nrf52
+        )
+
     def add_job(self, func, *args, **kwargs) -> None:
         self.event_loop.add_job(func, *args, **kwargs)
 

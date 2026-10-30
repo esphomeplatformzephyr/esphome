@@ -77,7 +77,7 @@ ZEPHYR_ESP32_ATTENUATION_TO_GAIN = {
 
 def validate_config(config: ConfigType) -> ConfigType:
     if CONF_ATTENUATION in config and not (
-        CORE.is_esp32 or (CORE.is_zephyr and zephyr_variant_family() == "esp32")
+        CORE.is_esp32 or (CORE.using_zephyr_rtos and zephyr_variant_family() == "esp32")
     ):
         raise cv.Invalid(
             "attenuation is only valid on esp32 or platform: zephyr with an "

@@ -355,7 +355,7 @@ def _require_vfs(config: ConfigType) -> ConfigType:
 def _validate_platform(config: ConfigType) -> ConfigType:
     if CORE.using_zephyr:
         # openthread_zephyr.cpp has no border router support yet
-        if CORE.is_zephyr and CONF_BORDER_ROUTER in config:
+        if CORE.using_zephyr_rtos and CONF_BORDER_ROUTER in config:
             raise cv.Invalid(
                 "OpenThread Border Router is not supported on platform: zephyr yet",
                 [CONF_BORDER_ROUTER],
@@ -421,7 +421,7 @@ def _validate_core_option_value(value: Any) -> str:
 
 
 def _validate_core_options_platform(options: dict[str, str]) -> dict[str, str]:
-    if not CORE.is_zephyr:
+    if not CORE.using_zephyr_rtos:
         return cv.only_on_esp32(options)
     if zephyr_framework_type() != "zephyr":
         raise cv.Invalid("core_options on Zephyr requires 'framework: type: zephyr'")
@@ -648,10 +648,10 @@ async def to_code(config: ConfigType) -> None:
         # Without SLAAC the device never forms an OMR (Off-Mesh-Routable) address, so
         # SRP's auto-registered host resolves by name but every address lookup times out.
         zephyr_add_prj_conf("OPENTHREAD_SLAAC", True)
-        if CORE.is_nrf52:
-            zephyr_add_prj_conf("MAIN_STACK_SIZE", 4096)
-        else:
+        if CORE.using_zephyr_rtos:
             zephyr_raise_prj_conf_min("MAIN_STACK_SIZE", 4096)
+        else:
+            zephyr_add_prj_conf("MAIN_STACK_SIZE", 4096)
 
         if not CORE.is_nrf52:
             # Mirror `zephyr: log_level:` into OpenThread's own log verbosity -- a separate

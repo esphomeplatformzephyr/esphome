@@ -897,6 +897,25 @@ def only_on(platforms):
     return validator_
 
 
+def only_on_zephyr_rtos(obj):
+    """Validate that this option is only specified on a Zephyr RTOS platform."""
+    if not CORE.using_zephyr_rtos:
+        raise Invalid("This feature is only available on Zephyr RTOS platforms")
+    return obj
+
+
+def only_on_or_zephyr_rtos(platforms):
+    """only_on(platforms) that also accepts every Zephyr RTOS platform."""
+    on_platforms = only_on(platforms)
+
+    def validator_(obj):
+        if CORE.using_zephyr_rtos:
+            return obj
+        return on_platforms(obj)
+
+    return validator_
+
+
 def only_with_framework(
     frameworks: Framework | str | list[Framework | str], suggestions=None
 ):
@@ -2353,7 +2372,7 @@ class SplitDefault(Optional):
                 keys += _get_default_key(variant, framework)
                 keys += _get_default_key(variant)
             keys += _get_default_key(framework)
-        elif CORE.is_zephyr:
+        elif CORE.using_zephyr_rtos:
             from esphome.components.zephyr import zephyr_variant
 
             if zephyr_var := zephyr_variant():
