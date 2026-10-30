@@ -35,7 +35,7 @@ def to_code(config: ConfigType) -> None:
     """REQUIRES_FULL_LIBCPP selects GLIBCXX_LIBCPP; without it Zephyr defaults
     to MINIMAL_LIBCPP, which has no STL and breaks ESPHome's C++ headers."""
     import esphome.codegen as cg  # noqa: PLC0415
-    from esphome.const import CONF_AP, CONF_LOG_LEVEL, CONF_WIFI  # noqa: PLC0415
+    from esphome.const import CONF_AP, CONF_FRAMEWORK, CONF_LOG_LEVEL, CONF_WIFI  # noqa: PLC0415
     from esphome.core import CORE  # noqa: PLC0415
 
     from .. import zephyr_add_prj_conf, zephyr_variant  # noqa: PLC0415 -- avoids circular import at module load
@@ -51,7 +51,7 @@ def to_code(config: ConfigType) -> None:
     # arch_stack_walk() isn't implemented for Xtensa (ESP32, S3); RISC-V
     # (esp32_h2/c6/c5/c3) does implement it and enables ARCH_HAS_STACKWALK
     # unconditionally, so no EXTRA_EXCEPTION_INFO is needed there either.
-    log_level = config.get(CONF_LOG_LEVEL, "ERROR")
+    log_level = config[CONF_FRAMEWORK][CONF_LOG_LEVEL]
     if log_level != "NONE" and zephyr_variant() not in _XTENSA_VARIANTS:
         zephyr_add_prj_conf("EXCEPTION_STACK_TRACE", True)
     # Consumed by C++ code shared across every esp32-family variant (core.cpp, etc.).

@@ -68,7 +68,9 @@ def config_schema(config: ConfigType) -> ConfigType:
     config = dict(config)
     if CONF_BOARD not in config:
         config[CONF_BOARD] = _DEFAULT_BOARD
-    config[CONF_ADVANCED] = _ADVANCED_SCHEMA(config.get(CONF_ADVANCED, {}))
+    config[CONF_FRAMEWORK][CONF_ADVANCED] = _ADVANCED_SCHEMA(
+        config[CONF_FRAMEWORK].get(CONF_ADVANCED, {})
+    )
     config[CONF_BOARD] = qualify_board(VARIANT, config[CONF_BOARD])
     _, framework_ver, sdk_name, _ = resolve_framework_version(
         VARIANT, "esp32_c6", config, "mainline ESP32-C6 support"
@@ -81,7 +83,7 @@ def config_schema(config: ConfigType) -> ConfigType:
         config,
         framework_type=sdk_name,
         sdk_source=config[CONF_FRAMEWORK].get(CONF_SOURCE),
-        runner=config[CONF_ADVANCED].get(CONF_RUNNER),
+        runner=config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_RUNNER),
     )
     return config
 

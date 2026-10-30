@@ -59,13 +59,20 @@ def test_uses_tinyuf2(tmp_path: Path, board: str, expected: bool) -> None:
 def test_config_schema_declares_the_touch_only_on_the_xiao(
     board: str, declared: bool
 ) -> None:
-    config = {CONF_BOARD: board, CONF_ADVANCED: {CONF_BOOTLOADER: "none"}}
+    config = {
+        CONF_BOARD: board,
+        CONF_FRAMEWORK: {CONF_ADVANCED: {CONF_BOOTLOADER: "none"}},
+    }
     stm32c5._xiao_config_schema(config)
-    assert (stm32c5.CONF_TINYUF2_TOUCH in config[CONF_ADVANCED]) is declared
+    advanced = config[CONF_FRAMEWORK][CONF_ADVANCED]
+    assert (stm32c5.CONF_TINYUF2_TOUCH in advanced) is declared
 
 
 def test_config_schema_rejects_mcuboot_on_the_xiao() -> None:
-    config = {CONF_BOARD: XIAO, CONF_ADVANCED: {CONF_BOOTLOADER: "mcuboot"}}
+    config = {
+        CONF_BOARD: XIAO,
+        CONF_FRAMEWORK: {CONF_ADVANCED: {CONF_BOOTLOADER: "mcuboot"}},
+    }
     with pytest.raises(cv.Invalid, match="TinyUF2"):
         stm32c5._xiao_config_schema(config)
 
@@ -80,7 +87,7 @@ def test_to_code_builds_uf2_and_touch_only_on_the_xiao(board: str, built: bool) 
         patch.object(stm32c5.cg, "add_define") as mock_define,
         patch.object(CORE, "add_job") as mock_job,
     ):
-        stm32c5._xiao_to_code({CONF_BOARD: board, CONF_ADVANCED: {}})
+        stm32c5._xiao_to_code({CONF_BOARD: board, CONF_FRAMEWORK: {CONF_ADVANCED: {}}})
     if built:
         mock_conf.assert_any_call("BUILD_OUTPUT_UF2", True)
         mock_conf.assert_any_call("BUILD_OUTPUT_UF2_FAMILY_ID", "0x00c5c5c5")
@@ -112,7 +119,7 @@ def test_to_code_adds_usb_clock_and_pins_only_while_the_board_lacks_them(
         patch.object(stm32c5.cg, "add_define"),
         patch.object(CORE, "add_job"),
     ):
-        stm32c5._xiao_to_code({CONF_BOARD: XIAO, CONF_ADVANCED: {}})
+        stm32c5._xiao_to_code({CONF_BOARD: XIAO, CONF_FRAMEWORK: {CONF_ADVANCED: {}}})
     added = [call.args[0].split()[0] for call in mock_overlay.call_args_list]
     assert added == expected
     mock_enabled.assert_called_once_with(XIAO, "clk48")
@@ -231,7 +238,7 @@ def test_reset_over_usb_touches_the_xiao_at_2001_baud(
     ports = MagicMock(
         side_effect=[[SimpleNamespace(path=PORT)], [], [SimpleNamespace(path=PORT)]]
     )
-    config = {PLATFORM_ZEPHYR: {"variant": "STM32C5", "advanced": {}}}
+    config = {PLATFORM_ZEPHYR: {"variant": "STM32C5", "framework": {"advanced": {}}}}
     with (
         patch("serial.Serial") as mock_serial,
         patch("esphome.util.get_serial_ports", ports),

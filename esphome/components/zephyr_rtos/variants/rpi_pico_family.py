@@ -9,7 +9,7 @@ from typing import Any
 
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.const import CONF_ADVANCED
+from esphome.const import CONF_ADVANCED, CONF_FRAMEWORK
 from esphome.core import CORE, CoroPriority, coroutine_with_priority
 from esphome.types import ConfigType
 
@@ -155,7 +155,7 @@ def to_code(config: ConfigType) -> None:
     # busy-wait, no timeout -- see rp2350.py's TEST_RANDOM_GENERATOR).
     # ARM Cortex-M's ARCH_HAS_STACKWALK only defaults on when EXTRA_EXCEPTION_INFO
     # is also set (arch/arm/core/Kconfig selects the dependency it needs).
-    log_level = config.get(CONF_LOG_LEVEL, "ERROR")
+    log_level = config[CONF_FRAMEWORK][CONF_LOG_LEVEL]
     if log_level != "NONE":
         zephyr_add_prj_conf("EXTRA_EXCEPTION_INFO", True)
         zephyr_add_prj_conf("EXCEPTION_STACK_TRACE", True)
@@ -188,7 +188,7 @@ def to_code(config: ConfigType) -> None:
         zephyr_add_prj_conf("RETENTION_BOOT_MODE", True, image=image)
         zephyr_add_overlay(boot_mode_overlay, image)
     cg.add_define("USE_ZEPHYR_BOOTSEL_TOUCH")
-    CORE.add_job(_bootsel_touch_to_code, config[CONF_ADVANCED])
+    CORE.add_job(_bootsel_touch_to_code, config[CONF_FRAMEWORK][CONF_ADVANCED])
 
 
 @coroutine_with_priority(CoroPriority.DIAGNOSTICS)

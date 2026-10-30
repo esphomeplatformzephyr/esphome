@@ -73,8 +73,10 @@ def config_schema(config: ConfigType) -> ConfigType:
     config = dict(config)
     if CONF_BOARD not in config:
         config[CONF_BOARD] = _DEFAULT_BOARD
-    config[CONF_ADVANCED] = _ADVANCED_SCHEMA(config.get(CONF_ADVANCED, {}))
-    bootloader = config[CONF_ADVANCED][CONF_BOOTLOADER]
+    config[CONF_FRAMEWORK][CONF_ADVANCED] = _ADVANCED_SCHEMA(
+        config[CONF_FRAMEWORK].get(CONF_ADVANCED, {})
+    )
+    bootloader = config[CONF_FRAMEWORK][CONF_ADVANCED][CONF_BOOTLOADER]
     config[CONF_BOARD] = qualify_board(VARIANT, config[CONF_BOARD])
     _xiao_config_schema(config)
     _, framework_ver, sdk_name, _ = resolve_framework_version(
@@ -88,7 +90,7 @@ def config_schema(config: ConfigType) -> ConfigType:
         config,
         framework_type=sdk_name,
         sdk_source=config[CONF_FRAMEWORK].get(CONF_SOURCE),
-        runner=config[CONF_ADVANCED].get(CONF_RUNNER),
+        runner=config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_RUNNER),
     )
     return config
 
@@ -156,11 +158,11 @@ def _is_xiao(board: str) -> bool:
 def _xiao_config_schema(config: ConfigType) -> None:
     # Components are counted at validation, so they cannot be created later in to_code.
     if _is_xiao(config[CONF_BOARD]):
-        advanced = config[CONF_ADVANCED]
+        advanced = config[CONF_FRAMEWORK][CONF_ADVANCED]
         if advanced[CONF_BOOTLOADER] == BOOTLOADER_MCUBOOT:
             raise cv.Invalid(
                 "The XIAO STM32C5's TinyUF2 bootloader cannot be replaced by MCUboot",
-                [CONF_ADVANCED, CONF_BOOTLOADER],
+                [CONF_FRAMEWORK, CONF_ADVANCED, CONF_BOOTLOADER],
             )
         advanced.setdefault(
             CONF_TINYUF2_TOUCH, declare_component_id(TinyUf2Touch)(None)
@@ -178,7 +180,7 @@ def _xiao_to_code(config: ConfigType) -> None:
             "BUILD_OUTPUT_UF2_FAMILY_ID", f"{_XIAO_UF2_FAMILY_ID:#010x}"
         )
         cg.add_define("USE_ZEPHYR_TINYUF2_TOUCH")
-        CORE.add_job(_tinyuf2_touch_to_code, config[CONF_ADVANCED])
+        CORE.add_job(_tinyuf2_touch_to_code, config[CONF_FRAMEWORK][CONF_ADVANCED])
         # The board DTS has no USB clock or pins; each is added only while it is missing.
         if not dts_node_enabled(config[CONF_BOARD], "clk48"):
             # HSE is 48 MHz on this board.

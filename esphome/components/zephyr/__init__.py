@@ -91,8 +91,34 @@ def CONFIG_SCHEMA(config: ConfigType) -> ConfigType:
     if target_platform not in (None, PLATFORM_ZEPHYR):
         return config
     from ..zephyr_rtos import zephyr_rtos_config_schema
+    from ..zephyr_rtos.variants import VARIANTS
 
-    return zephyr_rtos_config_schema(config)
+    families = frozenset(info.family for info in VARIANTS.values())
+    return zephyr_rtos_config_schema(_nest_flat_config(config), families)
+
+
+# Keys the flat zephyr: block keeps at the top level; the rest move under framework:
+_PLATFORM_KEYS = ("variant", "board", "watchdog_timeout", "framework")
+# Flat zephyr: keys that move under framework: advanced:
+_ADVANCED_KEYS = ("west_version", "ninja_version")
+
+
+def _nest_flat_config(config: ConfigType) -> ConfigType:
+    """Move the flat zephyr: block's Zephyr-only options under framework:."""
+    if not isinstance(config, dict):
+        return config
+    nested = {key: value for key, value in config.items() if key in _PLATFORM_KEYS}
+    framework = dict(nested.get("framework") or {})
+    advanced = dict(config.get("advanced") or {})
+    for key, value in config.items():
+        if key in _ADVANCED_KEYS:
+            advanced[key] = value
+        elif key not in _PLATFORM_KEYS and key != "advanced":
+            framework[key] = value
+    if advanced:
+        framework["advanced"] = advanced
+    nested["framework"] = framework
+    return nested
 
 
 @coroutine_with_priority(CoroPriority.PLATFORM)

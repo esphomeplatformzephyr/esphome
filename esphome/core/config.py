@@ -50,7 +50,6 @@ from esphome.const import (
     PLATFORM_ESP32,
     PLATFORM_HOST,
     PLATFORM_RP2,
-    PLATFORM_ZEPHYR,
     PlatformFramework,
     __version__ as ESPHOME_VERSION,
 )
@@ -228,7 +227,7 @@ def validate_loop_interval(config: ConfigType) -> ConfigType:
             max_loop = 4000  # 10000ms / 5 * 2 default value
         elif CORE.using_zephyr_rtos:
             # No watchdog (watchdog_timeout: 0): the loop sleep is not capped
-            wdt = fv.full_config.get()[PLATFORM_ZEPHYR].get(CONF_WATCHDOG_TIMEOUT)
+            wdt = fv.full_config.get()[CORE.target_platform].get(CONF_WATCHDOG_TIMEOUT)
             if wdt is None or wdt.total_milliseconds == 0:
                 return config
             max_loop = 2 * wdt.total_milliseconds // 5

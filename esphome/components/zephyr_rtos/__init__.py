@@ -59,7 +59,7 @@ from .const import (
     CONF_KCONFIG_OPTIONS,
     CONF_MAIN_STACK_SIZE,
     CONF_MODULES,
-    CONF_NINJA_VERSION,
+    CONF_NINJA_VERSION as CONF_NINJA_VERSION,
     CONF_OVERLAYS,
     CONF_RUNNER,
     CONF_SHIELD_SOURCE,
@@ -67,7 +67,7 @@ from .const import (
     CONF_SINGLE_SLOT,
     CONF_SNIPPET_SOURCE,
     CONF_SNIPPETS,
-    CONF_WEST_VERSION,
+    CONF_WEST_VERSION as CONF_WEST_VERSION,
     KEY_BOARD,
     KEY_BOARD_ROOT,
     KEY_BOOT_LAYOUT,
@@ -203,7 +203,7 @@ class ZephyrRtosData(ZephyrData):
     # (west_module, allow_regex, sentinel_name) entries added via zephyr_add_blobs() --
     # transport-conditional blob fetches, on top of the variant's own static `blobs`.
     blobs: list[tuple[str, str, str]]
-    runner: str | None  # zephyr: advanced: runner: -- west flash runner override
+    runner: str | None  # framework: advanced: runner: -- west flash runner override
     # RTT channel -> its user ("logger", "uart 'id'"), claimed by rtt.enable_rtt_node()
     rtt_channels: dict[int, str]
 
@@ -484,7 +484,7 @@ def _base_to_code(config: ConfigType) -> None:
     ):
         zephyr_add_prj_conf(option, False, False)
 
-    log_level = config[CONF_LOG_LEVEL]
+    log_level = config[CONF_FRAMEWORK][CONF_LOG_LEVEL]
     if log_level != "NONE":
         zephyr_add_prj_conf("LOG", True)
         zephyr_add_prj_conf("LOG_DEFAULT_LEVEL", _ZEPHYR_LOG_LEVEL_TO_INT[log_level])
@@ -509,7 +509,7 @@ def _main_stack_to_code(config: ConfigType) -> None:
     default_stack = 8192 if zephyr_variant_family() == "esp32" else 4096
     zephyr_add_prj_conf(
         "MAIN_STACK_SIZE",
-        config.get(CONF_ADVANCED, {}).get(CONF_MAIN_STACK_SIZE, default_stack),
+        config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_MAIN_STACK_SIZE, default_stack),
         required=False,
     )
 
@@ -553,7 +553,7 @@ async def _modules_to_code(config: ConfigType) -> None:
     # modules -- a user-supplied zephyr: modules: entry must always win, and a
     # version-only override needs every request already recorded to have something to
     # attach to (final resolution happens later still, in resolve_zephyr_modules()).
-    _apply_module_overrides(config.get(CONF_MODULES, []))
+    _apply_module_overrides(config[CONF_FRAMEWORK][CONF_MODULES])
 
 
 def _apply_module_overrides(module_confs: list[ConfigType]) -> None:
@@ -582,7 +582,7 @@ async def _kconfig_options_to_code(config: ConfigType) -> None:
     # Runs at the lowest priority so every component has already set its own prj.conf
     # defaults -- user-supplied kconfig_options: must always win, so this overrides
     # unconditionally instead of going through zephyr_add_prj_conf()'s conflict check.
-    for name, value in config.get(CONF_KCONFIG_OPTIONS, {}).items():
+    for name, value in config[CONF_FRAMEWORK][CONF_KCONFIG_OPTIONS].items():
         if isinstance(value, dict):
             for image_name, image_value in value.items():
                 zephyr_set_prj_conf_override(image_name, image_value, image=name)
@@ -597,7 +597,7 @@ async def _overlays_to_code(config: ConfigType) -> None:
     # Runs at the lowest priority so user-supplied overlay content is appended after
     # every component's own generated overlays (e.g. a partition table redefinition
     # needs to come after anything else touching &flash0).
-    overlays = config.get(CONF_OVERLAYS, {})
+    overlays = config[CONF_FRAMEWORK][CONF_OVERLAYS]
     if app_overlay := overlays.get("app"):
         zephyr_add_overlay(app_overlay)
     if mcuboot_overlay := overlays.get("mcuboot"):
@@ -873,27 +873,6 @@ _FRAMEWORK_SOURCE_SCHEMA = cv.Any(
     ),
 )
 
-# `type:` isn't validated against the variant's own sdk names here -- which variant is
-# selected isn't known until _ZEPHYR_SCHEMA's own CONF_VARIANT key is read, and this
-# schema is applied independently of key order. resolve_framework_version() (called
-# per-variant, after _ZEPHYR_SCHEMA) does that check, along with version:/source:
-# mutual exclusion and everything else that needs the variant to already be known.
-_FRAMEWORK_SCHEMA = cv.Schema(
-    {
-        cv.Optional(CONF_TYPE): cv.string_strict,
-        # Also accepts the literal "recommended", an explicit alias for the selected
-        # sdk's default_version (same effect as omitting this key).
-        cv.Optional(CONF_VERSION): cv.string_strict,
-        # Overrides the selected sdk's own official manifest with a fork/branch/ref or a
-        # `local:` path to an already-initialized west workspace. `url` may be omitted to
-        # target a branch (e.g. an alpha/pre-release) of the sdk's own official manifest.
-        cv.Optional(CONF_SOURCE): _FRAMEWORK_SOURCE_SCHEMA,
-        # How often a git source: is re-checked for updates (via `git pull`) -- own knob,
-        # independent of board_source:'s (a different git source with its own cadence).
-        cv.Optional(CONF_REFRESH, default="1d"): cv.All(cv.string, cv.source_refresh),
-    }
-)
-
 # Own refresh: knob (see _FRAMEWORK_SCHEMA's comment) -- board_source: is a different git
 # source than framework: source:, so it doesn't share a cadence with it. Unlike
 # framework: source:, board_source: has no "official" default url to fall back to, so it
@@ -978,10 +957,24 @@ _MODULE_SCHEMA = cv.All(
     cv.has_at_least_one_key(CONF_SOURCE, CONF_VERSION),
 )
 
-_ZEPHYR_SCHEMA = cv.Schema(
+# `type:` isn't validated against the variant's own sdk names here -- which variant is
+# selected isn't known until the platform schema's CONF_VARIANT key is read, and this
+# schema is applied independently of key order. resolve_framework_version() (called
+# per-variant, after the platform schema) does that check, along with version:/source:
+# mutual exclusion and everything else that needs the variant to already be known.
+_FRAMEWORK_SCHEMA = cv.Schema(
     {
-        cv.Required(CONF_VARIANT): cv.one_of(*VARIANTS, upper=True),
-        cv.Optional(CONF_BOARD): cv.string_strict,
+        cv.Optional(CONF_TYPE): cv.string_strict,
+        # Also accepts the literal "recommended", an explicit alias for the selected
+        # sdk's default_version (same effect as omitting this key).
+        cv.Optional(CONF_VERSION): cv.string_strict,
+        # Overrides the selected sdk's own official manifest with a fork/branch/ref or a
+        # `local:` path to an already-initialized west workspace. `url` may be omitted to
+        # target a branch (e.g. an alpha/pre-release) of the sdk's own official manifest.
+        cv.Optional(CONF_SOURCE): _FRAMEWORK_SOURCE_SCHEMA,
+        # How often a git source: is re-checked for updates (via `git pull`) -- own knob,
+        # independent of board_source:'s (a different git source with its own cadence).
+        cv.Optional(CONF_REFRESH, default="1d"): cv.All(cv.string, cv.source_refresh),
         cv.Optional(CONF_BOARD_SOURCE): _BOARD_SOURCE_SCHEMA,
         # Zephyr shields (physical add-on boards, e.g. an nRF7002 Wi-Fi/Zigbee
         # companion board) -- one `-DSHIELD=` entry per item, natively space/semicolon
@@ -993,16 +986,6 @@ _ZEPHYR_SCHEMA = cv.Schema(
         # Only needed when a snippet doesn't live under board_source:'s (or the
         # SDK's own) root -- see _resolve_snippet_source().
         cv.Optional(CONF_SNIPPET_SOURCE): _SNIPPET_SOURCE_SCHEMA,
-        # Which SDK to build against (type:), its version, where to fetch it from
-        # (source:), and how often to recheck a git source: (refresh:) -- see
-        # resolve_framework_version() in variants/__init__.py for the full resolution
-        # logic.
-        cv.Optional(CONF_FRAMEWORK, default={}): _FRAMEWORK_SCHEMA,
-        # Overrides requirements_west.txt's pinned west/ninja version, decoupled from
-        # CONF_VERSION since their release cadence isn't tied to Zephyr's.
-        cv.Optional(CONF_WEST_VERSION): cv.string_strict,
-        cv.Optional(CONF_NINJA_VERSION): cv.string_strict,
-        cv.Optional(CONF_WATCHDOG_TIMEOUT): _WATCHDOG_TIMEOUT_VALIDATOR,
         # Zephyr's own native logging verbosity (CONFIG_LOG_DEFAULT_LEVEL) -- separate
         # from ESPHome's own `logger: level:`, mirroring esp32's `framework: log_level:`.
         cv.Optional(CONF_LOG_LEVEL, default="ERROR"): cv.one_of(
@@ -1049,11 +1032,29 @@ _ZEPHYR_SCHEMA = cv.Schema(
 )
 
 
+def zephyr_rtos_platform_schema(families: frozenset[str]) -> cv.Schema:
+    """The <platform>: schema, limited to the variants of `families`."""
+    return cv.Schema(
+        {
+            cv.Required(CONF_VARIANT): cv.one_of(
+                *(name for name, info in VARIANTS.items() if info.family in families),
+                upper=True,
+            ),
+            cv.Optional(CONF_BOARD): cv.string_strict,
+            cv.Optional(CONF_WATCHDOG_TIMEOUT): _WATCHDOG_TIMEOUT_VALIDATOR,
+            # Which SDK to build against (type:), its version, where to fetch it from
+            # (source:), and the Zephyr-only options -- see resolve_framework_version()
+            # in variants/__init__.py for how type:/version:/source: are resolved.
+            cv.Optional(CONF_FRAMEWORK, default={}): _FRAMEWORK_SCHEMA,
+        }
+    )
+
+
 def _resolve_board_source(config: ConfigType, board: str) -> Path:
     """Resolve zephyr: board_source: into a local BOARD_ROOT directory."""
     conf = config[CONF_BOARD_SOURCE]
     if conf[CONF_TYPE] == TYPE_GIT:
-        with cv.prepend_path([CONF_BOARD_SOURCE]):
+        with cv.prepend_path([CONF_FRAMEWORK, CONF_BOARD_SOURCE]):
             root, _ = git.clone_or_update(
                 url=conf[CONF_URL],
                 ref=conf.get(CONF_REF),
@@ -1101,7 +1102,7 @@ def _resolve_board_source(config: ConfigType, board: str) -> Path:
         raise cv.Invalid(
             f"Could not find boards/*/{parts.name}/board.yml under this board_source. "
             f"Please check the source contains that board.",
-            [CONF_BOARD_SOURCE],
+            [CONF_FRAMEWORK, CONF_BOARD_SOURCE],
         )
     if parts.revision is not None:
         board_dir = board_yml_matches[0].parent
@@ -1155,7 +1156,7 @@ def _resolve_extra_source(
     else:
         conf = config[source_key]
         if conf[CONF_TYPE] == TYPE_GIT:
-            with cv.prepend_path([source_key]):
+            with cv.prepend_path([CONF_FRAMEWORK, source_key]):
                 root, _ = git.clone_or_update(
                     url=conf[CONF_URL],
                     ref=conf.get(CONF_REF),
@@ -1177,7 +1178,7 @@ def _resolve_extra_source(
         # validation time, against the SDK's own tree instead).
         return None
 
-    error_path = [source_key] if explicit else [items_key]
+    error_path = [CONF_FRAMEWORK, source_key if explicit else items_key]
     source_desc = (
         f"this {source_key}"
         if explicit
@@ -1236,12 +1237,16 @@ def _reject_kconfig_watchdog(kconfig_options: ConfigType) -> None:
             raise cv.Invalid(
                 f"'{CONF_KCONFIG_OPTIONS}: {name}' conflicts with "
                 f"'{CONF_WATCHDOG_TIMEOUT}: 0' -- set '{CONF_WATCHDOG_TIMEOUT}' instead",
-                [CONF_KCONFIG_OPTIONS, name],
+                [CONF_FRAMEWORK, CONF_KCONFIG_OPTIONS, name],
             )
 
 
-def zephyr_rtos_config_schema(config: ConfigType) -> ConfigType:
-    config = _ZEPHYR_SCHEMA(config)
+def zephyr_rtos_config_schema(
+    config: ConfigType, families: frozenset[str]
+) -> ConfigType:
+    """Validate a <platform>: block whose variants come from `families`."""
+    config = zephyr_rtos_platform_schema(families)(config)
+    framework = config[CONF_FRAMEWORK]
     variant = config[CONF_VARIANT]
     max_timeout_ms = VARIANTS[variant].watchdog_max_timeout_ms
     # A variant whose ceiling sits below the normal 5s floor (e.g. RA4M1's
@@ -1274,15 +1279,15 @@ def zephyr_rtos_config_schema(config: ConfigType) -> ConfigType:
         default_timeout = cv.TimePeriod(milliseconds=max_timeout_ms)
     config.setdefault(CONF_WATCHDOG_TIMEOUT, default_timeout)
     if config[CONF_WATCHDOG_TIMEOUT].total_milliseconds == 0:
-        _reject_kconfig_watchdog(config[CONF_KCONFIG_OPTIONS])
+        _reject_kconfig_watchdog(framework[CONF_KCONFIG_OPTIONS])
     board_root = None
-    if CONF_BOARD_SOURCE in config:
+    if CONF_BOARD_SOURCE in framework:
         if CONF_BOARD not in config:
             raise cv.Invalid(
                 f"'{CONF_BOARD_SOURCE}' requires '{CONF_BOARD}' to also be set",
-                [CONF_BOARD_SOURCE],
+                [CONF_FRAMEWORK, CONF_BOARD_SOURCE],
             )
-        board_root = _resolve_board_source(config, config[CONF_BOARD])
+        board_root = _resolve_board_source(framework, config[CONF_BOARD])
     elif CONF_BOARD in config:
         valid_boards = VARIANTS[variant].boards
         board = config[CONF_BOARD]
@@ -1292,33 +1297,35 @@ def zephyr_rtos_config_schema(config: ConfigType) -> ConfigType:
                 f"See https://esphome.io/components/zephyr.html for valid boards.",
                 [CONF_BOARD],
             )
-    shields = config.get(CONF_SHIELDS, [])
-    if CONF_SHIELD_SOURCE in config and not shields:
+    shields = framework[CONF_SHIELDS]
+    if CONF_SHIELD_SOURCE in framework and not shields:
         raise cv.Invalid(
             f"'{CONF_SHIELD_SOURCE}' requires '{CONF_SHIELDS}' to also be set",
-            [CONF_SHIELD_SOURCE],
+            [CONF_FRAMEWORK, CONF_SHIELD_SOURCE],
         )
     shield_root = (
-        _resolve_shield_source(config, shields, board_root) if shields else None
+        _resolve_shield_source(framework, shields, board_root) if shields else None
     )
-    snippets = config.get(CONF_SNIPPETS, [])
-    if CONF_SNIPPET_SOURCE in config and not snippets:
+    snippets = framework[CONF_SNIPPETS]
+    if CONF_SNIPPET_SOURCE in framework and not snippets:
         raise cv.Invalid(
             f"'{CONF_SNIPPET_SOURCE}' requires '{CONF_SNIPPETS}' to also be set",
-            [CONF_SNIPPET_SOURCE],
+            [CONF_FRAMEWORK, CONF_SNIPPET_SOURCE],
         )
     snippet_root = (
-        _resolve_snippet_source(config, snippets, board_root) if snippets else None
+        _resolve_snippet_source(framework, snippets, board_root) if snippets else None
     )
     config = get_variant_module(variant).config_schema(config)
+    framework = config[CONF_FRAMEWORK]
     if (
-        config[CONF_SINGLE_SLOT]
+        framework[CONF_SINGLE_SLOT]
         and zephyr_rtos_data()[KEY_BOOTLOADER] != BOOTLOADER_MCUBOOT
     ):
         raise cv.Invalid(
             f"'{CONF_SINGLE_SLOT}: true' requires the MCUboot bootloader "
-            f"(set 'advanced: bootloader: {BOOTLOADER_MCUBOOT}' for this variant)",
-            [CONF_SINGLE_SLOT],
+            f"(set 'framework: advanced: bootloader: {BOOTLOADER_MCUBOOT}' for this "
+            "variant)",
+            [CONF_FRAMEWORK, CONF_SINGLE_SLOT],
         )
     zephyr_rtos_data()[KEY_BOARD_ROOT] = board_root
     zephyr_rtos_data()[KEY_SHIELDS] = shields
@@ -1397,7 +1404,7 @@ def _restore_upload_data(zephyr_config: ConfigType) -> None:
     variant = zephyr_config[CONF_VARIANT]
     variant_data = VARIANTS[variant]
     framework = zephyr_config[CONF_FRAMEWORK]
-    advanced = zephyr_config.get(CONF_ADVANCED, {})
+    advanced = framework.get(CONF_ADVANCED, {})
     sdk_source = framework.get(CONF_SOURCE)
     if sdk_source is not None:
         # The cache holds paths as strings; the schema turns them back into Paths.
@@ -1420,7 +1427,7 @@ def _restore_upload_data(zephyr_config: ConfigType) -> None:
         runner=advanced.get(CONF_RUNNER),
     )
     _apply_module_overrides(
-        cv.ensure_list(_MODULE_SCHEMA)(zephyr_config.get(CONF_MODULES, []))
+        cv.ensure_list(_MODULE_SCHEMA)(framework.get(CONF_MODULES, []))
     )
 
 
@@ -1450,7 +1457,9 @@ def reset_over_usb(config: ConfigType, port: str, timeout: float = 10.0) -> bool
         zephyr_variant_family() == "rpi_pico"
         or (
             zephyr_variant() == ZEPHYR_VARIANT_NRF52
-            and config[CORE.target_platform].get(CONF_ADVANCED, {}).get(CONF_DFU)
+            and config[CORE.target_platform][CONF_FRAMEWORK]
+            .get(CONF_ADVANCED, {})
+            .get(CONF_DFU)
             is not None
         )
         or (zephyr_variant() == ZEPHYR_VARIANT_STM32C5 and stm32c5.uses_tinyuf2())
@@ -1649,7 +1658,7 @@ def run_compile(args, config: ConfigType) -> bool:
         from .commander_setup import check_and_install as commander_install
 
         commander_version = (
-            config[CORE.target_platform]
+            config[CORE.target_platform][CONF_FRAMEWORK]
             .get(CONF_ADVANCED, {})
             .get(CONF_COMMANDER_VERSION)
         )

@@ -318,3 +318,16 @@ def test_border_router_accepts_supported_config(
     _set_esp32_idf_core(set_core_config)
 
     _run_final_validation(otbr_config, full_config)
+
+
+def test_zephyr_log_level_sets_the_openthread_log_level(
+    generate_main: Callable[[str | Path], str],
+) -> None:
+    from esphome.components.zephyr import zephyr_data
+    from esphome.components.zephyr.const import KEY_PRJ_CONF
+
+    generate_main(CONFIG_DIR / "zephyr_log_level_debug.yaml")
+
+    prj_conf = zephyr_data()[KEY_PRJ_CONF][""]
+    assert prj_conf["CONFIG_OPENTHREAD_DEBUG"] == (True, True)
+    assert prj_conf["CONFIG_OPENTHREAD_LOG_LEVEL_INFO"] == (True, True)

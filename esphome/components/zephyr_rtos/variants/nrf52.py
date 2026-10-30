@@ -191,7 +191,9 @@ def config_schema(config: ConfigType) -> ConfigType:
     config = dict(config)
     if CONF_BOARD not in config:
         config[CONF_BOARD] = _DEFAULT_BOARD
-    config[CONF_ADVANCED] = _ADVANCED_SCHEMA(config.get(CONF_ADVANCED, {}))
+    config[CONF_FRAMEWORK][CONF_ADVANCED] = _ADVANCED_SCHEMA(
+        config[CONF_FRAMEWORK].get(CONF_ADVANCED, {})
+    )
     config[CONF_BOARD] = qualify_board(VARIANT, config[CONF_BOARD])
     _, framework_ver, sdk_name, _ = resolve_framework_version(
         VARIANT, "nrf52", config, "nRF52840 support"
@@ -199,20 +201,26 @@ def config_schema(config: ConfigType) -> ConfigType:
     set_core_data(
         VARIANT_NAME,
         config[CONF_BOARD],
-        config[CONF_ADVANCED][CONF_BOOTLOADER],
+        config[CONF_FRAMEWORK][CONF_ADVANCED][CONF_BOOTLOADER],
         framework_ver,
         config,
         framework_type=sdk_name,
         sdk_source=config[CONF_FRAMEWORK].get(CONF_SOURCE),
-        runner=config[CONF_ADVANCED].get(CONF_RUNNER),
+        runner=config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_RUNNER),
     )
     # On by default with a serial DFU bootloader; `dfu: false` turns it off.
-    dfu = config[CONF_ADVANCED].get(CONF_DFU)
-    if dfu is None and config[CONF_ADVANCED][CONF_BOOTLOADER] != BOOTLOADER_MCUBOOT:
+    dfu = config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_DFU)
+    if (
+        dfu is None
+        and config[CONF_FRAMEWORK][CONF_ADVANCED][CONF_BOOTLOADER] != BOOTLOADER_MCUBOOT
+    ):
         dfu = True
     if dfu is not None:
-        with cv.prepend_path([CONF_ADVANCED, CONF_DFU]):
-            if config[CONF_ADVANCED][CONF_BOOTLOADER] == BOOTLOADER_MCUBOOT:
+        with cv.prepend_path([CONF_FRAMEWORK, CONF_ADVANCED, CONF_DFU]):
+            if (
+                config[CONF_FRAMEWORK][CONF_ADVANCED][CONF_BOOTLOADER]
+                == BOOTLOADER_MCUBOOT
+            ):
                 raise cv.Invalid(
                     f"'{CONF_DFU}' needs a serial DFU bootloader, not '{BOOTLOADER_MCUBOOT}'"
                 )
@@ -222,7 +230,7 @@ def config_schema(config: ConfigType) -> ConfigType:
                     CONF_RESET_PIN,
                     {CONF_NUMBER: _DONGLE_RESET_PIN, CONF_INVERTED: True},
                 )
-            config[CONF_ADVANCED][CONF_DFU] = _dfu_schema(dfu)
+            config[CONF_FRAMEWORK][CONF_ADVANCED][CONF_DFU] = _dfu_schema(dfu)
     return config
 
 
@@ -238,7 +246,9 @@ async def to_code(config: ConfigType) -> None:
     zephyr_add_prj_conf("HWINFO", True)
 
     if (
-        sd_end := _SOFTDEVICE_END.get(config[CONF_ADVANCED][CONF_BOOTLOADER])
+        sd_end := _SOFTDEVICE_END.get(
+            config[CONF_FRAMEWORK][CONF_ADVANCED][CONF_BOOTLOADER]
+        )
     ) is not None:
         # The SoftDevice starts the app right after itself; writing over it or the
         # bootloader bricks the board.
@@ -247,7 +257,7 @@ async def to_code(config: ConfigType) -> None:
                 sd_end, ((0x0, sd_end), (_ADAFRUIT_BOOTLOADER_START, _FLASH_SIZE))
             )
         )
-    elif config[CONF_ADVANCED][CONF_BOOTLOADER] == BOOTLOADER_NRF:
+    elif config[CONF_FRAMEWORK][CONF_ADVANCED][CONF_BOOTLOADER] == BOOTLOADER_NRF:
         zephyr_set_boot_layout(_OPEN_DFU_LAYOUT)
     if _board_name(config[CONF_BOARD]) == _DONGLE_BOARD:
         from .. import zephyr_add_overlay
@@ -256,7 +266,7 @@ async def to_code(config: ConfigType) -> None:
         zephyr_add_overlay('&uart0 { status = "disabled"; };')
 
     CORE.add_job(_bootloader_to_code, config)
-    if dfu_config := config[CONF_ADVANCED].get(CONF_DFU):
+    if dfu_config := config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_DFU):
         CORE.add_job(_dfu_to_code, dfu_config)
 
 

@@ -63,7 +63,7 @@ from esphome.const import (
     KEY_CORE,
     KEY_FRAMEWORK_VERSION,
     PLATFORM_ESP32,
-    PLATFORM_ZEPHYR,
+    PLATFORM_ZEPHYR as PLATFORM_ZEPHYR,
     PlatformFramework,
 )
 from esphome.core import (
@@ -654,12 +654,12 @@ async def to_code(config: ConfigType) -> None:
             zephyr_add_prj_conf("MAIN_STACK_SIZE", 4096)
 
         if not CORE.is_nrf52:
-            # Mirror `zephyr: log_level:` into OpenThread's own log verbosity -- a separate
-            # Kconfig from Zephyr's native CONFIG_LOG_DEFAULT_LEVEL. nrf52 has no top-level
-            # `zephyr:` config block to read a log_level from, so it's excluded here.
-            zephyr_log_level = CORE.config.get(PLATFORM_ZEPHYR, {}).get(
-                CONF_LOG_LEVEL, "ERROR"
-            )
+            # Mirror `framework: log_level:` into OpenThread's own log verbosity -- a
+            # separate Kconfig from Zephyr's native CONFIG_LOG_DEFAULT_LEVEL. nrf52 has no
+            # framework: log_level: to read, so it's excluded here.
+            zephyr_log_level = CORE.config[CORE.target_platform][CONF_FRAMEWORK][
+                CONF_LOG_LEVEL
+            ]
             if zephyr_log_level != "NONE":
                 zephyr_add_prj_conf("OPENTHREAD_DEBUG", True)
                 zephyr_add_prj_conf("OPENTHREAD_LOG_LEVEL_DYNAMIC", False)

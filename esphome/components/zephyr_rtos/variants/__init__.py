@@ -6,6 +6,7 @@ from types import ModuleType
 
 import esphome.config_validation as cv
 from esphome.const import (
+    CONF_ADVANCED,
     CONF_FRAMEWORK,
     CONF_REFRESH,
     CONF_SOURCE,
@@ -503,7 +504,8 @@ def set_core_data(
 ) -> None:
     """Populate CORE.data for a Zephyr variant's config_schema().
 
-    `config` supplies cross-variant user overrides (CONF_WEST_VERSION, CONF_NINJA_VERSION).
+    `config` supplies cross-variant user overrides (framework: advanced: west_version:
+    and ninja_version:).
     Every keyword defaults to today's shared "nothing configured yet" starting point. A
     future variant (e.g. Nordic, STM32) that genuinely needs a different starting value for
     any of these passes its own instead of forking this function.
@@ -512,6 +514,7 @@ def set_core_data(
         ZephyrRtosData,  # deferred: zephyr_rtos/__init__.py imports this package at load time
     )
 
+    advanced = config.get(CONF_FRAMEWORK, {}).get(CONF_ADVANCED, {})
     CORE.toolchain = Toolchain.SDK_ZEPHYR
     CORE.data[KEY_CORE][KEY_TARGET_PLATFORM] = PLATFORM_ZEPHYR
     CORE.data[KEY_CORE][KEY_TARGET_FRAMEWORK] = KEY_ZEPHYR
@@ -543,10 +546,10 @@ def set_core_data(
         dts_include_paths=dts_include_paths,
         board_edt_cache=board_edt_cache if board_edt_cache is not None else {},
         board_yaml_cache=board_yaml_cache if board_yaml_cache is not None else {},
-        west_version=config.get(CONF_WEST_VERSION),
-        ninja_version=config.get(CONF_NINJA_VERSION),
-        snippets=config.get(CONF_SNIPPETS, []),
-        single_slot=config.get(CONF_SINGLE_SLOT, False),
+        west_version=advanced.get(CONF_WEST_VERSION),
+        ninja_version=advanced.get(CONF_NINJA_VERSION),
+        snippets=config.get(CONF_FRAMEWORK, {}).get(CONF_SNIPPETS, []),
+        single_slot=config.get(CONF_FRAMEWORK, {}).get(CONF_SINGLE_SLOT, False),
         shields=shields if shields is not None else [],
         shield_root=shield_root,
         snippet_root=snippet_root,
@@ -684,6 +687,10 @@ class _LazyVariants(dict):
     def items(self):
         self._ensure()
         return super().items()
+
+    def values(self):
+        self._ensure()
+        return super().values()
 
     def get(self, key, default=None):
         self._ensure()

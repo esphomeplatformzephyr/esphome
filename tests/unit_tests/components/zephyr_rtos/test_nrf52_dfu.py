@@ -270,7 +270,9 @@ def test_upload_adafruit_ble_scans_then_hands_over_to_the_bootloader(
 
 
 def _reset_config(variant: str, advanced: dict | None = None) -> dict:
-    return {PLATFORM_ZEPHYR: {"variant": variant, "advanced": advanced or {}}}
+    return {
+        PLATFORM_ZEPHYR: {"variant": variant, "framework": {"advanced": advanced or {}}}
+    }
 
 
 def _ports(*present: bool) -> MagicMock:

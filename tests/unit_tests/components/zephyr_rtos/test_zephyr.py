@@ -97,6 +97,12 @@ from esphome.const import (
 from esphome.core import CORE, ID, EsphomeError
 from tests.unit_tests.components.zephyr_rtos.zephyr_state import empty_zephyr_data
 
+_ALL_FAMILIES = frozenset(info.family for info in VARIANTS.values())
+
+
+def _validate(config: dict) -> dict:
+    return zephyr_rtos_config_schema(config, _ALL_FAMILIES)
+
 
 def test_empty_zephyr_data_has_every_zephyr_data_key() -> None:
     assert set(empty_zephyr_data()) == ZephyrRtosData.__required_keys__
@@ -1610,14 +1616,12 @@ def test_variant_config_schema_skips_validation_when_owned_by_other_platform() -
 def test_variant_config_schema_rejects_mac_address() -> None:
     _init_variant_schema_core()
     with pytest.raises(cv.Invalid, match="mac_address"):
-        zephyr_rtos_config_schema(
-            {"variant": "ESP32H2", "mac_address": "AA:BB:CC:DD:EE:FF"}
-        )
+        _validate({"variant": "ESP32H2", "mac_address": "AA:BB:CC:DD:EE:FF"})
 
 
 def test_variant_config_schema_defaults_watchdog_timeout_for_real_hardware() -> None:
     _init_variant_schema_core()
-    config = zephyr_rtos_config_schema({"variant": "ESP32H2"})
+    config = _validate({"variant": "ESP32H2"})
     assert config["watchdog_timeout"] == cv.TimePeriod(seconds=10)
 
 
@@ -1626,9 +1630,7 @@ def test_variant_config_schema_accepts_watchdog_timeout_zero(
     watchdog_timeout: object,
 ) -> None:
     _init_variant_schema_core()
-    config = zephyr_rtos_config_schema(
-        {"variant": "ESP32H2", "watchdog_timeout": watchdog_timeout}
-    )
+    config = _validate({"variant": "ESP32H2", "watchdog_timeout": watchdog_timeout})
     assert config["watchdog_timeout"].total_milliseconds == 0
 
 
@@ -1639,11 +1641,11 @@ def test_variant_config_schema_rejects_kconfig_watchdog_with_timeout_zero(
 ) -> None:
     _init_variant_schema_core()
     with pytest.raises(cv.Invalid, match="conflicts with 'watchdog_timeout: 0'"):
-        zephyr_rtos_config_schema(
+        _validate(
             {
                 "variant": "ESP32H2",
                 "watchdog_timeout": "0s",
-                "kconfig_options": {name: value},
+                "framework": {"kconfig_options": {name: value}},
             }
         )
 
@@ -1656,22 +1658,22 @@ def test_variant_config_schema_allows_kconfig_watchdog_off_or_other_image(
     kconfig_options: dict,
 ) -> None:
     _init_variant_schema_core()
-    zephyr_rtos_config_schema(
+    _validate(
         {
             "variant": "ESP32H2",
             "watchdog_timeout": "0s",
-            "kconfig_options": kconfig_options,
+            "framework": {"kconfig_options": kconfig_options},
         }
     )
 
 
 def test_variant_config_schema_allows_kconfig_watchdog_with_timeout() -> None:
     _init_variant_schema_core()
-    zephyr_rtos_config_schema(
+    _validate(
         {
             "variant": "ESP32H2",
             "watchdog_timeout": "10s",
-            "kconfig_options": {"WATCHDOG": True},
+            "framework": {"kconfig_options": {"WATCHDOG": True}},
         }
     )
 
@@ -1719,15 +1721,15 @@ def _stack() -> tuple:
 )
 def test_main_stack_to_code(variant: str | None, advanced: dict, expected: int) -> None:
     CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant=variant)
-    _main_stack_to_code({"advanced": advanced})
+    _main_stack_to_code({"framework": {"advanced": advanced}})
     assert _stack() == (expected, False)
 
 
 def test_variant_config_schema_rejects_main_stack_size_below_4096() -> None:
     _init_variant_schema_core()
     with pytest.raises(cv.Invalid, match="main_stack_size"):
-        zephyr_rtos_config_schema(
-            {"variant": "ESP32C3", "advanced": {"main_stack_size": 2048}}
+        _validate(
+            {"variant": "ESP32C3", "framework": {"advanced": {"main_stack_size": 2048}}}
         )
 
 
@@ -1748,15 +1750,15 @@ def test_zephyr_raise_prj_conf_min_raises_low_value() -> None:
 def test_zephyr_raise_prj_conf_min_never_lowers() -> None:
     # ESP32-H2 with OpenThread keeps 8192
     CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant="ESP32H2")
-    _main_stack_to_code({"advanced": {}})
+    _main_stack_to_code({"framework": {"advanced": {}}})
     zephyr_raise_prj_conf_min("MAIN_STACK_SIZE", 4096)
     assert _stack() == (8192, False)
 
 
 def _nrf52_advanced(**advanced: object) -> dict:
     _init_variant_schema_core()
-    config = zephyr_rtos_config_schema({"variant": "NRF52", "advanced": advanced})
-    return config["advanced"]
+    config = _validate({"variant": "NRF52", "framework": {"advanced": advanced}})
+    return config["framework"]["advanced"]
 
 
 def test_nrf52_dfu_defaults_on_with_adafruit_bootloader() -> None:
@@ -1776,10 +1778,13 @@ def test_nrf52_dfu_is_off_with_mcuboot() -> None:
 
 def test_nrf52_dfu_config_validates_again() -> None:
     _init_variant_schema_core()
-    first = zephyr_rtos_config_schema(
-        {"variant": "NRF52", "advanced": {"bootloader": "adafruit_nrf52_sd140_v6"}}
+    first = _validate(
+        {
+            "variant": "NRF52",
+            "framework": {"advanced": {"bootloader": "adafruit_nrf52_sd140_v6"}},
+        }
     )
-    assert zephyr_rtos_config_schema(first)["advanced"]["dfu"] is not None
+    assert _validate(first)["framework"]["advanced"]["dfu"] is not None
 
 
 def test_nrf52_dfu_rejects_mcuboot() -> None:
@@ -1794,8 +1799,12 @@ def _dongle_config(**advanced: object) -> dict:
     # The reset pin schema reports its errors against the config path
     token = path_context.set(["zephyr"])
     try:
-        return zephyr_rtos_config_schema(
-            {"variant": "NRF52", "board": "nrf52840dongle", "advanced": advanced}
+        return _validate(
+            {
+                "variant": "NRF52",
+                "board": "nrf52840dongle",
+                "framework": {"advanced": advanced},
+            }
         )
     finally:
         path_context.reset(token)
@@ -1807,13 +1816,14 @@ def test_nrf52_dongle_dfu_defaults_to_the_reset_pin(dfu: object) -> None:
     advanced = (
         {"bootloader": "nrf"} if dfu is None else {"bootloader": "nrf", "dfu": dfu}
     )
-    reset_pin = _dongle_config(**advanced)["advanced"]["dfu"]["reset_pin"]
+    reset_pin = _dongle_config(**advanced)["framework"]["advanced"]["dfu"]["reset_pin"]
     assert reset_pin["number"] == 19
     assert reset_pin["inverted"] is True
 
 
 def test_nrf52_dongle_dfu_off_has_no_reset_pin() -> None:
-    assert _dongle_config(bootloader="nrf", dfu=False)["advanced"]["dfu"] is None
+    dongle = _dongle_config(bootloader="nrf", dfu=False)
+    assert dongle["framework"]["advanced"]["dfu"] is None
 
 
 def test_variant_config_schema_raises_for_unregistered_variant(
@@ -1829,9 +1839,14 @@ def test_variant_config_schema_raises_for_unregistered_variant(
     _init_variant_schema_core()
     fake_variant = ZephyrVariant(sdk=ZephyrSDK(manifest_url="http://dummy"))
     monkeypatch.setitem(VARIANTS, "FAKE_VARIANT", fake_variant)
-    monkeypatch.setattr(zephyr_module, "_ZEPHYR_SCHEMA", lambda config: config)
+    framework = zephyr_module._FRAMEWORK_SCHEMA({})
+    monkeypatch.setattr(
+        zephyr_module,
+        "zephyr_rtos_platform_schema",
+        lambda families: lambda config: {**config, "framework": framework},
+    )
     with pytest.raises(KeyError, match="FAKE_VARIANT"):
-        zephyr_rtos_config_schema({"variant": "FAKE_VARIANT"})
+        _validate({"variant": "FAKE_VARIANT"})
 
 
 # ---------------------------------------------------------------------------
@@ -1839,7 +1854,7 @@ def test_variant_config_schema_raises_for_unregistered_variant(
 # upload`/`logs` can skip full validation via the validated-config cache and
 # re-run CONFIG_SCHEMA on the already-validated, cached zephyr: block in a
 # fresh process (see upload_program()) -- each variant's config_schema() must
-# return a dict that validates cleanly when fed back through _ZEPHYR_SCHEMA a
+# return a dict that validates cleanly when fed back through the platform schema a
 # second time. Covers every variant fixed by #43 (removal of the dead
 # `config[KEY_FRAMEWORK_VERSION] = version_str` write).
 # ---------------------------------------------------------------------------
@@ -1848,13 +1863,13 @@ def test_variant_config_schema_raises_for_unregistered_variant(
 @pytest.mark.parametrize("variant", sorted(VARIANTS))
 def test_variant_config_schema_round_trips_cleanly(variant: str) -> None:
     _init_variant_schema_core()
-    validated = zephyr_rtos_config_schema({CONF_VARIANT: variant})
+    validated = _validate({CONF_VARIANT: variant})
 
     # Simulate upload_program()'s cache-repopulation path: re-run CONFIG_SCHEMA on
     # the already-validated config in a fresh CORE.data state, exactly as it would
     # be in a separate `esphome upload` process.
     _init_variant_schema_core()
-    re_validated = zephyr_rtos_config_schema(validated)
+    re_validated = _validate(validated)
 
     assert re_validated[CONF_VARIANT] == variant
     assert "framework_version" not in re_validated
@@ -1920,7 +1935,7 @@ def test_upload_program_resolves_variant_and_flashes(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # upload_program -- KEY_ZEPHYR_RTOS repopulation on the validated-config cache fast
 # path (`esphome upload`/`logs` can skip full config validation, so the
-# CORE.data[KEY_ZEPHYR_RTOS] side effect of zephyr_rtos_config_schema() never ran)
+# CORE.data[KEY_ZEPHYR_RTOS] side effect of _validate() never ran)
 # ---------------------------------------------------------------------------
 
 
@@ -1944,8 +1959,8 @@ def _validate_zephyr_config(user_config: dict) -> dict:
     from esphome.components.zephyr_rtos.const import CONF_MODULES
 
     CORE.data[KEY_CORE] = {}
-    validated = zephyr_rtos_config_schema(user_config)
-    _apply_module_overrides(validated.get(CONF_MODULES, []))
+    validated = _validate(user_config)
+    _apply_module_overrides(validated[CONF_FRAMEWORK][CONF_MODULES])
     return validated
 
 
@@ -2035,20 +2050,22 @@ def test_upload_program_restore_reapplies_user_module_overrides(
     validated = _validate_zephyr_config(
         {
             CONF_VARIANT: "ESP32",
-            CONF_MODULES: [
-                {
-                    CONF_NAME: "git_mod",
-                    CONF_SOURCE: {
-                        CONF_TYPE: TYPE_GIT,
-                        CONF_URL: "https://example.com/m",
+            CONF_FRAMEWORK: {
+                CONF_MODULES: [
+                    {
+                        CONF_NAME: "git_mod",
+                        CONF_SOURCE: {
+                            CONF_TYPE: TYPE_GIT,
+                            CONF_URL: "https://example.com/m",
+                        },
                     },
-                },
-                {
-                    CONF_NAME: "local_mod",
-                    CONF_SOURCE: {CONF_TYPE: TYPE_LOCAL, CONF_PATH: str(tmp_path)},
-                },
-                {CONF_NAME: "tweaked_mod", CONF_VERSION: "1.2.3"},
-            ],
+                    {
+                        CONF_NAME: "local_mod",
+                        CONF_SOURCE: {CONF_TYPE: TYPE_LOCAL, CONF_PATH: str(tmp_path)},
+                    },
+                    {CONF_NAME: "tweaked_mod", CONF_VERSION: "1.2.3"},
+                ],
+            },
         }
     )
     expected, restored = _restore_from_cache(validated)

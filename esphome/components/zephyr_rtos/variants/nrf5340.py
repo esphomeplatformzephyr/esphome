@@ -105,7 +105,9 @@ def config_schema(config: ConfigType) -> ConfigType:
     config = dict(config)
     if CONF_BOARD not in config:
         config[CONF_BOARD] = _DEFAULT_BOARD
-    config[CONF_ADVANCED] = _ADVANCED_SCHEMA(config.get(CONF_ADVANCED, {}))
+    config[CONF_FRAMEWORK][CONF_ADVANCED] = _ADVANCED_SCHEMA(
+        config[CONF_FRAMEWORK].get(CONF_ADVANCED, {})
+    )
     config[CONF_BOARD] = qualify_board(VARIANT, config[CONF_BOARD])
     _, framework_ver, sdk_name, _ = resolve_framework_version(
         VARIANT, "nrf5340", config, "nRF5340 support"
@@ -113,12 +115,12 @@ def config_schema(config: ConfigType) -> ConfigType:
     set_core_data(
         VARIANT_NAME,
         config[CONF_BOARD],
-        config[CONF_ADVANCED][CONF_BOOTLOADER],
+        config[CONF_FRAMEWORK][CONF_ADVANCED][CONF_BOOTLOADER],
         framework_ver,
         config,
         framework_type=sdk_name,
         sdk_source=config[CONF_FRAMEWORK].get(CONF_SOURCE),
-        runner=config[CONF_ADVANCED].get(CONF_RUNNER),
+        runner=config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_RUNNER),
     )
     return config
 

@@ -32,12 +32,18 @@ BOOTLOADER_NONE = "none"
 # intentionally unvalidated here (see build_zephyr.log_available_runners()).
 CONF_RUNNER = "runner"
 CONF_MAIN_STACK_SIZE = "main_stack_size"
+CONF_WEST_VERSION = "west_version"
+CONF_NINJA_VERSION = "ninja_version"
 
 # Base advanced: schema shared by every variant; extend() on extra per-variant keys.
 ADVANCED_SCHEMA = cv.Schema(
     {
         cv.Optional(CONF_RUNNER): cv.string_strict,
         cv.Optional(CONF_MAIN_STACK_SIZE): cv.int_range(min=4096),
+        # Override requirements_west.txt's pinned west/ninja version, decoupled from
+        # framework: version: since their release cadence isn't tied to Zephyr's.
+        cv.Optional(CONF_WEST_VERSION): cv.string_strict,
+        cv.Optional(CONF_NINJA_VERSION): cv.string_strict,
     }
 )
 
@@ -73,8 +79,6 @@ COMMIT_SHA_RE: Final = re.compile(r"^[0-9a-f]{40}$")
 CONF_BOARD_SOURCE = "board_source"
 CONF_KCONFIG_OPTIONS = "kconfig_options"
 CONF_OVERLAYS = "overlays"
-CONF_WEST_VERSION = "west_version"
-CONF_NINJA_VERSION = "ninja_version"
 # framework: type: silabs only -- overrides commander_setup.py's pinned default. Its own
 # release cadence is independent of the silabs SDK version, same reasoning as
 # west_version:/ninja_version: vs. the Zephyr version.

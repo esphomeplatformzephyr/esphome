@@ -23,7 +23,7 @@ def to_code(config: ConfigType) -> None:
     """REQUIRES_FULL_LIBCPP selects GLIBCXX_LIBCPP; without it Zephyr defaults
     to MINIMAL_LIBCPP, which has no STL and breaks ESPHome's C++ headers."""
     import esphome.codegen as cg  # noqa: PLC0415
-    from esphome.const import CONF_LOG_LEVEL  # noqa: PLC0415
+    from esphome.const import CONF_FRAMEWORK, CONF_LOG_LEVEL  # noqa: PLC0415
 
     from .. import zephyr_add_prj_conf, zephyr_variant  # noqa: PLC0415 -- avoids circular import at module load
     from ..const import (  # noqa: PLC0415
@@ -52,7 +52,7 @@ def to_code(config: ConfigType) -> None:
         zephyr_add_prj_conf("ENTROPY_GENERATOR", True)
     # ARM Cortex-M's ARCH_HAS_STACKWALK only defaults on when EXTRA_EXCEPTION_INFO
     # is also set (arch/arm/core/Kconfig selects the dependency it needs).
-    log_level = config.get(CONF_LOG_LEVEL, "ERROR")
+    log_level = config[CONF_FRAMEWORK][CONF_LOG_LEVEL]
     if log_level != "NONE":
         zephyr_add_prj_conf("EXTRA_EXCEPTION_INFO", True)
         zephyr_add_prj_conf("EXCEPTION_STACK_TRACE", True)

@@ -1,0 +1,12 @@
+esphome:
+  name: test
+
+zephyr:
+  variant: NRF52
+  log_level: DEBUG
+
+network:
+  enable_ipv6: true
+
+openthread:
+  tlv: 0E080000000000010000

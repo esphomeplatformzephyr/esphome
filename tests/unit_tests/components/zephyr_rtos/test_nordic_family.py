@@ -18,7 +18,7 @@ def _run(framework_type: str, config: dict) -> None:
         "NRF5340", framework_type=framework_type
     )
     CORE.config = config
-    nordic_family.to_code({})
+    nordic_family.to_code({"framework": {"log_level": "ERROR"}})
 
 
 @pytest.mark.parametrize(
