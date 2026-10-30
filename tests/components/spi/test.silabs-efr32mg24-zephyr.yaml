@@ -1,0 +1,4 @@
+packages:
+  spi: !include ../../test_build_components/common/spi/silabs-efr32mg24-zephyr.yaml
+
+<<: !include common.yaml

@@ -1,0 +1,7 @@
+<<: !include common.yaml
+
+silabs:
+  watchdog_timeout: 6s
+  framework:
+    kconfig_options:
+      CONFIG_BOOT_BANNER: false

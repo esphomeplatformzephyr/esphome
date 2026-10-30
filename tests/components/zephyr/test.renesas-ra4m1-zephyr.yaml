@@ -1,0 +1,8 @@
+packages:
+  zephyr: !include common.yaml
+
+renesas:
+  watchdog_timeout: 5s
+  framework:
+    kconfig_options:
+      CONFIG_BOOT_BANNER: false

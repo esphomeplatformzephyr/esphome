@@ -1,4 +1,0 @@
-packages:
-  spi: !include ../../test_build_components/common/spi/zephyr-nrf52.yaml
-
-<<: !include common.yaml

@@ -1,4 +1,0 @@
-packages:
-  i2c: !include ../../test_build_components/common/i2c/zephyr-esp32-h2.yaml
-
-<<: !include common.yaml

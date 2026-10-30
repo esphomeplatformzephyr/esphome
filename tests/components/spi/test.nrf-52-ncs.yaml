@@ -1,0 +1,4 @@
+packages:
+  spi: !include ../../test_build_components/common/spi/nrf-52-ncs.yaml
+
+<<: !include common.yaml

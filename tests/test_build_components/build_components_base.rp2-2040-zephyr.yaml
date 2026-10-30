@@ -1,0 +1,20 @@
+esphome:
+  name: componenttestrp2040
+  friendly_name: $component_name
+
+rp2:
+  variant: RP2040
+  board: rpi_pico/rp2040/w/mcuboot
+  framework:
+    type: zephyr
+    advanced:
+      bootloader: mcuboot
+
+logger:
+  level: VERY_VERBOSE
+
+packages:
+  component_under_test: !include
+    file: $component_test_file
+    vars:
+      component_test_file: $component_test_file

@@ -1,0 +1,17 @@
+esphome:
+  name: componenttestsiwx917
+  friendly_name: $component_name
+
+silabs:
+  variant: SIWX917
+  framework:
+    type: zephyr
+
+logger:
+  level: VERY_VERBOSE
+
+packages:
+  component_under_test: !include
+    file: $component_test_file
+    vars:
+      component_test_file: $component_test_file

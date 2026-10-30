@@ -1,0 +1,17 @@
+esphome:
+  name: componenttestnrf5340
+  friendly_name: $component_name
+
+nrf:
+  variant: NRF5340
+  framework:
+    type: ncs
+
+logger:
+  level: VERY_VERBOSE
+
+packages:
+  component_under_test: !include
+    file: $component_test_file
+    vars:
+      component_test_file: $component_test_file

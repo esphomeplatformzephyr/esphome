@@ -1,0 +1,17 @@
+esphome:
+  name: componentteststm32wb55
+  friendly_name: $component_name
+
+stm32:
+  variant: STM32WB55
+  framework:
+    type: zephyr
+
+logger:
+  level: VERY_VERBOSE
+
+packages:
+  component_under_test: !include
+    file: $component_test_file
+    vars:
+      component_test_file: $component_test_file

@@ -1,6 +1,0 @@
-<<: !include common.yaml
-
-zephyr:
-  watchdog_timeout: 6s
-  kconfig_options:
-    CONFIG_BOOT_BANNER: false

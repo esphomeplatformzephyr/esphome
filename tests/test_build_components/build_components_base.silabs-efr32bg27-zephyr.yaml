@@ -1,0 +1,18 @@
+esphome:
+  name: componenttestefr32bg27
+  friendly_name: $component_name
+
+silabs:
+  variant: EFR32BG27
+  framework:
+    type: zephyr
+
+logger:
+  level: VERY_VERBOSE
+  baud_rate: 0
+
+packages:
+  component_under_test: !include
+    file: $component_test_file
+    vars:
+      component_test_file: $component_test_file

@@ -1634,9 +1634,13 @@ def main() -> None:
                 platforms.update(component_platforms)
                 if component not in skip_compile:
                     compiled_platforms.update(component_platforms)
-            needs_idf = any(p.startswith("esp32") for p in platforms)
+            # esp32-*-zephyr targets build with Zephyr, not ESP-IDF
+            needs_idf = any(
+                p.startswith("esp32") and not p.endswith("-zephyr") for p in platforms
+            )
             check_idf_py = not idf_py_check_assigned and any(
-                p.startswith("esp32") for p in compiled_platforms
+                p.startswith("esp32") and not p.endswith("-zephyr")
+                for p in compiled_platforms
             )
             idf_py_check_assigned |= check_idf_py
             component_test_batches.append(

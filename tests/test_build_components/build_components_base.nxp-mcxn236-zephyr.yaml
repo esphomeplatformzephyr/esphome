@@ -1,0 +1,17 @@
+esphome:
+  name: componenttestmcxn236
+  friendly_name: $component_name
+
+nxp:
+  variant: MCXN236
+  framework:
+    type: zephyr
+
+logger:
+  level: VERY_VERBOSE
+
+packages:
+  component_under_test: !include
+    file: $component_test_file
+    vars:
+      component_test_file: $component_test_file

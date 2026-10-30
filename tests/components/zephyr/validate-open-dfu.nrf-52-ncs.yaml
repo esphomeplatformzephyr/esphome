@@ -1,0 +1,8 @@
+packages:
+  zephyr: !include common.yaml
+
+nrf:
+  board: nrf52840dongle
+  framework:
+    advanced:
+      bootloader: nrf
