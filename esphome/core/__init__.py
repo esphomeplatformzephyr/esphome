@@ -28,9 +28,14 @@ from esphome.const import (
     PLATFORM_ESP8266,
     PLATFORM_HOST,
     PLATFORM_LN882X,
+    PLATFORM_NRF,
     PLATFORM_NRF52,
+    PLATFORM_NXP,
+    PLATFORM_RENESAS,
     PLATFORM_RP2,
     PLATFORM_RTL87XX,
+    PLATFORM_SILABS,
+    PLATFORM_STM32,
     PLATFORM_ZEPHYR,
     ErrorFormat,
     Toolchain,
@@ -1014,8 +1019,28 @@ class EsphomeCore:
         return self.is_bk72xx or self.is_rtl87xx or self.is_ln882x
 
     @property
+    def is_nrf(self):
+        return self.target_platform == PLATFORM_NRF
+
+    @property
     def is_nrf52(self):
         return self.target_platform == PLATFORM_NRF52
+
+    @property
+    def is_nxp(self):
+        return self.target_platform == PLATFORM_NXP
+
+    @property
+    def is_renesas(self):
+        return self.target_platform == PLATFORM_RENESAS
+
+    @property
+    def is_silabs(self):
+        return self.target_platform == PLATFORM_SILABS
+
+    @property
+    def is_stm32(self):
+        return self.target_platform == PLATFORM_STM32
 
     @property
     def is_zephyr(self):

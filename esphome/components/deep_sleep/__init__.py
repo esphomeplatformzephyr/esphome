@@ -40,7 +40,6 @@ from esphome.const import (
     PLATFORM_ESP32,
     PLATFORM_ESP8266,
     PLATFORM_NRF52,
-    PLATFORM_ZEPHYR as PLATFORM_ZEPHYR,
     PlatformFramework,
 )
 from esphome.core import CORE, ID

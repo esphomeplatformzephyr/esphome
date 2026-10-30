@@ -25,7 +25,6 @@ from esphome.const import (
     CONF_RX_BUFFER_SIZE,
     CONF_TX_BUFFER_SIZE,
     PLATFORM_NRF52,
-    PLATFORM_ZEPHYR as PLATFORM_ZEPHYR,
 )
 from esphome.core import CORE
 from esphome.cpp_generator import MockObj

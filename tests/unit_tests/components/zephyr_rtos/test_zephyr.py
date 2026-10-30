@@ -101,7 +101,7 @@ _ALL_FAMILIES = frozenset(info.family for info in VARIANTS.values())
 
 
 def _validate(config: dict) -> dict:
-    return zephyr_rtos_config_schema(config, _ALL_FAMILIES)
+    return zephyr_rtos_config_schema(config, _ALL_FAMILIES, PLATFORM_ZEPHYR)
 
 
 def test_empty_zephyr_data_has_every_zephyr_data_key() -> None:

@@ -58,7 +58,10 @@ class Platform(StrEnum):
     HOST = "host"
     LIBRETINY_OLDSTYLE = "libretiny"
     LN882X = "ln882x"
+    NRF = "nrf"
     NRF52 = "nrf52"
+    NXP = "nxp"
+    RENESAS = "renesas"
     RP2 = "rp2"  # canonical name for the RP2 family (RP2040, RP2350, …)
     # Deprecated: use Platform.RP2 instead. Python enum aliasing makes this
     # the same member as RP2 (same string value), so ``Platform.RP2040`` and
@@ -66,6 +69,8 @@ class Platform(StrEnum):
     # Scheduled for removal in 2027.7.0.
     RP2040 = "rp2"
     RTL87XX = "rtl87xx"
+    SILABS = "silabs"
+    STM32 = "stm32"
     ZEPHYR = "zephyr"
 
 
@@ -128,6 +133,11 @@ class PlatformFramework(Enum):
 
     # Zephyr framework platforms
     NRF52_ZEPHYR = (Platform.NRF52, Framework.ZEPHYR)
+    NRF_ZEPHYR = (Platform.NRF, Framework.ZEPHYR)
+    NXP_ZEPHYR = (Platform.NXP, Framework.ZEPHYR)
+    RENESAS_ZEPHYR = (Platform.RENESAS, Framework.ZEPHYR)
+    SILABS_ZEPHYR = (Platform.SILABS, Framework.ZEPHYR)
+    STM32_ZEPHYR = (Platform.STM32, Framework.ZEPHYR)
     ZEPHYR_ZEPHYR = (Platform.ZEPHYR, Framework.ZEPHYR)
 
     # Host platform (native)
@@ -141,12 +151,17 @@ PLATFORM_ESP8266 = Platform.ESP8266
 PLATFORM_HOST = Platform.HOST
 PLATFORM_LIBRETINY_OLDSTYLE = Platform.LIBRETINY_OLDSTYLE
 PLATFORM_LN882X = Platform.LN882X
+PLATFORM_NRF = Platform.NRF
 PLATFORM_NRF52 = Platform.NRF52
+PLATFORM_NXP = Platform.NXP
+PLATFORM_RENESAS = Platform.RENESAS
 PLATFORM_RP2 = Platform.RP2
 # Deprecated: use PLATFORM_RP2 instead. Kept as a back-compat alias;
 # scheduled for removal in 2027.7.0.
 PLATFORM_RP2040 = Platform.RP2040
 PLATFORM_RTL87XX = Platform.RTL87XX
+PLATFORM_SILABS = Platform.SILABS
+PLATFORM_STM32 = Platform.STM32
 PLATFORM_ZEPHYR = Platform.ZEPHYR
 
 

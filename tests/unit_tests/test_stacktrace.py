@@ -20,14 +20,28 @@ from esphome.const import (
     PLATFORM_ESP8266,
     PLATFORM_HOST,
     PLATFORM_LN882X,
+    PLATFORM_NRF,
     PLATFORM_NRF52,
+    PLATFORM_NXP,
+    PLATFORM_RENESAS,
     PLATFORM_RP2,
     PLATFORM_RTL87XX,
+    PLATFORM_SILABS,
+    PLATFORM_STM32,
     PLATFORM_ZEPHYR,
 )
 from esphome.core import EsphomeError
 
 CONFIG = {"esphome": {"name": "test"}}
+
+_ZEPHYR_RTOS_PLATFORMS = (
+    PLATFORM_NRF,
+    PLATFORM_NXP,
+    PLATFORM_RENESAS,
+    PLATFORM_SILABS,
+    PLATFORM_STM32,
+    PLATFORM_ZEPHYR,
+)
 
 # Real dump lines per registered platform; the gate must fire on each.
 # "addresses" are decoder-consumed dump lines, "state_markers" open a
@@ -86,15 +100,18 @@ CRASH_SAMPLES: dict[str, dict[str, list[str]]] = {
             "PC=0x27a1c LR=0x1e33",
         ],
     },
-    # platform: zephyr shares logger_zephyr.cpp with nrf52, so it prints the
-    # same banner and register pair; the decoder is a separate module.
-    PLATFORM_ZEPHYR: {
-        "state_markers": ["Last crash:"],
-        "addresses": [
-            "PC=0x00000050 LR=0x00000000",
-            "PC=0x27a1c LR=0x1e33",
-        ],
-    },
+    # The Zephyr RTOS platforms share logger_zephyr.cpp with nrf52, so they
+    # print the same banner and register pair; the decoder is a separate module.
+    **dict.fromkeys(
+        _ZEPHYR_RTOS_PLATFORMS,
+        {
+            "state_markers": ["Last crash:"],
+            "addresses": [
+                "PC=0x00000050 LR=0x00000000",
+                "PC=0x27a1c LR=0x1e33",
+            ],
+        },
+    ),
 }
 
 BENIGN_LINES = [
@@ -254,7 +271,7 @@ DECODER_PATTERNS: dict[str, list[str]] = {
     PLATFORM_RTL87XX: ["CRASH_HANDLER_RE", "CRASH_HANDLER_ADDR_RE"],
     PLATFORM_LN882X: ["CRASH_HANDLER_RE", "CRASH_HANDLER_ADDR_RE"],
     PLATFORM_NRF52: ["STACKTRACE_NRF52_PC_LR_RE"],
-    PLATFORM_ZEPHYR: ["STACKTRACE_ZEPHYR_PC_LR_RE"],
+    **dict.fromkeys(_ZEPHYR_RTOS_PLATFORMS, ["STACKTRACE_ZEPHYR_PC_LR_RE"]),
 }
 
 # Declared decoder patterns whose language the gate deliberately does

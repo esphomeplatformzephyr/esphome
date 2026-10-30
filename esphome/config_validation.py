@@ -2377,6 +2377,8 @@ class SplitDefault(Optional):
 
             if zephyr_var := zephyr_variant():
                 keys += [f"zephyr_{zephyr_var.lower()}"]
+            # One zephyr= default covers every Zephyr RTOS platform.
+            keys += _get_default_key() + ["zephyr"]
         keys += _get_default_key()
         for key in keys:
             if self._defaults.get(key) is not None:

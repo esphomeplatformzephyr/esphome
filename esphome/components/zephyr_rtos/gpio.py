@@ -9,6 +9,11 @@ from esphome.const import (
     CONF_INVERTED,
     CONF_MODE,
     CONF_NUMBER,
+    PLATFORM_NRF,
+    PLATFORM_NXP,
+    PLATFORM_RENESAS,
+    PLATFORM_SILABS,
+    PLATFORM_STM32,
     PLATFORM_ZEPHYR,
 )
 from esphome.core import EsphomeError
@@ -198,7 +203,6 @@ def pin_summary(variant_info: "ZephyrVariant", num: int) -> str:
     return f"GPIO{num}, {prefix}{pin:02d}" if zero_pad else f"GPIO{num}, {prefix}{pin}"
 
 
-@pins.PIN_SCHEMA_REGISTRY.register(PLATFORM_ZEPHYR, ZEPHYR_PIN_SCHEMA)
 async def zephyr_pin_to_code(config):
     from . import zephyr_add_prj_conf, zephyr_rtos_data
     from .dts_lookup import get_gpio_port_size
@@ -238,3 +242,14 @@ async def zephyr_pin_to_code(config):
         cg.add(var.set_inverted(True))
     cg.add(var.set_flags(pins.gpio_flags_expr(config[CONF_MODE])))
     return var
+
+
+for _platform in (
+    PLATFORM_NRF,
+    PLATFORM_NXP,
+    PLATFORM_RENESAS,
+    PLATFORM_SILABS,
+    PLATFORM_STM32,
+    PLATFORM_ZEPHYR,
+):
+    pins.PIN_SCHEMA_REGISTRY.register(_platform, ZEPHYR_PIN_SCHEMA)(zephyr_pin_to_code)

@@ -42,12 +42,15 @@ from esphome.const import (
     CONF_WIFI,
     KEY_CORE,
     KEY_FRAMEWORK_VERSION,
+    KEY_TARGET_FRAMEWORK,
+    KEY_TARGET_PLATFORM,
     TYPE_GIT,
     TYPE_LOCAL,
 )
 from esphome.core import CORE, CoroPriority, EsphomeError, coroutine_with_priority
 from esphome.cpp_generator import MockObj
 from esphome.helpers import copy_file_if_changed, rmtree, write_file_if_changed
+from esphome.schema_extractors import SCHEMA_EXTRACT, schema_extractor
 from esphome.types import ConfigType
 from esphome.writer import clean_cmake_cache
 
@@ -59,7 +62,6 @@ from .const import (
     CONF_KCONFIG_OPTIONS,
     CONF_MAIN_STACK_SIZE,
     CONF_MODULES,
-    CONF_NINJA_VERSION as CONF_NINJA_VERSION,
     CONF_OVERLAYS,
     CONF_RUNNER,
     CONF_SHIELD_SOURCE,
@@ -67,7 +69,6 @@ from .const import (
     CONF_SINGLE_SLOT,
     CONF_SNIPPET_SOURCE,
     CONF_SNIPPETS,
-    CONF_WEST_VERSION as CONF_WEST_VERSION,
     KEY_BOARD,
     KEY_BOARD_ROOT,
     KEY_BOOT_LAYOUT,
@@ -1242,9 +1243,12 @@ def _reject_kconfig_watchdog(kconfig_options: ConfigType) -> None:
 
 
 def zephyr_rtos_config_schema(
-    config: ConfigType, families: frozenset[str]
+    config: ConfigType, families: frozenset[str], platform: str
 ) -> ConfigType:
     """Validate a <platform>: block whose variants come from `families`."""
+    core = CORE.data.setdefault(KEY_CORE, {})
+    core[KEY_TARGET_PLATFORM] = platform
+    core[KEY_TARGET_FRAMEWORK] = KEY_ZEPHYR
     config = zephyr_rtos_platform_schema(families)(config)
     framework = config[CONF_FRAMEWORK]
     variant = config[CONF_VARIANT]
@@ -1332,6 +1336,20 @@ def zephyr_rtos_config_schema(
     zephyr_rtos_data()[KEY_SHIELD_ROOT] = shield_root
     zephyr_rtos_data()[KEY_SNIPPET_ROOT] = snippet_root
     return config
+
+
+def zephyr_rtos_platform_config(
+    platform: str, families: frozenset[str]
+) -> Callable[[ConfigType], ConfigType]:
+    """CONFIG_SCHEMA for the <platform>: block of a Zephyr RTOS platform."""
+
+    @schema_extractor("schema")
+    def validator(config: ConfigType) -> ConfigType:
+        if config is SCHEMA_EXTRACT:
+            return zephyr_rtos_platform_schema(families)
+        return zephyr_rtos_config_schema(config, families, platform)
+
+    return validator
 
 
 async def zephyr_rtos_to_code(config: ConfigType) -> None:

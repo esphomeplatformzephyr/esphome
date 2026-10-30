@@ -1,0 +1,11 @@
+esphome:
+  name: test
+
+silabs:
+  variant: EFR32MG24
+  framework:
+    type: zephyr
+    kconfig_options:
+      CONFIG_TEST_OPTION: true
+
+logger:

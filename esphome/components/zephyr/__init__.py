@@ -94,7 +94,9 @@ def CONFIG_SCHEMA(config: ConfigType) -> ConfigType:
     from ..zephyr_rtos.variants import VARIANTS
 
     families = frozenset(info.family for info in VARIANTS.values())
-    return zephyr_rtos_config_schema(_nest_flat_config(config), families)
+    return zephyr_rtos_config_schema(
+        _nest_flat_config(config), families, PLATFORM_ZEPHYR
+    )
 
 
 # Keys the flat zephyr: block keeps at the top level; the rest move under framework:

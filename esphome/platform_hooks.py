@@ -27,9 +27,14 @@ from esphome.const import (
     PLATFORM_ESP32,
     PLATFORM_ESP8266,
     PLATFORM_LN882X,
+    PLATFORM_NRF,
     PLATFORM_NRF52,
+    PLATFORM_NXP,
+    PLATFORM_RENESAS,
     PLATFORM_RP2,
     PLATFORM_RTL87XX,
+    PLATFORM_SILABS,
+    PLATFORM_STM32,
     PLATFORM_ZEPHYR,
     Platform,
 )
@@ -41,6 +46,16 @@ _LOGGER = logging.getLogger(__name__)
 # CLI does (upload method, log transport) warns. A new hook is loud by
 # default.
 COSMETIC_HOOKS: Final = frozenset({"process_stacktrace", "ota_image"})
+
+# Platforms built by zephyr_rtos
+_ZEPHYR_RTOS_PLATFORMS: Final = (
+    PLATFORM_NRF,
+    PLATFORM_NXP,
+    PLATFORM_RENESAS,
+    PLATFORM_SILABS,
+    PLATFORM_STM32,
+    PLATFORM_ZEPHYR,
+)
 
 # Platforms whose firmware prints the crash handler report share one gate.
 _CRASH_HANDLER_GATE = r"0x[0-9a-fA-F]{3,}\b|CRASH DETECTED ON PREVIOUS BOOT"
@@ -73,12 +88,12 @@ STACKTRACE_GATES: Final[dict[str, str]] = {
     PLATFORM_NRF52: r"0x[0-9a-fA-F]{3,}\b|Last crash:",
     # Same trigger language as nrf52: both decode the "Last crash:" banner
     # logger_zephyr.cpp prints, followed by a "PC=... LR=..." register pair.
-    PLATFORM_ZEPHYR: r"0x[0-9a-fA-F]{3,}\b|Last crash:",
+    **dict.fromkeys(_ZEPHYR_RTOS_PLATFORMS, r"0x[0-9a-fA-F]{3,}\b|Last crash:"),
 }
 
 PLATFORM_HOOKS: Final[dict[str, frozenset[str]]] = {
     "show_logs": frozenset({PLATFORM_NRF52}),
-    "upload_program": frozenset({PLATFORM_NRF52, PLATFORM_ZEPHYR}),
+    "upload_program": frozenset({PLATFORM_NRF52, *_ZEPHYR_RTOS_PLATFORMS}),
     "process_stacktrace": frozenset(STACKTRACE_GATES),
     # The file an app update sends, when it is not the build output itself
     "ota_image": frozenset({PLATFORM_BK72XX, PLATFORM_LN882X, PLATFORM_RTL87XX}),

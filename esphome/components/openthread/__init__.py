@@ -63,7 +63,6 @@ from esphome.const import (
     KEY_CORE,
     KEY_FRAMEWORK_VERSION,
     PLATFORM_ESP32,
-    PLATFORM_ZEPHYR as PLATFORM_ZEPHYR,
     PlatformFramework,
 )
 from esphome.core import (

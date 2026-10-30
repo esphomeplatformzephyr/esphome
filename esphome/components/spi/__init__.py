@@ -59,7 +59,6 @@ from esphome.const import (
     PLATFORM_ESP8266,
     PLATFORM_NRF52,
     PLATFORM_RP2,
-    PLATFORM_ZEPHYR as PLATFORM_ZEPHYR,
     PlatformFramework,
 )
 from esphome.core import CORE, CoroPriority, coroutine_with_priority

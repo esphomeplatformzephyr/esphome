@@ -1,0 +1,11 @@
+esphome:
+  name: test
+
+nrf:
+  variant: NRF52
+  framework:
+    type: zephyr
+    kconfig_options:
+      CONFIG_TEST_OPTION: true
+
+logger:

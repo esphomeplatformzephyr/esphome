@@ -19,13 +19,7 @@ from esphome.components.zephyr.const import (
     ZEPHYR_VARIANT_ESP32_S3,
 )
 import esphome.config_validation as cv
-from esphome.const import (
-    CONF_ID,
-    KEY_CORE,
-    KEY_FRAMEWORK_VERSION,
-    PLATFORM_NRF52,
-    PLATFORM_ZEPHYR as PLATFORM_ZEPHYR,
-)
+from esphome.const import CONF_ID, KEY_CORE, KEY_FRAMEWORK_VERSION, PLATFORM_NRF52
 from esphome.core import CORE, CoroPriority, coroutine_with_priority
 from esphome.types import ConfigType
 

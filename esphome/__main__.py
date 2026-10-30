@@ -378,14 +378,7 @@ def choose_upload_log_host(
         and (
             picotool := (
                 (_find_picotool() if CORE.is_rp2 else None)
-                or (
-                    _find_picotool_zephyr()
-                    if (
-                        CORE.using_zephyr_rtos
-                        and CORE.data.get("zephyr", {}).get("family") == "rpi_pico"
-                    )
-                    else None
-                )
+                or (_find_picotool_zephyr() if _is_zephyr_rpi_pico() else None)
             )
         )
         is not None
@@ -434,13 +427,7 @@ def choose_upload_log_host(
     # Show helpful BOOTSEL instructions for RP2040/RP2350 when no BOOTSEL device is found
     if (
         purpose == Purpose.UPLOADING
-        and (
-            CORE.is_rp2
-            or (
-                CORE.using_zephyr_rtos
-                and CORE.data.get("zephyr", {}).get("family") == "rpi_pico"
-            )
-        )
+        and (CORE.is_rp2 or _is_zephyr_rpi_pico())
         and not any(get_port_type(opt[1]) == PortType.BOOTSEL for opt in options)
     ):
         if bootsel_permission_error:
@@ -1140,6 +1127,12 @@ def _find_picotool() -> Path | None:
     except Exception:  # noqa: BLE001  # pylint: disable=broad-except
         return None
     return get_picotool_path(idedata.cc_path)
+
+
+def _is_zephyr_rpi_pico() -> bool:
+    from esphome.components.zephyr import zephyr_variant_family
+
+    return CORE.using_zephyr_rtos and zephyr_variant_family() == "rpi_pico"
 
 
 def _find_picotool_zephyr() -> Path | None:
@@ -2071,13 +2064,7 @@ def command_run(args: ArgsProtocol, config: ConfigType) -> int | None:
 
     # After BOOTSEL upload, wait for a new serial port to appear
     # so it shows up in the log chooser
-    if successful_device is None and (
-        CORE.is_rp2
-        or (
-            CORE.using_zephyr_rtos
-            and CORE.data.get("zephyr", {}).get("family") == "rpi_pico"
-        )
-    ):
+    if successful_device is None and (CORE.is_rp2 or _is_zephyr_rpi_pico()):
         _wait_for_serial_port(known_ports=pre_upload_ports)
         # If exactly one new serial port appeared, use it directly
         serial_ports = get_serial_ports()

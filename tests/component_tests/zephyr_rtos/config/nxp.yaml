@@ -1,0 +1,11 @@
+esphome:
+  name: test
+
+nxp:
+  variant: MCXN236
+  framework:
+    type: zephyr
+    kconfig_options:
+      CONFIG_TEST_OPTION: true
+
+logger:

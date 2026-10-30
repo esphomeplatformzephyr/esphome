@@ -1,0 +1,11 @@
+esphome:
+  name: test
+
+stm32:
+  variant: STM32F4
+  framework:
+    type: zephyr
+    kconfig_options:
+      CONFIG_TEST_OPTION: true
+
+logger:

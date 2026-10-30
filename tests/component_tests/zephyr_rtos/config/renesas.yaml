@@ -1,0 +1,11 @@
+esphome:
+  name: test
+
+renesas:
+  variant: RA4M1
+  framework:
+    type: zephyr
+    kconfig_options:
+      CONFIG_TEST_OPTION: true
+
+logger:

@@ -16,8 +16,6 @@ from esphome.const import (
     KEY_CORE,
     KEY_FRAMEWORK_VERSION,
     KEY_TARGET_FRAMEWORK,
-    KEY_TARGET_PLATFORM,
-    PLATFORM_ZEPHYR,
     TYPE_GIT,
     Toolchain,
 )
@@ -516,7 +514,6 @@ def set_core_data(
 
     advanced = config.get(CONF_FRAMEWORK, {}).get(CONF_ADVANCED, {})
     CORE.toolchain = Toolchain.SDK_ZEPHYR
-    CORE.data[KEY_CORE][KEY_TARGET_PLATFORM] = PLATFORM_ZEPHYR
     CORE.data[KEY_CORE][KEY_TARGET_FRAMEWORK] = KEY_ZEPHYR
     CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION] = framework_ver
 
