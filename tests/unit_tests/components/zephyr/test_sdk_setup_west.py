@@ -60,6 +60,12 @@ def _fake_extract(archive: Path, extract_dir: Path, **kwargs: Any) -> None:
     (Path(extract_dir) / "setup.sh").touch()
 
 
+def _fake_extract_windows(archive: Path, extract_dir: Path, **kwargs: Any) -> None:
+    """The Windows minimal archive ships setup.cmd instead of setup.sh."""
+    Path(extract_dir).mkdir(parents=True, exist_ok=True)
+    (Path(extract_dir) / "setup.cmd").touch()
+
+
 def _make_complete_base(sdk_path: Path) -> None:
     sdk_path.mkdir(parents=True)
     (sdk_path / "setup.sh").touch()
@@ -280,7 +286,7 @@ def test_check_and_install_rejects_unsupported_os(
     mock_sdk_download_ops: tuple[MagicMock, MagicMock],
 ) -> None:
     monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path / "cache"))
-    monkeypatch.setattr(sys, "platform", "win32")
+    monkeypatch.setattr(sys, "platform", "freebsd14")
     framework = _make_framework(tmp_path)
 
     with pytest.raises(RuntimeError, match="Unsupported OS for Zephyr SDK"):
@@ -310,3 +316,98 @@ def test_check_and_install_picks_the_macos_arm_archive(
         "machine": "aarch64",
         "extension": "tar.xz",
     }
+
+
+def test_check_and_install_picks_the_windows_7z_archive(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
+) -> None:
+    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    monkeypatch.setattr(sys, "platform", "win32")
+    framework = _make_framework(tmp_path)
+    mock_download, _mock_extract = mock_sdk_download_ops
+
+    with (
+        patch("platform.machine", return_value="AMD64"),
+        patch("subprocess.run") as mock_subprocess_run,
+    ):
+        mock_subprocess_run.return_value.returncode = 0
+        # The fake extraction only creates setup.sh; Windows needs setup.cmd.
+        with patch(
+            "esphome.framework_helpers.archive_extract_all",
+            side_effect=_fake_extract_windows,
+        ):
+            check_and_install(framework, toolchain="arm-zephyr-eabi")
+
+    assert mock_download.call_args.args[1] == {
+        "VERSION": "0.17.4",
+        "sysname": "windows",
+        "machine": "x86_64",
+        "extension": "7z",
+    }
+
+
+def test_check_and_install_windows_arm_uses_the_x64_archive(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
+) -> None:
+    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    monkeypatch.setattr(sys, "platform", "win32")
+    framework = _make_framework(tmp_path)
+    mock_download, _mock_extract = mock_sdk_download_ops
+
+    with (
+        patch("platform.machine", return_value="ARM64"),
+        patch("subprocess.run") as mock_subprocess_run,
+        patch(
+            "esphome.framework_helpers.archive_extract_all",
+            side_effect=_fake_extract_windows,
+        ),
+    ):
+        mock_subprocess_run.return_value.returncode = 0
+        check_and_install(framework, toolchain="arm-zephyr-eabi")
+
+    assert mock_download.call_args.args[1]["machine"] == "x86_64"
+
+
+def test_check_and_install_runs_setup_cmd_with_slash_options_on_windows(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
+) -> None:
+    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    monkeypatch.setattr(sys, "platform", "win32")
+    framework = _make_framework(tmp_path)
+    sdk_path = _sdk_install_dir("0.17.4")
+    sdk_path.mkdir(parents=True)
+    (sdk_path / "setup.cmd").touch()
+    (sdk_path / ".esphome_base_complete").touch()
+
+    with patch("subprocess.run") as mock_subprocess_run:
+        mock_subprocess_run.return_value.returncode = 0
+        check_and_install(framework, toolchain="arm-zephyr-eabi")
+
+    assert mock_subprocess_run.call_args.args[0] == [
+        str(sdk_path / "setup.cmd"),
+        "/t",
+        "arm-zephyr-eabi",
+    ]
+    assert (sdk_path / ".esphome_complete_arm-zephyr-eabi").exists()
+
+
+def test_check_and_install_raises_without_setup_cmd_on_windows(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
+) -> None:
+    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    monkeypatch.setattr(sys, "platform", "win32")
+    framework = _make_framework(tmp_path)
+    sdk_path = _sdk_install_dir("0.17.4")
+    sdk_path.mkdir(parents=True)
+    (sdk_path / ".esphome_base_complete").touch()
+
+    with pytest.raises(RuntimeError, match="no setup.cmd"):
+        check_and_install(framework, toolchain="arm-zephyr-eabi")
