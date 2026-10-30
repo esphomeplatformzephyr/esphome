@@ -72,6 +72,8 @@ STACKTRACE_GATES: Final[dict[str, str]] = {
         r"0x[0-9a-fA-F]{3,}\b"
         r"|(?:PC|RA|MEPC|MTVAL|EXCVADDR|call)\s*[:=]\s*(?:0x)?4[0-9a-fA-F]{7}"
         r"|CRASH DETECTED ON PREVIOUS BOOT"
+        # framework: type: zephyr
+        r"|Last crash:"
     ),
     PLATFORM_ESP8266: (
         r"0x[0-9a-fA-F]{3,}\b"
@@ -81,7 +83,8 @@ STACKTRACE_GATES: Final[dict[str, str]] = {
         r"|>>>stack>>>"
         r"|CRASH DETECTED ON PREVIOUS BOOT"
     ),
-    PLATFORM_RP2: _CRASH_HANDLER_GATE,
+    # framework: type: zephyr adds the "Last crash:" banner
+    PLATFORM_RP2: _CRASH_HANDLER_GATE + "|Last crash:",
     PLATFORM_BK72XX: _CRASH_HANDLER_GATE,
     PLATFORM_LN882X: _CRASH_HANDLER_GATE,
     PLATFORM_RTL87XX: _CRASH_HANDLER_GATE,
@@ -93,7 +96,10 @@ STACKTRACE_GATES: Final[dict[str, str]] = {
 
 PLATFORM_HOOKS: Final[dict[str, frozenset[str]]] = {
     "show_logs": frozenset({PLATFORM_NRF52}),
-    "upload_program": frozenset({PLATFORM_NRF52, *_ZEPHYR_RTOS_PLATFORMS}),
+    # esp32 and rp2 only for framework: type: zephyr
+    "upload_program": frozenset(
+        {PLATFORM_ESP32, PLATFORM_NRF52, PLATFORM_RP2, *_ZEPHYR_RTOS_PLATFORMS}
+    ),
     "process_stacktrace": frozenset(STACKTRACE_GATES),
     # The file an app update sends, when it is not the build output itself
     "ota_image": frozenset({PLATFORM_BK72XX, PLATFORM_LN882X, PLATFORM_RTL87XX}),

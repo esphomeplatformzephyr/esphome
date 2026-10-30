@@ -13,6 +13,7 @@ from esphome.const import (
     CONF_FRAMEWORK,
     CONF_PLATFORM_VERSION,
     CONF_SOURCE,
+    CONF_TYPE,
     CONF_VARIANT,
     CONF_VERSION,
     CONF_WATCHDOG_TIMEOUT,
@@ -33,7 +34,8 @@ from esphome.core import (
 from esphome.core.config import BOARD_MAX_LENGTH
 from esphome.helpers import copy_file_if_changed, read_file, write_file_if_changed
 from esphome.platformio.toolchain import copy_ccache_script
-from esphome.stacktrace import process_crash_handler_line as process_stacktrace  # noqa: F401
+from esphome.schema_extractors import SCHEMA_EXTRACT, schema_extractor
+from esphome.stacktrace import process_crash_handler_line
 from esphome.storage_json import StorageJSON
 from esphome.types import ConfigType
 
@@ -56,9 +58,22 @@ from .gpio import rp2_pin_to_code  # noqa: F401
 
 _LOGGER = logging.getLogger(__name__)
 CODEOWNERS = ["@jesserockz"]
-AUTO_LOAD = ["preferences"]
 DOMAIN = "rp2"
 IS_TARGET_PLATFORM = True
+FRAMEWORK_ZEPHYR = "zephyr"
+# The variant families zephyr_rtos builds for framework: type: zephyr
+ZEPHYR_FAMILIES = frozenset({"rpi_pico"})
+
+
+def _uses_zephyr(config: ConfigType) -> bool:
+    """True when the raw rp2: block selects framework: type: zephyr."""
+    framework = config.get(CONF_FRAMEWORK) if isinstance(config, dict) else None
+    return isinstance(framework, dict) and framework.get(CONF_TYPE) == FRAMEWORK_ZEPHYR
+
+
+def AUTO_LOAD(config: ConfigType) -> list[str]:
+    return ["zephyr_rtos"] if _uses_zephyr(config) else ["preferences"]
+
 
 # Legacy top-level YAML keys that route here. The framework
 # (esphome/loader.py + esphome/config.py) handles both the deprecation
@@ -299,7 +314,7 @@ def _detect_variant(value: ConfigType) -> ConfigType:
     return value
 
 
-CONFIG_SCHEMA = cv.All(
+_RP2_SCHEMA = cv.All(
     cv.Schema(
         {
             cv.Optional(CONF_BOARD): cv.All(
@@ -322,8 +337,22 @@ CONFIG_SCHEMA = cv.All(
 )
 
 
+@schema_extractor("schema")
+def CONFIG_SCHEMA(config: ConfigType) -> ConfigType:
+    if config is SCHEMA_EXTRACT:
+        return _RP2_SCHEMA
+    if _uses_zephyr(config):
+        from esphome.components.zephyr_rtos import zephyr_rtos_config_schema
+
+        return zephyr_rtos_config_schema(config, ZEPHYR_FAMILIES, PLATFORM_RP2)
+    return _RP2_SCHEMA(config)
+
+
 @coroutine_with_priority(CoroPriority.PLATFORM)
 async def to_code(config: ConfigType) -> None:
+    if CORE.using_zephyr_rtos:
+        # zephyr_rtos builds it
+        return
     cg.add(rp2_ns.setup_preferences())
 
     # Allow LDF to properly discover dependency including those in preprocessor
@@ -638,6 +667,11 @@ def generate_pio_files() -> bool:
 
 # Called by writer.py
 def copy_files() -> None:
+    if CORE.using_zephyr_rtos:
+        from esphome.components import zephyr_rtos
+
+        zephyr_rtos.copy_files()
+        return
     dir = Path(__file__).parent
     post_build_file = dir / "post_build.py.script"
     copy_file_if_changed(
@@ -655,3 +689,27 @@ def copy_files() -> None:
         path = CORE.relative_src_path("esphome.h")
         content = read_file(path).rstrip("\n")
         write_file_if_changed(path, content + '\n#include "pio_includes.h"\n')
+
+
+def run_compile(args, config: ConfigType) -> bool:
+    if not CORE.using_zephyr_rtos:
+        return False
+    from esphome.components import zephyr_rtos
+
+    return zephyr_rtos.run_compile(args, config)
+
+
+def upload_program(config: ConfigType, args, host: str) -> bool:
+    if not CORE.using_zephyr_rtos:
+        return False
+    from esphome.components import zephyr_rtos
+
+    return zephyr_rtos.upload_program(config, args, host)
+
+
+def process_stacktrace(config: ConfigType, line: str, backtrace_state: bool) -> bool:
+    if CORE.using_zephyr_rtos:
+        from esphome.components import zephyr_rtos
+
+        return zephyr_rtos.process_stacktrace(config, line, backtrace_state)
+    return process_crash_handler_line(config, line, backtrace_state)

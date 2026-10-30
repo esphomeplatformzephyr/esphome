@@ -51,7 +51,8 @@ _ZEPHYR_RTOS_PLATFORMS = (
 CRASH_SAMPLES: dict[str, dict[str, list[str]]] = {
     PLATFORM_ESP32: {
         "state_markers": [],
-        "extra_triggers": ["*** CRASH DETECTED ON PREVIOUS BOOT ***"],
+        # framework: type: zephyr prints the "Last crash:" banner
+        "extra_triggers": ["*** CRASH DETECTED ON PREVIOUS BOOT ***", "Last crash:"],
         "addresses": [
             "Backtrace: 0x400d1a2c:0x3ffb1f60 0x400d2a3c:0x3ffb1f80",
             "PC      : 0x400d1a2c  PS      : 0x00060330",
@@ -77,6 +78,8 @@ CRASH_SAMPLES: dict[str, dict[str, list[str]]] = {
     },
     PLATFORM_RP2: {
         "state_markers": ["CRASH DETECTED ON PREVIOUS BOOT"],
+        # framework: type: zephyr prints the "Last crash:" banner
+        "extra_triggers": ["Last crash:"],
         "addresses": ["PC:  0x10001234 (fault location)"],
     },
     PLATFORM_BK72XX: {
@@ -154,7 +157,6 @@ def test_gates_are_platform_scoped() -> None:
     esp32_gate = re.compile(stacktrace.platform_hooks.STACKTRACE_GATES[PLATFORM_ESP32])
     for line in (
         ">>>stack>>>",
-        "Last crash:",
         "Exception (28):",
         "3ffffe10: 40201234 3ffe8410 00000000 40201000",
     ):
@@ -284,8 +286,14 @@ GATE_EXEMPT_PATTERNS = {
 }
 
 
+# Hooks that wrap a shared decoder for framework: type: zephyr: (module, function)
+_SHARED_DECODERS = {PLATFORM_RP2: ("esphome.stacktrace", "process_crash_handler_line")}
+
+
 def _decoder_module(platform: str):
     """Where a platform's decoder patterns live: its package, or its hook's module."""
+    if (shared := _SHARED_DECODERS.get(platform)) is not None:
+        return importlib.import_module(shared[0])
     module = importlib.import_module(f"esphome.components.{platform}")
     return importlib.import_module(module.process_stacktrace.__module__)
 
@@ -352,7 +360,10 @@ def test_platform_declarations_match_decoder(platform: str) -> None:
     # decoder must declare a marker. The reverse (a stateless decoder
     # declaring none) is not asserted; an unrelated "return True" added
     # to a decoder would turn it into a false failure.
-    source = inspect.getsource(module.process_stacktrace)
+    decoder_fn = module.process_stacktrace
+    if (shared := _SHARED_DECODERS.get(platform)) is not None:
+        decoder_fn = getattr(decoder, shared[1])
+    source = inspect.getsource(decoder_fn)
     sets_state = "return True" in source or "backtrace_state = True" in source
     if CRASH_SAMPLES[platform]["state_markers"]:
         # The heuristic fails open on a respelling (return bool(...));

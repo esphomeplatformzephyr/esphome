@@ -132,10 +132,12 @@ class PlatformFramework(Enum):
     LN882X_ARDUINO = (Platform.LN882X, Framework.ARDUINO)
 
     # Zephyr framework platforms
+    ESP32_ZEPHYR = (Platform.ESP32, Framework.ZEPHYR)
     NRF52_ZEPHYR = (Platform.NRF52, Framework.ZEPHYR)
     NRF_ZEPHYR = (Platform.NRF, Framework.ZEPHYR)
     NXP_ZEPHYR = (Platform.NXP, Framework.ZEPHYR)
     RENESAS_ZEPHYR = (Platform.RENESAS, Framework.ZEPHYR)
+    RP2_ZEPHYR = (Platform.RP2, Framework.ZEPHYR)
     SILABS_ZEPHYR = (Platform.SILABS, Framework.ZEPHYR)
     STM32_ZEPHYR = (Platform.STM32, Framework.ZEPHYR)
     ZEPHYR_ZEPHYR = (Platform.ZEPHYR, Framework.ZEPHYR)

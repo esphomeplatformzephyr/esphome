@@ -106,10 +106,22 @@ from .const import (
 from .gpio import esp32_pin_to_code  # noqa: F401
 
 _LOGGER = logging.getLogger(__name__)
-AUTO_LOAD = ["preferences"]
 CODEOWNERS = ["@esphome/core"]
 DOMAIN = "esp32"
 IS_TARGET_PLATFORM = True
+# The variant families zephyr_rtos builds for framework: type: zephyr
+ZEPHYR_FAMILIES = frozenset({"esp32"})
+
+
+def _uses_zephyr(config: ConfigType) -> bool:
+    """True when the raw esp32: block selects framework: type: zephyr."""
+    framework = config.get(CONF_FRAMEWORK) if isinstance(config, dict) else None
+    return isinstance(framework, dict) and framework.get(CONF_TYPE) == FRAMEWORK_ZEPHYR
+
+
+def AUTO_LOAD(config: ConfigType) -> list[str]:
+    return ["zephyr_rtos"] if _uses_zephyr(config) else ["preferences"]
+
 
 CONF_ASSERTION_LEVEL = "assertion_level"
 CONF_COMPILER_OPTIMIZATION = "compiler_optimization"
@@ -1742,6 +1754,8 @@ def _validate_signed_ota_keys(config: ConfigType) -> ConfigType:
 
 
 def final_validate(config) -> None:
+    if CORE.using_zephyr_rtos:
+        return
     # Imported locally to avoid circular import issues
     from esphome.components.psram import DOMAIN as PSRAM_DOMAIN
 
@@ -2275,6 +2289,7 @@ def _parse_idf_component(value: str) -> ConfigType:
 
 FRAMEWORK_ESP_IDF = "esp-idf"
 FRAMEWORK_ARDUINO = "arduino"
+FRAMEWORK_ZEPHYR = "zephyr"
 FRAMEWORK_SCHEMA = cv.Schema(
     {
         cv.Optional(CONF_TYPE): cv.one_of(FRAMEWORK_ESP_IDF, FRAMEWORK_ARDUINO),
@@ -2467,7 +2482,7 @@ FLASH_MODES = ["qio", "qout", "dio", "dout", "opi"]
 FLASH_FREQUENCIES = [
     f"{freq}MHZ" for freq in (120, 80, 64, 60, 48, 40, 32, 30, 26, 24, 20, 16)
 ]
-CONFIG_SCHEMA = cv.All(
+_ESP32_SCHEMA = cv.All(
     cv.Schema(
         {
             cv.Optional(CONF_BOARD): cv.All(
@@ -2525,6 +2540,17 @@ CONFIG_SCHEMA = cv.All(
     _require_ipv4_on_arduino,
     cv.has_at_least_one_key(CONF_BOARD, CONF_VARIANT),
 )
+
+
+@schema_extractor("schema")
+def CONFIG_SCHEMA(config: ConfigType) -> ConfigType:
+    if config is SCHEMA_EXTRACT:
+        return _ESP32_SCHEMA
+    if _uses_zephyr(config):
+        from esphome.components.zephyr_rtos import zephyr_rtos_config_schema
+
+        return zephyr_rtos_config_schema(config, ZEPHYR_FAMILIES, PLATFORM_ESP32)
+    return _ESP32_SCHEMA(config)
 
 
 FINAL_VALIDATE_SCHEMA = cv.Schema(final_validate)
@@ -2980,6 +3006,9 @@ async def _finalize_arduino_aware_flags():
 
 
 async def to_code(config):
+    if CORE.using_zephyr_rtos:
+        # zephyr_rtos builds it
+        return
     framework_ver: cv.Version = CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]
     conf = config[CONF_FRAMEWORK]
 
@@ -3979,6 +4008,11 @@ def _write_idf_component_yml():
 
 # Called by writer.py
 def copy_files():
+    if CORE.using_zephyr_rtos:
+        from esphome.components import zephyr_rtos
+
+        zephyr_rtos.copy_files()
+        return
     _write_sdkconfig()
     _write_idf_component_yml()
 
@@ -4102,7 +4136,27 @@ STACKTRACE_ESP32_BACKTRACE_PC_RE = re.compile(r"4[0-9a-f]{7}")
 STACKTRACE_ESP32_CRASH_BT_RE = re.compile(r"BT\d+:\s*0x([0-9a-fA-F]{8})")
 
 
+def run_compile(args, config: ConfigType) -> bool:
+    if not CORE.using_zephyr_rtos:
+        return False
+    from esphome.components import zephyr_rtos
+
+    return zephyr_rtos.run_compile(args, config)
+
+
+def upload_program(config: ConfigType, args, host: str) -> bool:
+    if not CORE.using_zephyr_rtos:
+        return False
+    from esphome.components import zephyr_rtos
+
+    return zephyr_rtos.upload_program(config, args, host)
+
+
 def process_stacktrace(config, line, backtrace_state):
+    if CORE.using_zephyr_rtos:
+        from esphome.components import zephyr_rtos
+
+        return zephyr_rtos.process_stacktrace(config, line, backtrace_state)
     line = line.strip()
 
     # ESP32 PC/EXCVADDR

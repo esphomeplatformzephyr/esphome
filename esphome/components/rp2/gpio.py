@@ -17,6 +17,7 @@ from esphome.const import (
 )
 from esphome.core import CORE
 from esphome.cpp_generator import MockObj
+from esphome.schema_extractors import SCHEMA_EXTRACT, schema_extractor
 from esphome.types import ConfigType
 
 from . import boards
@@ -103,8 +104,23 @@ RP2_PIN_SCHEMA = cv.All(
 )
 
 
-@pins.PIN_SCHEMA_REGISTRY.register("rp2", RP2_PIN_SCHEMA)
+@schema_extractor("schema")
+def _pin_schema(value: Any) -> Any:
+    if value is SCHEMA_EXTRACT:
+        return RP2_PIN_SCHEMA
+    if CORE.using_zephyr_rtos:
+        from esphome.components.zephyr_rtos.gpio import ZEPHYR_PIN_SCHEMA
+
+        return ZEPHYR_PIN_SCHEMA(value)
+    return RP2_PIN_SCHEMA(value)
+
+
+@pins.PIN_SCHEMA_REGISTRY.register("rp2", _pin_schema)
 async def rp2_pin_to_code(config: ConfigType) -> MockObj:
+    if CORE.using_zephyr_rtos:
+        from esphome.components.zephyr_rtos.gpio import zephyr_pin_to_code
+
+        return await zephyr_pin_to_code(config)
     var = cg.new_Pvariable(config[CONF_ID])
     num = config[CONF_NUMBER]
     cg.add(var.set_pin(num))

@@ -269,7 +269,16 @@ _filter_backend_source_files = filter_source_files_from_platform(
             PlatformFramework.LN882X_ARDUINO,
         },
         "ota_backend_host.cpp": {PlatformFramework.HOST_NATIVE},
-        "ota_backend_zephyr.cpp": {PlatformFramework.ZEPHYR_ZEPHYR},
+        "ota_backend_zephyr.cpp": {
+            PlatformFramework.ESP32_ZEPHYR,
+            PlatformFramework.NRF_ZEPHYR,
+            PlatformFramework.NXP_ZEPHYR,
+            PlatformFramework.RENESAS_ZEPHYR,
+            PlatformFramework.RP2_ZEPHYR,
+            PlatformFramework.SILABS_ZEPHYR,
+            PlatformFramework.STM32_ZEPHYR,
+            PlatformFramework.ZEPHYR_ZEPHYR,
+        },
     }
 )
 

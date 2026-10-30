@@ -2347,7 +2347,17 @@ class SplitDefault(Optional):
     @property
     def default(self):
         keys = []
-        if CORE.is_esp32:
+        if CORE.using_zephyr_rtos:
+            from esphome.components.zephyr import zephyr_variant
+
+            if zephyr_var := zephyr_variant():
+                keys += [f"zephyr_{zephyr_var.lower()}"]
+            # One zephyr= default covers every Zephyr RTOS platform; the esp32 and rp2
+            # keys hold ESP-IDF and Arduino values, so those platforms skip their own.
+            if not (CORE.is_esp32 or CORE.is_rp2):
+                keys += _get_default_key()
+            keys += ["zephyr"]
+        elif CORE.is_esp32:
             from esphome.components.esp32 import VARIANT_ESP32, get_esp32_variant
 
             variant = get_esp32_variant().replace(VARIANT_ESP32, "").lower()
@@ -2372,14 +2382,8 @@ class SplitDefault(Optional):
                 keys += _get_default_key(variant, framework)
                 keys += _get_default_key(variant)
             keys += _get_default_key(framework)
-        elif CORE.using_zephyr_rtos:
-            from esphome.components.zephyr import zephyr_variant
-
-            if zephyr_var := zephyr_variant():
-                keys += [f"zephyr_{zephyr_var.lower()}"]
-            # One zephyr= default covers every Zephyr RTOS platform.
-            keys += _get_default_key() + ["zephyr"]
-        keys += _get_default_key()
+        if not CORE.using_zephyr_rtos:
+            keys += _get_default_key()
         for key in keys:
             if self._defaults.get(key) is not None:
                 return self._defaults[key]

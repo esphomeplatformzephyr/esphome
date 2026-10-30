@@ -1,0 +1,16 @@
+esphome:
+  name: test
+
+rp2:
+  variant: RP2040
+  framework:
+    type: zephyr
+    kconfig_options:
+      CONFIG_TEST_OPTION: true
+
+logger:
+
+binary_sensor:
+  - platform: gpio
+    pin: 2
+    name: Button

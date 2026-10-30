@@ -1101,7 +1101,14 @@ _filter_platform_sources = filter_source_files_from_platform(
             PlatformFramework.HOST_NATIVE,
         },
         "wake/wake_zephyr.cpp": {
+            PlatformFramework.ESP32_ZEPHYR,
             PlatformFramework.NRF52_ZEPHYR,
+            PlatformFramework.NRF_ZEPHYR,
+            PlatformFramework.NXP_ZEPHYR,
+            PlatformFramework.RENESAS_ZEPHYR,
+            PlatformFramework.RP2_ZEPHYR,
+            PlatformFramework.SILABS_ZEPHYR,
+            PlatformFramework.STM32_ZEPHYR,
             PlatformFramework.ZEPHYR_ZEPHYR,
         },
         # Note: lock_free_queue.h and event_pool.h are header files and don't need to be filtered

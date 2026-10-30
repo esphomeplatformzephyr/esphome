@@ -19,6 +19,7 @@ from esphome.const import (
     PLATFORM_ESP32,
     PLATFORM_LN882X,
     PLATFORM_RP2,
+    Framework,
     PlatformFramework,
 )
 from esphome.core import CORE
@@ -190,9 +191,14 @@ def test_hub_source_filter_covers_every_hub_platform() -> None:
     # bluetooth_connection cannot import this module to derive the hub.cpp
     # framework set, so pin it here: a platform admitted to the proxy but
     # missing from the filter would validate, then fail at link.
-    expected = frameworks_for_platforms(
-        [*bluetooth_proxy._HUB_PLATFORMS, PLATFORM_ESP32]
-    )
+    # The proxy has no framework: type: zephyr support.
+    expected = {
+        pf
+        for pf in frameworks_for_platforms(
+            [*bluetooth_proxy._HUB_PLATFORMS, PLATFORM_ESP32]
+        )
+        if pf.value[1] != Framework.ZEPHYR
+    }
     hub_frameworks = bluetooth_connection.SOURCE_FILE_FRAMEWORKS[
         "bluetooth_connection_hub.cpp"
     ]

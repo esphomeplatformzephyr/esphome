@@ -1769,7 +1769,7 @@ def test_esp32_build_internals_are_yaml_only() -> None:
     User-facing choices (framework type/version, board, variant, …)
     stay on the main form.
     """
-    from esphome.components.esp32 import CONFIG_SCHEMA, FRAMEWORK_SCHEMA
+    from esphome.components.esp32 import _ESP32_SCHEMA, FRAMEWORK_SCHEMA
 
     fw_markers = {str(k): k for k in FRAMEWORK_SCHEMA.schema}
     for field in (
@@ -1785,7 +1785,7 @@ def test_esp32_build_internals_are_yaml_only() -> None:
     assert fw_markers["type"].visibility is None
     assert fw_markers["version"].visibility is None
 
-    main_markers = {str(k): k for k in CONFIG_SCHEMA.validators[0].schema}
+    main_markers = {str(k): k for k in _ESP32_SCHEMA.validators[0].schema}
     assert main_markers["partitions"].visibility is cv.Visibility.YAML_ONLY
     # toolchain is a real but rarely-touched override -> advanced disclosure.
     assert main_markers["toolchain"].visibility is cv.Visibility.ADVANCED

@@ -780,7 +780,16 @@ _platform_filter = filter_source_files_from_platform(
             PlatformFramework.RTL87XX_ARDUINO,
             PlatformFramework.LN882X_ARDUINO,
         },
-        "uart_component_zephyr.cpp": {PlatformFramework.ZEPHYR_ZEPHYR},
+        "uart_component_zephyr.cpp": {
+            PlatformFramework.ESP32_ZEPHYR,
+            PlatformFramework.NRF_ZEPHYR,
+            PlatformFramework.NXP_ZEPHYR,
+            PlatformFramework.RENESAS_ZEPHYR,
+            PlatformFramework.RP2_ZEPHYR,
+            PlatformFramework.SILABS_ZEPHYR,
+            PlatformFramework.STM32_ZEPHYR,
+            PlatformFramework.ZEPHYR_ZEPHYR,
+        },
     }
 )
 

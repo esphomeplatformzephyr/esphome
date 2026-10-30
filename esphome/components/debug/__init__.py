@@ -147,7 +147,14 @@ FILTER_SOURCE_FILES = filter_source_files_from_platform(
             PlatformFramework.LN882X_ARDUINO,
         },
         "debug_zephyr.cpp": {
+            PlatformFramework.ESP32_ZEPHYR,
             PlatformFramework.NRF52_ZEPHYR,
+            PlatformFramework.NRF_ZEPHYR,
+            PlatformFramework.NXP_ZEPHYR,
+            PlatformFramework.RENESAS_ZEPHYR,
+            PlatformFramework.RP2_ZEPHYR,
+            PlatformFramework.SILABS_ZEPHYR,
+            PlatformFramework.STM32_ZEPHYR,
             PlatformFramework.ZEPHYR_ZEPHYR,
         },
     }

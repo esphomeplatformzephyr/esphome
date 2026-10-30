@@ -123,15 +123,6 @@ def _nest_flat_config(config: ConfigType) -> ConfigType:
     return nested
 
 
-@coroutine_with_priority(CoroPriority.PLATFORM)
-async def to_code(config: ConfigType) -> None:
-    if not CORE.is_zephyr:
-        return
-    from ..zephyr_rtos import zephyr_rtos_to_code
-
-    await zephyr_rtos_to_code(config)
-
-
 _ZEPHYR_RTOS_HOOKS = frozenset(
     {
         "upload_program",

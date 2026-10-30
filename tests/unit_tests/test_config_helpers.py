@@ -149,6 +149,7 @@ def test_frameworks_for_platforms_derives_and_rejects_unknown() -> None:
     assert frameworks_for_platforms(["esp32"]) == {
         PlatformFramework.ESP32_ARDUINO,
         PlatformFramework.ESP32_IDF,
+        PlatformFramework.ESP32_ZEPHYR,
     }
     with pytest.raises(ValueError, match="unknown platform"):
         frameworks_for_platforms(["esp32", "not_a_platform"])

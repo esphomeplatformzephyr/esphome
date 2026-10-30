@@ -17,6 +17,7 @@ from esphome.const import (
     PLATFORM_ESP32,
 )
 from esphome.core import CORE
+from esphome.schema_extractors import SCHEMA_EXTRACT, schema_extractor
 from esphome.types import ConfigType
 
 from . import boards
@@ -208,8 +209,23 @@ ESP32_PIN_SCHEMA = cv.All(
 )
 
 
-@pins.PIN_SCHEMA_REGISTRY.register(PLATFORM_ESP32, ESP32_PIN_SCHEMA)
+@schema_extractor("schema")
+def _pin_schema(value):
+    if value is SCHEMA_EXTRACT:
+        return ESP32_PIN_SCHEMA
+    if CORE.using_zephyr_rtos:
+        from esphome.components.zephyr_rtos.gpio import ZEPHYR_PIN_SCHEMA
+
+        return ZEPHYR_PIN_SCHEMA(value)
+    return ESP32_PIN_SCHEMA(value)
+
+
+@pins.PIN_SCHEMA_REGISTRY.register(PLATFORM_ESP32, _pin_schema)
 async def esp32_pin_to_code(config):
+    if CORE.using_zephyr_rtos:
+        from esphome.components.zephyr_rtos.gpio import zephyr_pin_to_code
+
+        return await zephyr_pin_to_code(config)
     var = cg.new_Pvariable(config[CONF_ID])
     num = config[CONF_NUMBER]
     cg.add(var.set_pin(getattr(gpio_num_t, f"GPIO_NUM_{num}")))

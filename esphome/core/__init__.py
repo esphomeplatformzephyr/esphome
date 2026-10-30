@@ -1101,7 +1101,7 @@ class EsphomeCore:
     def using_zephyr_rtos(self):
         """Zephyr built by zephyr_rtos: every Zephyr platform except nrf52."""
         return (
-            self.data[KEY_CORE].get(KEY_TARGET_FRAMEWORK) == "zephyr"
+            self.data.get(KEY_CORE, {}).get(KEY_TARGET_FRAMEWORK) == "zephyr"
             and not self.is_nrf52
         )
 

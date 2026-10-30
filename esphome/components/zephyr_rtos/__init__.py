@@ -1351,6 +1351,13 @@ def zephyr_rtos_platform_config(
     return validator
 
 
+@coroutine_with_priority(CoroPriority.PLATFORM)
+async def to_code(config: ConfigType) -> None:
+    # Every Zephyr RTOS platform auto-loads this component, so the platform block is
+    # built here at PLATFORM priority, whatever priority the platform's own to_code has.
+    await zephyr_rtos_to_code(CORE.config[CORE.target_platform])
+
+
 async def zephyr_rtos_to_code(config: ConfigType) -> None:
     from .dts_fetch import fetch_board_dts
 
