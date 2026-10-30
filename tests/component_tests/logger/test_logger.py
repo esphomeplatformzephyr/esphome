@@ -7,7 +7,8 @@ import re
 import pytest
 
 from esphome.components.logger import uart_selection, validate_task_log_buffer_alignment
-from esphome.components.zephyr.const import ZEPHYR_VARIANT_NRF52
+from esphome.components.zephyr.const import KEY_ZEPHYR_RTOS
+from esphome.components.zephyr_rtos.const import ZEPHYR_VARIANT_NRF52
 from esphome.config_validation import Invalid
 from esphome.const import PlatformFramework
 from esphome.core import CORE
@@ -186,8 +187,8 @@ def test_any_uart_number_accepted_on_zephyr(
 ) -> None:
     set_core_config(
         PlatformFramework.ZEPHYR_ZEPHYR,
-        platform_data={"variant": ZEPHYR_VARIANT_NRF52, "family": "nordic"},
     )
+    CORE.data[KEY_ZEPHYR_RTOS] = {"variant": ZEPHYR_VARIANT_NRF52, "family": "nordic"}
     assert uart_selection("uart3") == "UART3"
     assert uart_selection("UART12") == "UART12"
 
@@ -196,7 +197,7 @@ def test_zephyr_uart3_codegen(
     monkeypatch: pytest.MonkeyPatch, generate_main: Callable[[str | Path], str]
 ) -> None:
     """UART2 and up have no UART_SELECTION_* on Zephyr and map to the UART0 default."""
-    from esphome.components.zephyr import dts_lookup  # noqa: PLC0415
+    from esphome.components.zephyr_rtos import dts_lookup  # noqa: PLC0415
 
     # Resolve UART<n> to uart<n> without reading the board's devicetree
     monkeypatch.setattr(
@@ -218,8 +219,8 @@ def test_debug_probe_outputs_accepted_on_zephyr(
 ) -> None:
     set_core_config(
         PlatformFramework.ZEPHYR_ZEPHYR,
-        platform_data={"variant": ZEPHYR_VARIANT_NRF52, "family": "nordic"},
     )
+    CORE.data[KEY_ZEPHYR_RTOS] = {"variant": ZEPHYR_VARIANT_NRF52, "family": "nordic"}
     assert uart_selection(value) == value.upper()
 
 
@@ -228,8 +229,8 @@ def test_rtt_rejected_on_family_without_rtt(
 ) -> None:
     set_core_config(
         PlatformFramework.ZEPHYR_ZEPHYR,
-        platform_data={"variant": "ESP32", "family": "esp32"},
     )
+    CORE.data[KEY_ZEPHYR_RTOS] = {"variant": "ESP32", "family": "esp32"}
     with pytest.raises(Invalid, match="esp32 does not support"):
         uart_selection("RTT0")
 
@@ -247,8 +248,8 @@ def test_semihost_warns(
 ) -> None:
     set_core_config(
         PlatformFramework.ZEPHYR_ZEPHYR,
-        platform_data={"variant": ZEPHYR_VARIANT_NRF52, "family": "nordic"},
     )
+    CORE.data[KEY_ZEPHYR_RTOS] = {"variant": ZEPHYR_VARIANT_NRF52, "family": "nordic"}
     uart_selection("SEMIHOST")
     assert "no debugger is attached" in caplog.text
 
@@ -292,8 +293,9 @@ def test_zephyr_rtt_reuses_board_node(
     monkeypatch: pytest.MonkeyPatch, generate_main: Callable[[str | Path], str]
 ) -> None:
     """A board that already declares rtt0 gets it enabled, not a duplicate label."""
-    from esphome.components.zephyr import dts_lookup, zephyr_data  # noqa: PLC0415
+    from esphome.components.zephyr import zephyr_data  # noqa: PLC0415
     from esphome.components.zephyr.const import KEY_OVERLAY  # noqa: PLC0415
+    from esphome.components.zephyr_rtos import dts_lookup  # noqa: PLC0415
 
     monkeypatch.setattr(
         dts_lookup, "dts_node_label_exists", lambda board, label: label == "rtt0"
@@ -308,7 +310,7 @@ def test_rtt3_not_a_logger_keyword(set_core_config: SetCoreConfigCallable) -> No
     """Channel 3 needs SEGGER's buffer counts raised; it is only reachable as "&rtt3"."""
     set_core_config(
         PlatformFramework.ZEPHYR_ZEPHYR,
-        platform_data={"variant": ZEPHYR_VARIANT_NRF52, "family": "nordic"},
     )
+    CORE.data[KEY_ZEPHYR_RTOS] = {"variant": ZEPHYR_VARIANT_NRF52, "family": "nordic"}
     with pytest.raises(Invalid):
         uart_selection("RTT3")

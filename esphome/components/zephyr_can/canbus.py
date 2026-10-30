@@ -11,6 +11,10 @@ from esphome.components.canbus import (
     register_canbus,
 )
 from esphome.components.zephyr import (
+    VARIANTS,
+    get_can_controller_labels,
+    normalize_dts_label,
+    validate_dts_label_exists,
     zephyr_add_overlay,
     zephyr_add_prj_conf,
     zephyr_data,
@@ -18,12 +22,6 @@ from esphome.components.zephyr import (
     zephyr_variant_family,
 )
 from esphome.components.zephyr.const import KEY_BOARD
-from esphome.components.zephyr.dts_lookup import (
-    get_can_controller_labels,
-    normalize_dts_label,
-    validate_dts_label_exists,
-)
-from esphome.components.zephyr.variants import VARIANTS
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ID,

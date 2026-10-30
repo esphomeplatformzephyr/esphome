@@ -16,8 +16,7 @@ from esphome.components.esp32 import (
     VARIANT_ESP32S31,
     get_esp32_variant,
 )
-from esphome.components.zephyr import zephyr_variant
-from esphome.components.zephyr.variants import VARIANTS
+from esphome.components.zephyr import VARIANTS, zephyr_variant
 import esphome.config_validation as cv
 from esphome.const import CONF_ANALOG, CONF_INPUT, CONF_NUMBER, PLATFORM_ESP8266
 from esphome.core import CORE

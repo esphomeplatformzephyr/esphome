@@ -28,13 +28,13 @@ from esphome.components.esp32.gpio_esp32_c6 import esp32_c6_validate_lp_i2c
 from esphome.components.esp32.gpio_esp32_p4 import esp32_p4_validate_lp_i2c
 from esphome.components.esp32.gpio_esp32_s31 import esp32_s31_validate_lp_i2c
 from esphome.components.zephyr import (
+    normalize_dts_label,
     zephyr_add_overlay,
     zephyr_add_prj_conf,
     zephyr_data,
     zephyr_setup_i2c_pinctrl,
 )
 from esphome.components.zephyr.const import KEY_BOARD
-from esphome.components.zephyr.dts_lookup import normalize_dts_label
 from esphome.config_helpers import filter_source_files_from_platform
 import esphome.config_validation as cv
 from esphome.const import (
@@ -341,14 +341,35 @@ async def to_code(config: ConfigType) -> None:
         cg.add(var.set_frequency(int(config[CONF_FREQUENCY])))
         cg.add(var.set_scan(config[CONF_SCAN]))
     elif CORE.using_zephyr:
-        from esphome.components.zephyr.dts_lookup import resolve_zephyr_bus
+        from esphome.components.zephyr import resolve_zephyr_bus
 
         zephyr_add_prj_conf("I2C", True)
 
         board = zephyr_data()[KEY_BOARD]
-        if CORE.is_nrf52 and CONF_DTS_NODE_OVERRIDE not in config:
-            # platform: nrf52 has no DTS to search; keep upstream's default.
-            i2c = "i2c1" if board == "xiao_ble" else "i2c0"
+        if CORE.is_nrf52:
+            i2c = "i2c0"
+            if board == "xiao_ble":
+                i2c = "i2c1"
+            zephyr_add_overlay(
+                f"""
+                    &pinctrl {{
+                        {i2c}_default: {i2c}_default {{
+                            group1 {{
+                                psels = <NRF_PSEL(TWIM_SDA, {config[CONF_SDA] // 32}, {config[CONF_SDA] % 32})>,
+                                    <NRF_PSEL(TWIM_SCL, {config[CONF_SCL] // 32}, {config[CONF_SCL] % 32})>;
+                            }};
+                        }};
+                        {i2c}_sleep: {i2c}_sleep {{
+                            group1 {{
+                                psels = <NRF_PSEL(TWIM_SDA, {config[CONF_SDA] // 32}, {config[CONF_SDA] % 32})>,
+                                    <NRF_PSEL(TWIM_SCL, {config[CONF_SCL] // 32}, {config[CONF_SCL] % 32})>;
+                                low-power-enable;
+                            }};
+                        }};
+                    }};
+                """
+            )
+            sda, scl = f"GPIO{config[CONF_SDA]}", f"GPIO{config[CONF_SCL]}"
         else:
             i2c = resolve_zephyr_bus(
                 DOMAIN,
@@ -356,10 +377,10 @@ async def to_code(config: ConfigType) -> None:
                 override_key=CONF_DTS_NODE_OVERRIDE,
                 override=config.get(CONF_DTS_NODE_OVERRIDE),
             )
-        zephyr_add_overlay(f'&{i2c} {{ status = "okay"; }};')
-        sda, scl = zephyr_setup_i2c_pinctrl(
-            board, i2c, config.get(CONF_SDA), config.get(CONF_SCL)
-        )
+            zephyr_add_overlay(f'&{i2c} {{ status = "okay"; }};')
+            sda, scl = zephyr_setup_i2c_pinctrl(
+                board, i2c, config.get(CONF_SDA), config.get(CONF_SCL)
+            )
         var = cg.new_Pvariable(
             config[CONF_ID], MockObj(f"DEVICE_DT_GET(DT_NODELABEL({i2c}))")
         )

@@ -648,7 +648,10 @@ async def to_code(config: ConfigType) -> None:
         # Without SLAAC the device never forms an OMR (Off-Mesh-Routable) address, so
         # SRP's auto-registered host resolves by name but every address lookup times out.
         zephyr_add_prj_conf("OPENTHREAD_SLAAC", True)
-        zephyr_raise_prj_conf_min("MAIN_STACK_SIZE", 4096)
+        if CORE.is_nrf52:
+            zephyr_add_prj_conf("MAIN_STACK_SIZE", 4096)
+        else:
+            zephyr_raise_prj_conf_min("MAIN_STACK_SIZE", 4096)
 
         if not CORE.is_nrf52:
             # Mirror `zephyr: log_level:` into OpenThread's own log verbosity -- a separate

@@ -1,10 +1,7 @@
 import esphome.codegen as cg
 from esphome.components import power_management, zephyr
+from esphome.components.zephyr import board_has_cpu_freq_pstates, board_has_pm_states
 from esphome.components.zephyr.const import KEY_BOARD
-from esphome.components.zephyr.dts_lookup import (
-    board_has_cpu_freq_pstates,
-    board_has_pm_states,
-)
 import esphome.config_validation as cv
 from esphome.const import CONF_ID, CONF_OPENTHREAD, CONF_PLATFORM
 from esphome.core import CORE, EsphomeError

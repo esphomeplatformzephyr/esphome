@@ -14,17 +14,19 @@ from esphome.components.spi import (
     one_of_interface_validator,
     validate_spi_config,
 )
+from esphome.components.zephyr.const import KEY_ZEPHYR_RTOS
 import esphome.config_validation as cv
 from esphome.const import CONF_NUMBER, KEY_VARIANT, PlatformFramework
+from esphome.core import CORE
 from tests.component_tests.types import SetCoreConfigCallable
-from tests.unit_tests.components.zephyr.zephyr_state import empty_zephyr_data
+from tests.unit_tests.components.zephyr_rtos.zephyr_state import empty_zephyr_data
 
 
 def _zephyr(set_core_config: SetCoreConfigCallable, variant: str | None = None) -> None:
     set_core_config(
         PlatformFramework.ZEPHYR_ZEPHYR,
-        platform_data=empty_zephyr_data(variant=variant),
     )
+    CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant=variant)
 
 
 def test_quad_platform_validator_accepts_esp32_arduino_idf(

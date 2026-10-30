@@ -11,19 +11,19 @@ import pytest
 
 from esphome.components.nrf52 import set_core_data
 from esphome.components.zephyr import zephyr_data
-from esphome.components.zephyr.const import (
-    KEY_OVERLAY,
-    KEY_PARTITION_REQUIREMENTS,
-    KEY_PM_STATIC,
-    KEY_PRJ_CONF,
-    KEY_ZEPHYR,
-)
 from esphome.components.zephyr_coredump import (
     CONFIG_SCHEMA,
     DUMP_THREADS_MIN_VERSION,
     PARTITION_SIZE,
     _partition_address,
     to_code,
+)
+from esphome.components.zephyr_rtos.const import (
+    KEY_OVERLAY,
+    KEY_PARTITION_REQUIREMENTS,
+    KEY_PM_STATIC,
+    KEY_PRJ_CONF,
+    KEY_ZEPHYR_RTOS,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -34,7 +34,7 @@ from esphome.const import (
     PLATFORM_ZEPHYR,
 )
 from esphome.core import CORE, ID
-from tests.unit_tests.components.zephyr.zephyr_state import empty_zephyr_data
+from tests.unit_tests.components.zephyr_rtos.zephyr_state import empty_zephyr_data
 
 
 def _core_data(
@@ -123,7 +123,7 @@ def test_mcumgr_warns_that_the_slots_move(
 
 def _zephyr_core_data(variant: str) -> None:
     CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR}
-    CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant=variant)
+    CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant=variant)
 
 
 @pytest.mark.parametrize("variant", ["ESP32H2", "NRF54L15", "ESP32S3"])

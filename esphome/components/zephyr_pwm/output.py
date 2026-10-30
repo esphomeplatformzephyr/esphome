@@ -7,12 +7,12 @@ import esphome.codegen as cg
 from esphome.components import output
 from esphome.components.output import DOMAIN as OUTPUT_DOMAIN
 from esphome.components.zephyr import (
+    VARIANTS,
     zephyr_add_overlay_builder,
     zephyr_add_prj_conf,
     zephyr_variant,
     zephyr_variant_family,
 )
-from esphome.components.zephyr.variants import VARIANTS
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ALLOW_OTHER_USES,

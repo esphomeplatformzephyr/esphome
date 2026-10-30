@@ -862,7 +862,7 @@ def _skip_bootloader_supported() -> bool:
     if CORE.is_esp32 and CORE.using_toolchain_esp_idf:
         return True
     if CORE.is_zephyr:
-        from esphome.components.zephyr.mcuboot import zephyr_skip_bootloader_supported  # noqa: PLC0415
+        from esphome.components.zephyr import zephyr_skip_bootloader_supported  # noqa: PLC0415
 
         return zephyr_skip_bootloader_supported()
     return False

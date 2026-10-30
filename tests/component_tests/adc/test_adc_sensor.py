@@ -81,8 +81,9 @@ def test_silabs_adc_reuses_board_analog_bus(
     expected: str,
 ) -> None:
     """A bus+parity the board already allocates keeps its slot; others get slot 0."""
-    from esphome.components.zephyr import dts_lookup, zephyr_data  # noqa: PLC0415
+    from esphome.components.zephyr import zephyr_data  # noqa: PLC0415
     from esphome.components.zephyr.const import KEY_OVERLAY  # noqa: PLC0415
+    from esphome.components.zephyr_rtos import dts_lookup  # noqa: PLC0415
 
     states = None if board_buses is None else [("iadc0_default", ["group0"])]
     monkeypatch.setattr(dts_lookup, "get_pinctrl_states", lambda *_: states)

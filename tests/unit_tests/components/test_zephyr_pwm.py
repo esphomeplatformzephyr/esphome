@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-from esphome.components.zephyr.const import KEY_ZEPHYR
 from esphome.components.zephyr_pwm.output import PWMBlock, _overlay_pwm_renesas
+from esphome.components.zephyr_rtos.const import KEY_ZEPHYR_RTOS
 from esphome.const import KEY_CORE, KEY_TARGET_PLATFORM, PLATFORM_ZEPHYR
 from esphome.core import CORE
-from tests.unit_tests.components.zephyr.zephyr_state import empty_zephyr_data
+from tests.unit_tests.components.zephyr_rtos.zephyr_state import empty_zephyr_data
 
 
 def test_renesas_overlay_uses_gtioc_function_for_any_gpt_channel() -> None:
     """RA_PSEL_GPT1 selects the GTIOC pin function on every GPT channel."""
     CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: PLATFORM_ZEPHYR}
-    CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant="RA4M1")
+    CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant="RA4M1")
     overlay = _overlay_pwm_renesas(
         [PWMBlock(id=0, period_ns=1_000_000, pins=[69, 70])], ["pwm3"]
     )

@@ -7,7 +7,8 @@ import pytest
 
 from esphome import config_validation as cv
 from esphome.components import deep_sleep
-from esphome.components.zephyr.variants import VARIANTS
+from esphome.components.zephyr.const import KEY_ZEPHYR_RTOS
+from esphome.components.zephyr_rtos.variants import VARIANTS
 from esphome.const import CONF_WAKEUP_PIN, PlatformFramework
 from esphome.core import CORE
 
@@ -238,8 +239,11 @@ def test_deep_sleep_zephyr_wakeup_pin(
 def _set_zephyr_variant(set_core_config: SetCoreConfigCallable, variant: str) -> None:
     set_core_config(
         PlatformFramework.ZEPHYR_ZEPHYR,
-        platform_data={"variant": variant, "family": VARIANTS[variant].family},
     )
+    CORE.data[KEY_ZEPHYR_RTOS] = {
+        "variant": variant,
+        "family": VARIANTS[variant].family,
+    }
 
 
 @pytest.mark.parametrize(

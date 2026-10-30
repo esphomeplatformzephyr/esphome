@@ -12,7 +12,7 @@ from esphome.components.adafruit_ble.ota import CONFIG_SCHEMA, _final_validate
 from esphome.components.nrf52 import _final_validate as nrf52_final_validate
 from esphome.components.nrf52.const import BOOTLOADER_ADAFRUIT_NRF52_SD140_V6
 from esphome.components.ota import _ota_final_validate
-from esphome.components.zephyr.const import (
+from esphome.components.zephyr_rtos.const import (
     BOOTLOADER_MCUBOOT,
     KEY_BOOTLOADER,
     KEY_SINGLE_SLOT,

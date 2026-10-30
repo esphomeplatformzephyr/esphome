@@ -1,9 +1,13 @@
 import esphome.codegen as cg
 from esphome.components import logger
 from esphome.components.nrf52.framework import include_west_project
-from esphome.components.zephyr import zephyr_add_prj_conf, zephyr_family_uart_drivers
+from esphome.components.zephyr import (
+    DEBUG_OWNER,
+    claim_rtt_channel,
+    zephyr_add_prj_conf,
+    zephyr_family_uart_drivers,
+)
 from esphome.components.zephyr.const import SEGGER_RTT_UART
-from esphome.components.zephyr.rtt import DEBUG_OWNER, claim_rtt_channel
 from esphome.config_helpers import filter_source_files_from_platform
 import esphome.config_validation as cv
 from esphome.const import (

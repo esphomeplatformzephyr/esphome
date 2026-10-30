@@ -7,8 +7,7 @@ from esphome.components.nrf52.framework import (
     bluetooth_west_projects,
     include_west_project,
 )
-from esphome.components.zephyr import zephyr_add_prj_conf, zephyr_variant
-from esphome.components.zephyr.variants import VARIANTS
+from esphome.components.zephyr import VARIANTS, zephyr_add_prj_conf, zephyr_variant
 import esphome.config_validation as cv
 from esphome.const import CONF_ID, Framework
 from esphome.core import CORE, CoroPriority, coroutine_with_priority

@@ -331,7 +331,7 @@ def _validate_swap_method(config: ConfigType) -> ConfigType:
     # would otherwise import just to build this schema.
     if not CORE.is_zephyr:
         return reject_swap_method_off_zephyr(config)
-    from esphome.components.zephyr.mcuboot import validate_swap_method
+    from esphome.components.zephyr import validate_swap_method
 
     return validate_swap_method(config)
 
@@ -426,7 +426,7 @@ async def to_code(config: ConfigType) -> None:
     cg.add_build_flag("-DUSE_OTA_PLATFORM_ESPHOME")
 
     if CORE.is_zephyr:
-        from esphome.components.zephyr.mcuboot import apply_swap_method
+        from esphome.components.zephyr import apply_swap_method
 
         apply_swap_method(config)
 

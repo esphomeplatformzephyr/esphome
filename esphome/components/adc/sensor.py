@@ -11,7 +11,9 @@ from esphome.components.esp32 import (
 )
 from esphome.components.nrf52.const import AIN_TO_GPIO, EXTRA_ADC
 from esphome.components.zephyr import (
+    VARIANTS,
     zephyr_add_overlay,
+    zephyr_add_overlay_builder,
     zephyr_add_prj_conf,
     zephyr_add_user,
     zephyr_data,
@@ -19,7 +21,6 @@ from esphome.components.zephyr import (
     zephyr_variant_family,
 )
 from esphome.components.zephyr.const import KEY_BOARD
-from esphome.components.zephyr.variants import VARIANTS
 from esphome.config_helpers import filter_source_files_from_platform
 import esphome.config_validation as cv
 from esphome.const import (
@@ -200,6 +201,19 @@ def _get_data() -> ADCData:
     return CORE.data[DOMAIN]
 
 
+def _nrf52_io_channels_overlay() -> str:
+    entries = ", ".join(
+        f"<&adc {channel_id}>" for channel_id in range(_get_data().nrf52_channel_id)
+    )
+    return f"""
+            / {{
+                zephyr,user {{
+                    io-channels = {entries};
+                }};
+            }};
+            """
+
+
 def _silabs_pin_bus_role(pin_num: int, port_width: int) -> tuple[int, str]:
     """(bus, EVEN/ODD) that pin_num's IADC analog-bus allocation falls under --
     per silabs,dbus-pinctrl.yaml, analog-bus allocation is port+parity-wide (any
@@ -241,7 +255,7 @@ def _silabs_iadc_token_for(bus: int, parity: str) -> str:
     data = _get_data()
     if not data.silabs_iadc_board_seeded:
         data.silabs_iadc_board_seeded = True
-        from esphome.components.zephyr.dts_lookup import (  # noqa: PLC0415
+        from esphome.components.zephyr import (  # noqa: PLC0415
             get_pinctrl_group_property,
             get_pinctrl_states,
         )
@@ -368,7 +382,7 @@ async def to_code(config: ConfigType) -> None:
         if isinstance(pin_number, int):
             GPIO_TO_AIN = {v: k for k, v in AIN_TO_GPIO.items()}
             pin_number = GPIO_TO_AIN[pin_number]
-        zephyr_add_user("io-channels", f"<&adc {channel_id}>")
+        zephyr_add_overlay_builder(_nrf52_io_channels_overlay)
         zephyr_add_overlay(f"""
                 &adc {{
                     #address-cells = <1>;

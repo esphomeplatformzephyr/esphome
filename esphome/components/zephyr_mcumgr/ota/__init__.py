@@ -11,23 +11,24 @@ from esphome.components.ota import (
     ota_to_code,
 )
 from esphome.components.zephyr import (
-    KEY_BOARD,
     VARIANTS,
     HexValue,
-    mcuboot,
+    apply_swap_method,
+    validate_swap_method,
     zephyr_add_overlay,
     zephyr_add_prj_conf,
     zephyr_add_sysbuild_conf,
     zephyr_cdc_acm_label,
     zephyr_claim_cdc_acm,
     zephyr_data,
+    zephyr_framework_type,
     zephyr_variant,
     zephyr_variant_family,
 )
 from esphome.components.zephyr.const import (
     BOOTLOADER_MCUBOOT,
+    KEY_BOARD,
     KEY_BOOTLOADER,
-    KEY_FRAMEWORK_TYPE,
     KEY_PM_STATIC,
     KEY_SYSBUILD,
     ZEPHYR_VARIANT_EFR32BG27,
@@ -170,7 +171,7 @@ CONFIG_SCHEMA = cv.All(
     .extend(cv.COMPONENT_SCHEMA),
     _validate_transport,
     _validate_platform,
-    mcuboot.validate_swap_method,
+    validate_swap_method,
 )
 
 
@@ -224,7 +225,7 @@ async def to_code(config: ConfigType) -> None:
 
     await cg.register_component(var, config)
 
-    mcuboot.apply_swap_method(config)
+    apply_swap_method(config)
 
     zephyr_add_prj_conf("NET_BUF", True)
     zephyr_add_prj_conf("ZCBOR", True)
@@ -244,7 +245,8 @@ async def to_code(config: ConfigType) -> None:
     zephyr_add_prj_conf("IMG_ERASE_PROGRESSIVELY", True)
 
     zephyr_add_prj_conf("BOOTLOADER_MCUBOOT", True)
-    zephyr_add_sysbuild_conf("BOOTLOADER_MCUBOOT", True)
+    if not CORE.is_nrf52:
+        zephyr_add_sysbuild_conf("BOOTLOADER_MCUBOOT", True)
 
     zephyr_add_prj_conf("MCUMGR_MGMT_NOTIFICATION_HOOKS", True)
     zephyr_add_prj_conf("MCUMGR_GRP_IMG_STATUS_HOOKS", True)
@@ -261,7 +263,7 @@ async def to_code(config: ConfigType) -> None:
         # NCS-only sample Kconfig (undefined in mainline Zephyr -- EFR32MG24 is the
         # first supported variant that isn't NCS-based, and mainline treats an
         # undefined-symbol assignment as a fatal Kconfig warning).
-        if zephyr_data().get(KEY_FRAMEWORK_TYPE) == "ncs":
+        if CORE.is_nrf52 or zephyr_framework_type() == "ncs":
             zephyr_add_prj_conf("NCS_SAMPLE_MCUMGR_BT_OTA_DFU_SPEEDUP", True)
             request_ble_l2cap_mtu(498)  # matches NCS_SAMPLE_MCUMGR_BT_OTA_DFU_SPEEDUP
     if CONF_HARDWARE_UART in transport:
@@ -279,7 +281,7 @@ async def to_code(config: ConfigType) -> None:
             # (e.g. nRF54 uses uart20/uart30, EFR32MG24 has only usart0), and some
             # variants declare no portable mapping at all (resolved per board from
             # DTS instead) -- see resolve_uart_node_label()'s own docstring.
-            from esphome.components.zephyr.dts_lookup import resolve_uart_node_label
+            from esphome.components.zephyr import resolve_uart_node_label
 
             uart_name = resolve_uart_node_label(
                 zephyr_data()[KEY_BOARD],

@@ -233,7 +233,13 @@ def uart_selection(value: Any) -> str:
     if CORE.is_nrf52:
         return cv.one_of(*UART_SELECTION_NRF52, upper=True)(value)
     if CORE.is_zephyr:
-        from esphome.components.zephyr import zephyr_variant, zephyr_variant_family
+        from esphome.components.zephyr import (
+            RTT_PORTS,
+            validate_rtt_port,
+            validate_uart_label_override,
+            zephyr_variant,
+            zephyr_variant_family,
+        )
         from esphome.components.zephyr.const import (
             ZEPHYR_VARIANT_ESP32_C3,
             ZEPHYR_VARIANT_ESP32_C5,
@@ -241,8 +247,6 @@ def uart_selection(value: Any) -> str:
             ZEPHYR_VARIANT_ESP32_H2,
             ZEPHYR_VARIANT_ESP32_S3,
         )
-        from esphome.components.zephyr.dts_lookup import validate_uart_label_override
-        from esphome.components.zephyr.rtt import RTT_PORTS, validate_rtt_port
 
         if (
             isinstance(value, str)
@@ -763,20 +767,18 @@ async def _late_logger_init(config: ConfigType) -> None:
                 zephyr_add_prj_conf("UART_LINE_CTRL", True)
     if CORE.is_zephyr and has_serial_logging:
         from esphome.components.zephyr import (
-            KEY_BOARD,
             VARIANTS,
+            claim_rtt_channel,
+            enable_rtt_node,
+            rtt_channel,
+            rtt_label_channel,
             zephyr_add_overlay,
             zephyr_add_prj_conf,
             zephyr_cdc_acm_label,
             zephyr_data,
             zephyr_variant,
         )
-        from esphome.components.zephyr.rtt import (
-            claim_rtt_channel,
-            enable_rtt_node,
-            rtt_channel,
-            rtt_label_channel,
-        )
+        from esphome.components.zephyr.const import KEY_BOARD
 
         zephyr_add_prj_conf("SERIAL", True)
         hw_uart = config.get(CONF_HARDWARE_UART, UART0)
@@ -789,9 +791,7 @@ async def _late_logger_init(config: ConfigType) -> None:
         # from DTS instead. See resolve_uart_node_label()'s own docstring.
         if hw_uart.startswith("&") or ZEPHYR_UART_RE.fullmatch(hw_uart):
             if hw_uart.startswith("&"):
-                from esphome.components.zephyr.dts_lookup import (
-                    validate_dts_label_exists,
-                )
+                from esphome.components.zephyr import validate_dts_label_exists
 
                 node = hw_uart[1:]
                 node_known = validate_dts_label_exists(
@@ -800,7 +800,7 @@ async def _late_logger_init(config: ConfigType) -> None:
                 if (label_channel := rtt_label_channel(node)) is not None:
                     claim_rtt_channel(label_channel, "logger")
             else:
-                from esphome.components.zephyr.dts_lookup import resolve_uart_node_label
+                from esphome.components.zephyr import resolve_uart_node_label
 
                 node = resolve_uart_node_label(
                     zephyr_data()[KEY_BOARD],

@@ -4,13 +4,14 @@ import random
 import esphome.codegen as cg
 from esphome.components.const import CONF_MANUFACTURER
 from esphome.components.zephyr import (
+    VARIANTS,
     request_zephyr_module,
+    resolve_sdk,
     zephyr_add_prj_conf,
     zephyr_framework_type,
     zephyr_require_partition,
     zephyr_variant,
 )
-from esphome.components.zephyr.variants import VARIANTS, resolve_sdk
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ID,

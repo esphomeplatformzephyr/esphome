@@ -174,14 +174,16 @@ def validate_host_config(config):
 
 def validate_zephyr_config(config):
     if CORE.is_zephyr and (CONF_TX_PIN in config or CONF_RX_PIN in config):
-        from esphome.components.zephyr.rtt import rtt_channel  # noqa: PLC0415
+        from esphome.components.zephyr import rtt_channel  # noqa: PLC0415
 
         if rtt_channel(config.get(CONF_PORT, "")) is not None:
             raise cv.Invalid(
                 "TX and RX pins are not used by an RTT port; it runs over the debug probe"
             )
-        from esphome.components.zephyr import zephyr_variant  # noqa: PLC0415
-        from esphome.components.zephyr.variants import VARIANTS  # noqa: PLC0415
+        from esphome.components.zephyr import (
+            VARIANTS,  # noqa: PLC0415
+            zephyr_variant,  # noqa: PLC0415
+        )
 
         # Only esp32-family UART pins go through the GPIO matrix and can use any pin.
         variant = zephyr_variant()
@@ -311,11 +313,11 @@ def maybe_empty_debug(value):
 def validate_port(value):
     if CORE.is_zephyr:
         value = cv.string_strict(value)
-        from esphome.components.zephyr.dts_lookup import validate_uart_label_override
+        from esphome.components.zephyr import validate_uart_label_override
 
         if (override := validate_uart_label_override(value)) is not None:
             return override
-        from esphome.components.zephyr.rtt import RTT_PORTS, validate_rtt_port
+        from esphome.components.zephyr import RTT_PORTS, validate_rtt_port
 
         if value.upper() in RTT_PORTS:
             return validate_rtt_port(value.upper())
@@ -456,23 +458,19 @@ async def to_code(config):
     if CONF_PORT in config:
         if CORE.is_zephyr:
             from esphome.components.zephyr import (
-                KEY_BOARD,
                 VARIANTS,
+                claim_rtt_channel,
+                enable_rtt_node,
+                resolve_uart_node_label,
+                rtt_channel,
+                rtt_label_channel,
+                validate_dts_label_exists,
                 zephyr_add_prj_conf,
                 zephyr_data,
                 zephyr_setup_uart_pinctrl,
                 zephyr_variant,
             )
-            from esphome.components.zephyr.dts_lookup import (
-                resolve_uart_node_label,
-                validate_dts_label_exists,
-            )
-            from esphome.components.zephyr.rtt import (
-                claim_rtt_channel,
-                enable_rtt_node,
-                rtt_channel,
-                rtt_label_channel,
-            )
+            from esphome.components.zephyr.const import KEY_BOARD
 
             zephyr_add_prj_conf("SERIAL", True)
             zephyr_add_prj_conf("RING_BUFFER", True)

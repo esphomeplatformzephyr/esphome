@@ -22,6 +22,8 @@ from esphome.components.esp32 import (
 )
 from esphome.components.psram import DOMAIN as PSRAM_DOMAIN
 from esphome.components.zephyr import (
+    normalize_dts_label,
+    resolve_zephyr_bus,
     zephyr_add_overlay,
     zephyr_add_prj_conf,
     zephyr_data,
@@ -37,7 +39,6 @@ from esphome.components.zephyr.const import (
     ZEPHYR_VARIANT_ESP32_H2,
     ZEPHYR_VARIANT_ESP32_S3,
 )
-from esphome.components.zephyr.dts_lookup import normalize_dts_label, resolve_zephyr_bus
 from esphome.config_helpers import filter_source_files_from_platform
 import esphome.config_validation as cv
 from esphome.const import (
@@ -386,7 +387,7 @@ def _validate_clk_pin_required(value: ConfigType) -> ConfigType:
 
 def validate_spi_config(config: list[ConfigType]) -> list[ConfigType]:
     if CORE.is_zephyr:
-        from esphome.components.zephyr.variants import VARIANTS  # noqa: PLC0415
+        from esphome.components.zephyr import VARIANTS  # noqa: PLC0415
 
         # interface: <bus label> picks one of the board's SPI buses; "hardware" and
         # "any" are resolved from the board DTS in to_code().

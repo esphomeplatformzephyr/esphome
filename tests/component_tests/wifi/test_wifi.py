@@ -4,6 +4,7 @@ import pytest
 from voluptuous import Invalid
 
 from esphome.components.wifi import CONFIG_SCHEMA, _validate, validate_variant
+from esphome.components.zephyr.const import KEY_ZEPHYR_RTOS
 from esphome.const import (
     CONF_AP,
     CONF_HIDDEN,
@@ -13,6 +14,7 @@ from esphome.const import (
     CONF_USE_ADDRESS,
     PlatformFramework,
 )
+from esphome.core import CORE
 from tests.component_tests.types import SetCoreConfigCallable
 
 
@@ -58,9 +60,9 @@ def test_hidden_without_ssid_rejected(set_core_config: SetCoreConfigCallable) ->
 def _set_zephyr_with_ap(set_core_config: SetCoreConfigCallable, variant: str) -> None:
     set_core_config(
         PlatformFramework.ZEPHYR_ZEPHYR,
-        platform_data={"variant": variant, "board": "some_board"},
         full_config={"wifi": {CONF_AP: {}}},
     )
+    CORE.data[KEY_ZEPHYR_RTOS] = {"variant": variant, "board": "some_board"}
 
 
 def test_ap_rejected_on_nrf70(set_core_config: SetCoreConfigCallable) -> None:

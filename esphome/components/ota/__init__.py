@@ -47,7 +47,7 @@ CONF_SWAP_METHOD = "swap_method"
 # Shared by every ota: platform that can run on Zephyr (platform: esphome and
 # platform: zephyr_mcumgr both end up pushing the very same MCUboot sysbuild
 # MCUBOOT_MODE_SWAP_* Kconfig choice symbol -- see
-# esphome.components.zephyr.mcuboot). Defined here, not in the zephyr package,
+# esphome.components.zephyr). Defined here, not in the zephyr package,
 # so that platform: esphome -- built on every platform, not just Zephyr -- can
 # use it without importing esphome.components.zephyr at module-load time.
 SWAP_METHOD_SCHEMA = {

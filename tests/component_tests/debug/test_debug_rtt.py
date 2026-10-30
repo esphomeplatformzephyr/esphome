@@ -5,9 +5,10 @@ from pathlib import Path
 
 import pytest
 
+from esphome.components.zephyr.const import KEY_ZEPHYR_RTOS
 from esphome.config_validation import Invalid
 from esphome.const import PlatformFramework
-from esphome.core import EsphomeError
+from esphome.core import CORE, EsphomeError
 from tests.component_tests.types import SetCoreConfigCallable
 
 CONFIG_DIR = Path(__file__).parent / "config"
@@ -59,8 +60,8 @@ def test_rtt_console_rejected_without_rtt_family(
 
     set_core_config(
         PlatformFramework.ZEPHYR_ZEPHYR,
-        platform_data={"variant": "ESP32", "family": "esp32"},
     )
+    CORE.data[KEY_ZEPHYR_RTOS] = {"variant": "ESP32", "family": "esp32"}
     with pytest.raises(Invalid, match="needs SEGGER RTT"):
         _validate_rtt_console({CONF_ENABLE_RTT_CONSOLE: True})
 
@@ -92,9 +93,10 @@ def test_other_channel_allowed_with_debug(
 def test_debug_wins_rtt0_in_either_order(
     set_core_config: SetCoreConfigCallable, debug_first: bool
 ) -> None:
-    from esphome.components.zephyr.rtt import DEBUG_OWNER, claim_rtt_channel  # noqa: PLC0415
+    from esphome.components.zephyr_rtos.rtt import DEBUG_OWNER, claim_rtt_channel  # noqa: PLC0415
 
-    set_core_config(PlatformFramework.ZEPHYR_ZEPHYR, platform_data={"rtt_channels": {}})
+    set_core_config(PlatformFramework.ZEPHYR_ZEPHYR)
+    CORE.data[KEY_ZEPHYR_RTOS] = {"rtt_channels": {}}
     owners = [DEBUG_OWNER, "logger"] if debug_first else ["logger", DEBUG_OWNER]
     claim_rtt_channel(0, owners[0])
     with pytest.raises(EsphomeError, match="reserved by debug: .*move logger "):

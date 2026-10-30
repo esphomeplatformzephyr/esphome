@@ -436,9 +436,8 @@ def validate_variant(_):
                 f"Use a WiFi-capable board like 'rpipicow' or 'rpipico2w'."
             )
     if CORE.is_zephyr:
-        from esphome.components.zephyr import zephyr_data, zephyr_variant
+        from esphome.components.zephyr import VARIANTS, zephyr_data, zephyr_variant
         from esphome.components.zephyr.const import KEY_BOARD
-        from esphome.components.zephyr.variants import VARIANTS
 
         variant_name = zephyr_variant()
         variant = VARIANTS.get(variant_name)
@@ -1064,12 +1063,12 @@ async def to_code(config):
         cg.add_library("WiFi", None)
     elif CORE.is_zephyr:
         from esphome.components.zephyr import (
+            VARIANTS,
             zephyr_add_blobs,
             zephyr_add_overlay,
             zephyr_add_prj_conf,
             zephyr_variant,
         )
-        from esphome.components.zephyr.variants import VARIANTS
 
         zephyr_add_prj_conf("WIFI", True)
         zephyr_add_prj_conf("NET_HOSTNAME_DYNAMIC", True)

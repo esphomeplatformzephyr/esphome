@@ -6,7 +6,8 @@ from pathlib import Path
 import pytest
 
 from esphome.components import uart
-from esphome.components.zephyr.const import ZEPHYR_VARIANT_NRF52
+from esphome.components.zephyr.const import KEY_ZEPHYR_RTOS
+from esphome.components.zephyr_rtos.const import ZEPHYR_VARIANT_NRF52
 from esphome.config_validation import Invalid
 from esphome.const import (
     CONF_BAUD_RATE,
@@ -22,8 +23,8 @@ from tests.component_tests.types import SetCoreConfigCallable
 def _zephyr(set_core_config: SetCoreConfigCallable, variant: str) -> None:
     set_core_config(
         PlatformFramework.ZEPHYR_ZEPHYR,
-        platform_data={"variant": variant, "family": "nordic"},
     )
+    CORE.data[KEY_ZEPHYR_RTOS] = {"variant": variant, "family": "nordic"}
 
 
 @pytest.mark.parametrize("port", ["rtt0", "RTT1", "Rtt2"])
@@ -43,8 +44,8 @@ def test_rtt_port_rejected_on_family_without_rtt(
 ) -> None:
     set_core_config(
         PlatformFramework.ZEPHYR_ZEPHYR,
-        platform_data={"variant": "ESP32", "family": "esp32"},
     )
+    CORE.data[KEY_ZEPHYR_RTOS] = {"variant": "ESP32", "family": "esp32"}
     with pytest.raises(Invalid, match="esp32 does not support"):
         uart.validate_port("RTT1")
 
@@ -54,8 +55,8 @@ def test_rtt_port_rejected_on_family_without_rtt(
     ["nordic", "stm32", "silabs", "silabs_siwx91x", "rpi_pico", "renesas", "nxp"],
 )
 def test_every_rtt_family_declares_it(family: str) -> None:
-    from esphome.components.zephyr import _get_family_module  # noqa: PLC0415
-    from esphome.components.zephyr.const import SEGGER_RTT_UART  # noqa: PLC0415
+    from esphome.components.zephyr_rtos import _get_family_module  # noqa: PLC0415
+    from esphome.components.zephyr_rtos.const import SEGGER_RTT_UART  # noqa: PLC0415
 
     assert SEGGER_RTT_UART in _get_family_module(family).UART_DRIVERS
 
