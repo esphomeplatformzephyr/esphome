@@ -37,7 +37,7 @@ DebugComponent = debug_ns.class_("DebugComponent", cg.PollingComponent)
 def _validate_rtt_console(config: ConfigType) -> ConfigType:
     if not config[CONF_ENABLE_RTT_CONSOLE]:
         return config
-    if not CORE.using_zephyr or CORE.is_nrf52:
+    if not CORE.using_zephyr_rtos:
         raise cv.Invalid(
             f"{CONF_ENABLE_RTT_CONSOLE} is only available on Zephyr RTOS builds",
             path=[CONF_ENABLE_RTT_CONSOLE],
