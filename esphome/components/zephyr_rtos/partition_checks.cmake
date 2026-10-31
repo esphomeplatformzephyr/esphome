@@ -7,7 +7,7 @@
 
 function(_esphome_fail)
   string(JOIN "" msg ${ARGN})
-  message(FATAL_ERROR "ESPHome: ${msg} Fix the flash layout with 'zephyr: overlays:' "
+  message(FATAL_ERROR "ESPHome: ${msg} Fix the flash layout with 'framework: overlays:' "
     "(an MCUboot build needs the same layout in the app and mcuboot overlays).")
 endfunction()
 

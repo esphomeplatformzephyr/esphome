@@ -309,7 +309,7 @@ class ZephyrVariant:
     # than freely assignable to any channel the way Nordic's NRF_PSEL pinmux is.
     # Empty = this variant's PWM (if any) uses the free allocator instead.
     pwm_pin_map: dict[int, tuple[int, int]] = field(default_factory=dict)
-    # Largest `zephyr: watchdog_timeout:` this variant's WDT hardware can actually
+    # Largest `<platform>: watchdog_timeout:` this variant's WDT hardware can actually
     # arm, in milliseconds. None = trust the generic 5-60s schema range (true for
     # every variant whose WDT clock gives it a multi-minute+ ceiling). Some
     # variants' watchdog peripheral is clocked too fast, or has too small a

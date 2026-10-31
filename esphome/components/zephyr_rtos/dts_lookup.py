@@ -30,14 +30,14 @@ _NOT_FOUND: Final = object()
 
 def validate_dts_label_exists(platform: str, board: str, label: str) -> bool:
     """Warn, don't raise, if label isn't among board's known DTS nodes -- it may be
-    declared in the user's own `zephyr: overlays:`, invisible to this scan. Returns
+    declared in the user's own `framework: overlays:`, invisible to this scan. Returns
     False then, so a caller can skip a forward-referencing `&label { ... }` override."""
     lookup_fn = _BUS_LOOKUP.get(platform)
     labels = lookup_fn(board) if lookup_fn is not None else None
     if labels is not None and label not in labels:
         _LOGGER.warning(
             "'%s' is not among the %s devicetree nodes ESPHome found on board '%s' "
-            "(%s) -- assuming it's declared in your own `zephyr: overlays:`. If not, "
+            "(%s) -- assuming it's declared in your own `framework: overlays:`. If not, "
             "this will fail at devicetree-compile time.",
             label,
             platform.upper(),

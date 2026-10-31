@@ -235,7 +235,7 @@ def _fetch_sdk_source_version(url: str, ref: str | None, dest: Path) -> None:
 
 
 def resolve_sdk_source_version(source: ConfigType, refresh: TimePeriodSeconds) -> str:
-    """Return the 'major.minor.patch' version of a zephyr: sdk_source:, read directly from
+    """Return the 'major.minor.patch' version of a framework: source:, read directly from
     its VERSION file rather than guessed -- several places elsewhere in the codebase (build
     output layout, sysbuild mode, DTS lookups) branch on the exact semver, so this can't just
     default to the variant's own baseline when a custom source is in play.

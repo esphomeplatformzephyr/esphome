@@ -50,8 +50,8 @@ def _source_cache_key(
     source: ConfigType | None,
     git_modules: list[ZephyrModule] | None = None,
 ) -> str:
-    """Distinguish a custom zephyr: sdk_source: from the official ver_tag-keyed cache dir,
-    and from other sdk_source configs sharing the same version: value. A non-empty
+    """Distinguish a custom framework: source: from the official ver_tag-keyed cache dir,
+    and from other framework: source: configs sharing the same version: value. A non-empty
     git_modules set also gets its own cache dir -- a different active module *set*
     changes what the generated manifest fetches, so it can't share a workspace with a
     no-module build or a different combination.
@@ -340,13 +340,13 @@ def _check_and_install(
 
     modules (resolve_zephyr_modules()'s result): additive west modules to fetch
     alongside the SDK, each as its own sibling project in a generated manifest --
-    see _generate_synthetic_manifest(). A module with local_path set (zephyr:
+    see _generate_synthetic_manifest(). A module with local_path set (framework:
     modules: type: local) isn't a west project at all -- the caller wires it into the
     build directly via EXTRA_ZEPHYR_MODULES instead, same as a converted PlatformIO
     library.
 
     west_version/ninja_version override requirements_west.txt's pinned versions
-    (CONF_WEST_VERSION/CONF_NINJA_VERSION). source, if given (zephyr: sdk_source:), overrides
+    (CONF_WEST_VERSION/CONF_NINJA_VERSION). source, if given (framework: source:), overrides
     which Zephyr gets fetched -- a git fork/branch/ref (cloned into ESPHome's own managed
     cache, same as the official source), or a `local:` path to a manifest repo (e.g. a Zephyr
     fork checked out for local development). `local:` deliberately does NOT copy or symlink

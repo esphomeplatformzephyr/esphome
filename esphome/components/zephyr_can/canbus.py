@@ -177,7 +177,7 @@ async def to_code(config: ConfigType) -> None:
     # STM32 SoC devicetrees ship their CAN nodes disabled, so the node always has to be
     # turned on here. A controller that also needs a kernel clock source picked (e.g.
     # STM32U5's FDCAN, which only gets its bus clock from the SoC dtsi) needs a `clocks`
-    # property too -- add that from `zephyr: overlays: app:`, which is applied after
+    # property too -- add that from `framework: overlays: app:`, which is applied after
     # component overlays and therefore wins.
     overlay = [f"&{instance} {{", '  status = "okay";']
     if (tx_pin := config.get(CONF_TX_PIN)) is not None:

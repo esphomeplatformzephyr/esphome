@@ -1214,7 +1214,7 @@ def test_zephyr_setup_spi_pinctrl_unimplemented_family_warns_and_enables_bus(
 ) -> None:
     # No generated overlay for rp2040 -- just enable the bus and warn, matching
     # UART's own "board has no pinctrl configured" fallback, rather than a hard
-    # block. Lets a user's own `zephyr: overlays:` (or a board that already wires
+    # block. Lets a user's own `framework: overlays:` (or a board that already wires
     # this bus) make it work.
     CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant="RP2040")
     with patch(

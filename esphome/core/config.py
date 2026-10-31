@@ -241,7 +241,7 @@ def validate_loop_interval(config: ConfigType) -> ConfigType:
                 max_loop,
                 " Raise esp32.watchdog_timeout to sleep longer."
                 if CORE.is_esp32
-                else " Raise zephyr.watchdog_timeout to sleep longer."
+                else f" Raise {CORE.target_platform}.watchdog_timeout to sleep longer."
                 if CORE.using_zephyr_rtos
                 else "",
             )

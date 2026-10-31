@@ -95,7 +95,7 @@ CONF_SNIPPET_SOURCE = "snippet_source"
 KEY_SNIPPET_ROOT: Final = "snippet_root"
 CONF_MODULES = "modules"
 
-# zephyr: version: "recommended" -- explicit alias for the variant's default_version,
+# framework: version: "recommended" -- explicit alias for the variant's default_version,
 # same as omitting `version:` entirely.
 VERSION_RECOMMENDED: Final = "recommended"
 

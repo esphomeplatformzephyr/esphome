@@ -326,7 +326,7 @@ def zephyr_setup_uart_pinctrl(
         if not has_pinctrl_configured(board, port_label):
             _LOGGER.warning(
                 "Board '%s' has no pinctrl configured for port '%s' -- "
-                "assuming you've configured it yourself via `zephyr: "
+                "assuming you've configured it yourself via `framework: "
                 "overlays:`. If not, this will fail at devicetree-compile "
                 "time.",
                 board,
@@ -339,7 +339,7 @@ def zephyr_setup_uart_pinctrl(
         _LOGGER.warning(
             "'%s' is not a devicetree node ESPHome found on board '%s' -- "
             "tx_pin:/rx_pin: can't be applied to it this way. Configure pins "
-            "directly in your own `zephyr: overlays:` instead.",
+            "directly in your own `framework: overlays:` instead.",
             port_label,
             board,
         )
@@ -700,11 +700,11 @@ def zephyr_setup_spi_pinctrl(
         # e.g. silabs' spi-controller.yaml requires #address-cells/#size-cells plus
         # real cs-gpios wiring, which every board that actually supports SPI on a
         # USART/EUSART sets itself (verified against every board in-tree that does).
-        # We don't fabricate that ourselves -- add it via `zephyr: overlays:`, or use
+        # We don't fabricate that ourselves -- add it via `framework: overlays:`, or use
         # a board that already wires this bus for SPI.
         _LOGGER.warning(
             "Board '%s' has no pinctrl configured for SPI bus '%s' -- assuming "
-            "you've configured it yourself via `zephyr: overlays:`. If not, this "
+            "you've configured it yourself via `framework: overlays:`. If not, this "
             "will fail at devicetree-compile time.",
             board,
             bus_label,
@@ -713,7 +713,7 @@ def zephyr_setup_spi_pinctrl(
     if family not in ("esp32", "nordic", "silabs", "silabs_siwx91x"):
         # stm32, renesas, rp2040, and any other family: no generated pinctrl overlay
         # -- clk/miso/mosi are irrelevant here, whatever the board (or the user's own
-        # zephyr: overlays:) already wires is trusted as-is.
+        # framework: overlays:) already wires is trusted as-is.
         zephyr_add_overlay(f'&{bus_label} {{ status = "okay"; }};')
         return
 

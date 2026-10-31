@@ -149,7 +149,7 @@ _ZEPHYR_LOG_LEVEL_TO_INT = {
 
 
 class ZephyrRtosData(ZephyrData):
-    board_root: Path | None  # resolved zephyr: board_source: dir, or None if unset
+    board_root: Path | None  # resolved framework: board_source: dir, or None if unset
     sdk_source: ConfigType | None  # resolved framework: source:, or None if unset
     variant: str | None
     family: (
@@ -178,15 +178,15 @@ class ZephyrRtosData(ZephyrData):
     ninja_version: str | None  # None = use requirements_west.txt's pinned version
     snippets: list[
         str
-    ]  # zephyr: snippets: -- one `-S <name>` per entry to `west build`
-    single_slot: bool  # zephyr: single_slot: -- see mcuboot.apply_single_slot()
-    shields: list[str]  # zephyr: shields: -- one `-DSHIELD=` entry per item
+    ]  # framework: snippets: -- one `-S <name>` per entry to `west build`
+    single_slot: bool  # framework: single_slot: -- see mcuboot.apply_single_slot()
+    shields: list[str]  # framework: shields: -- one `-DSHIELD=` entry per item
     shield_root: (
         Path | None
-    )  # resolved zephyr: shield_source: dir, or board_root, or None
+    )  # resolved framework: shield_source: dir, or board_root, or None
     snippet_root: (
         Path | None
-    )  # resolved zephyr: snippet_source: dir, or board_root, or None
+    )  # resolved framework: snippet_source: dir, or board_root, or None
     # capability -> template, requested via request_zephyr_module(). Not yet resolved
     # to a version -- a framework: modules: override (module_overrides) may still apply
     # before final resolution in run_compile(), so resolving eagerly here could raise
@@ -1050,7 +1050,7 @@ def zephyr_rtos_platform_schema(families: frozenset[str]) -> cv.Schema:
 
 
 def _resolve_board_source(config: ConfigType, board: str) -> Path:
-    """Resolve zephyr: board_source: into a local BOARD_ROOT directory."""
+    """Resolve framework: board_source: into a local BOARD_ROOT directory."""
     conf = config[CONF_BOARD_SOURCE]
     if conf[CONF_TYPE] == TYPE_GIT:
         with cv.prepend_path([CONF_FRAMEWORK, CONF_BOARD_SOURCE]):
@@ -1132,7 +1132,7 @@ def _resolve_extra_source(
     marker_relpath: Callable[[str], str],
     kind_label: str,
 ) -> Path | None:
-    """Resolve a zephyr: <kind>_source: into a local root directory.
+    """Resolve a framework: <kind>_source: into a local root directory.
 
     Shared by _resolve_shield_source()/_resolve_snippet_source() -- both mirror
     board_source:'s own git/local resolution exactly, differing only in the config
@@ -1197,7 +1197,7 @@ def _resolve_extra_source(
 def _resolve_shield_source(
     config: ConfigType, shields: list[str], board_root: Path | None
 ) -> Path | None:
-    """Resolve zephyr: shield_source: into a local SHIELD_ROOT directory."""
+    """Resolve framework: shield_source: into a local SHIELD_ROOT directory."""
     return _resolve_extra_source(
         config,
         shields,
@@ -1212,7 +1212,7 @@ def _resolve_shield_source(
 def _resolve_snippet_source(
     config: ConfigType, snippets: list[str], board_root: Path | None
 ) -> Path | None:
-    """Resolve zephyr: snippet_source: into a local SNIPPET_ROOT directory."""
+    """Resolve framework: snippet_source: into a local SNIPPET_ROOT directory."""
     return _resolve_extra_source(
         config,
         snippets,

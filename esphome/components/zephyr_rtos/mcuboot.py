@@ -62,7 +62,7 @@ def zephyr_skip_bootloader_supported() -> bool:
 
 
 def apply_single_slot() -> None:
-    """Push zephyr: single_slot: true to sysbuild.conf.
+    """Push framework: single_slot: true to sysbuild.conf.
 
     Called directly from zephyr_to_code(), independent of whether any ota:
     platform is configured -- unlike apply_swap_method(), single_slot: has no

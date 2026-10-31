@@ -121,7 +121,7 @@ def log_available_runners(build_dir: Path, requested_runner: str | None = None) 
     default, read from runners.yaml (see resolve_dev_id() for another
     consumer of the same file).
 
-    `requested_runner` (zephyr: advanced: runner:), if given, is checked against
+    `requested_runner` (framework: advanced: runner:), if given, is checked against
     `runners` -- valid names are only knowable here, after CMake configure -- and
     logged if recognized, else warned about, never a hard config-time error.
     """
@@ -206,7 +206,7 @@ def resolve_dev_id(
 
     Reads the board's default flash runner from runners.yaml (written by the
     CMake configure step, see _find_runners_yaml() for the sysbuild wrinkle) and,
-    only when the *effective* runner -- `runner_override` (zephyr: advanced:
+    only when the *effective* runner -- `runner_override` (framework: advanced:
     runner:) if given, else the board's default -- is known to support device IDs
     (see _runner_supports_dev_id()), looks up the USB serial number backing the
     selected serial `port`. Returns None whenever the runner is unknown/unsupported
@@ -480,7 +480,7 @@ def run_west_flash(
     multi-domain flashing -- both already know every image from the CMake
     configure step, so there is no need to replicate that logic here.
 
-    `runner`, when given (zephyr: advanced: runner:), overrides Zephyr's own
+    `runner`, when given (framework: advanced: runner:), overrides Zephyr's own
     esp32-family default runner.
     """
     west_cmd = [
@@ -526,7 +526,7 @@ def run_west_flash_generic(
     picks whichever probe it finds, which is ambiguous when more than one
     debug-probe board is attached at once.
 
-    `runner`, when given (zephyr: advanced: runner:), overrides the board's
+    `runner`, when given (framework: advanced: runner:), overrides the board's
     default flash-runner (runners.yaml's `flash-runner:`).
     """
     west_cmd = [
