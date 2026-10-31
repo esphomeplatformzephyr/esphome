@@ -883,6 +883,26 @@ def test_storage_json_nrf52_apply_to_core_raises_on_invalid_framework_version(
         loaded.apply_to_core()
 
 
+@pytest.mark.parametrize(
+    ("core_platform", "target_platform"),
+    [("esp32", "ESP32C6"), ("stm32", "STM32")],
+)
+def test_storage_json_zephyr_rtos_framework_version_round_trip(
+    setup_core: Path, core_platform: str, target_platform: str
+) -> None:
+    """framework: type: zephyr restores KEY_FRAMEWORK_VERSION, and on esp32 skips the ESP-IDF slot."""
+    from esphome.components.esp32.const import KEY_ESP32
+    from esphome.const import KEY_CORE, KEY_FRAMEWORK_VERSION
+
+    storage = _make_nrf52_storage("4.5.0")
+    storage.core_platform = core_platform
+    storage.target_platform = target_platform
+
+    storage.apply_to_core()
+    assert CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION] == cv.Version(4, 5, 0)
+    assert KEY_ESP32 not in CORE.data
+
+
 def test_storage_json_load_area(tmp_path: Path) -> None:
     """``area`` round-trips through load; absence loads as None."""
     file_path = tmp_path / "with_area.json"

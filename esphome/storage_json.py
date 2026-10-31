@@ -370,24 +370,25 @@ class StorageJSON:
             KEY_TARGET_PLATFORM: target_platform,
             KEY_TARGET_FRAMEWORK: self.framework,
         }
+        # Checked before esp32: an esp32 framework: type: zephyr build keeps
+        # its version in KEY_FRAMEWORK_VERSION, not the ESP-IDF slot.
+        if CORE.using_zephyr or target_platform == const.PLATFORM_NRF52:
+            if self.framework_version:
+                CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION] = _parse_framework_version(
+                    self.framework_version
+                )
         # The compile pipeline populates CORE.data[KEY_ESP32] when esp32's
         # validator runs; on the cache fast path that validator is skipped,
         # so populate the variant upload_using_esptool reads from
         # CORE.data[KEY_ESP32][KEY_VARIANT]. target_platform on disk is the
         # variant (e.g. "ESP32S3"); core_platform is the family (e.g. "esp32").
-        if target_platform == const.PLATFORM_ESP32:
+        elif target_platform == const.PLATFORM_ESP32:
             esp32_data = {KEY_VARIANT: self.target_platform}
             if self.framework_version:
                 esp32_data[KEY_IDF_VERSION] = _parse_framework_version(
                     self.framework_version
                 )
             CORE.data[KEY_ESP32] = esp32_data
-        elif self.framework_version and (
-            CORE.using_zephyr or target_platform == const.PLATFORM_NRF52
-        ):
-            CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION] = _parse_framework_version(
-                self.framework_version
-            )
 
     def __eq__(self, o) -> bool:
         return isinstance(o, StorageJSON) and self.as_dict() == o.as_dict()
