@@ -16,14 +16,15 @@ namespace esphome::mdns {
 
 ESPHOME_LOG_TAG(TAG, "mdns");
 
-constexpr size_t TXT_BUFFER_SIZE = 256;
+#ifdef USE_MDNS_RESPONDER
+static constexpr size_t TXT_BUFFER_SIZE = 256;
 
 // mdns_responder_set_ext_records() stores these pointers, not copies -- must live forever.
-std::array<dns_sd_rec, MDNS_SERVICE_COUNT> g_records{};                             // NOLINT
-std::array<uint16_t, MDNS_SERVICE_COUNT> g_ports{};                                 // NOLINT
-std::array<std::array<char, TXT_BUFFER_SIZE>, MDNS_SERVICE_COUNT> g_txt_buffers{};  // NOLINT
+static std::array<dns_sd_rec, MDNS_SERVICE_COUNT> g_records{};                             // NOLINT
+static std::array<uint16_t, MDNS_SERVICE_COUNT> g_ports{};                                 // NOLINT
+static std::array<std::array<char, TXT_BUFFER_SIZE>, MDNS_SERVICE_COUNT> g_txt_buffers{};  // NOLINT
 
-size_t encode_txt_records(const FixedVector<MDNSTXTRecord> &txt_records, char *buf, size_t buf_size) {
+static size_t encode_txt_records(const FixedVector<MDNSTXTRecord> &txt_records, char *buf, size_t buf_size) {
   size_t pos = 0;
   for (const auto &record : txt_records) {
     char kv[TXT_BUFFER_SIZE];
@@ -41,7 +42,9 @@ size_t encode_txt_records(const FixedVector<MDNSTXTRecord> &txt_records, char *b
   }
   return pos;
 }
+#endif  // USE_MDNS_RESPONDER
 
+#if defined(USE_MDNS_RESPONDER) || defined(USE_MDNS_STORE_SERVICES)
 static void register_zephyr(MDNSComponent *comp, StaticVector<MDNSService, MDNS_SERVICE_COUNT> &services) {
 #if defined(USE_MDNS_RESPONDER)
   size_t count = 0;
@@ -69,6 +72,10 @@ static void register_zephyr(MDNSComponent *comp, StaticVector<MDNSService, MDNS_
 }
 
 void MDNSComponent::setup() { this->setup_buffers_and_register_(register_zephyr); }
+#else
+// No responder and nothing consuming the records, so skip the boot-time compile.
+void MDNSComponent::setup() {}
+#endif
 
 void MDNSComponent::on_shutdown() {
 #if defined(USE_MDNS_RESPONDER)
