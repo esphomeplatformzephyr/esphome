@@ -337,10 +337,27 @@ _RP2_SCHEMA = cv.All(
 )
 
 
+def _extraction_schema() -> cv.Schema:
+    """The rp2: schema with framework: typed by type:, so type: zephyr and its options show."""
+    from esphome.components.zephyr_rtos import zephyr_rtos_framework_schema
+
+    return _RP2_SCHEMA.validators[0].extend(
+        {
+            cv.Optional(CONF_FRAMEWORK, default={}): cv.typed_schema(
+                {
+                    "arduino": ARDUINO_FRAMEWORK_SCHEMA,
+                    FRAMEWORK_ZEPHYR: zephyr_rtos_framework_schema(),
+                },
+                default_type="arduino",
+            )
+        }
+    )
+
+
 @schema_extractor("schema")
 def CONFIG_SCHEMA(config: ConfigType) -> ConfigType:
     if config is SCHEMA_EXTRACT:
-        return _RP2_SCHEMA
+        return _extraction_schema()
     if _uses_zephyr(config):
         from esphome.components.zephyr_rtos import zephyr_rtos_config_schema
 

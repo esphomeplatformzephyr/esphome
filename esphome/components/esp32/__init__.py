@@ -2542,10 +2542,27 @@ _ESP32_SCHEMA = cv.All(
 )
 
 
+def _extraction_schema() -> cv.Schema:
+    """The esp32: schema with framework: typed by type:, so type: zephyr and its options show."""
+    from esphome.components.zephyr_rtos import zephyr_rtos_framework_schema
+
+    return _ESP32_SCHEMA.validators[0].extend(
+        {
+            cv.Optional(CONF_FRAMEWORK): cv.typed_schema(
+                {
+                    FRAMEWORK_ESP_IDF: FRAMEWORK_SCHEMA,
+                    FRAMEWORK_ARDUINO: FRAMEWORK_SCHEMA,
+                    FRAMEWORK_ZEPHYR: zephyr_rtos_framework_schema(),
+                }
+            )
+        }
+    )
+
+
 @schema_extractor("schema")
 def CONFIG_SCHEMA(config: ConfigType) -> ConfigType:
     if config is SCHEMA_EXTRACT:
-        return _ESP32_SCHEMA
+        return _extraction_schema()
     if _uses_zephyr(config):
         from esphome.components.zephyr_rtos import zephyr_rtos_config_schema
 

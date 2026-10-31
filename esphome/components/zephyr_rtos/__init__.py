@@ -1031,6 +1031,11 @@ _FRAMEWORK_SCHEMA = cv.Schema(
 )
 
 
+def zephyr_rtos_framework_schema() -> cv.Schema:
+    """The framework: schema of a Zephyr RTOS build, for esp32/rp2 schema extraction."""
+    return _FRAMEWORK_SCHEMA
+
+
 def zephyr_rtos_platform_schema(families: frozenset[str]) -> cv.Schema:
     """The <platform>: schema, limited to the variants of `families`."""
     return cv.Schema(
@@ -1296,7 +1301,7 @@ def zephyr_rtos_config_schema(
         if valid_boards and board not in valid_boards:
             raise cv.Invalid(
                 f"Board {board!r} is not valid for variant {variant!r}. "
-                f"See https://esphome.io/components/zephyr.html for valid boards.",
+                f"See https://esphome.io/components/{platform}/ for valid boards.",
                 [CONF_BOARD],
             )
     shields = framework[CONF_SHIELDS]
