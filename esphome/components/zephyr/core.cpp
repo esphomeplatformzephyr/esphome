@@ -9,6 +9,16 @@
 #ifndef USE_NRF52
 #include <zephyr/drivers/hwinfo.h>
 #endif
+#ifdef USE_ZEPHYR_VARIANT_FAMILY_NORDIC
+#include <hal/nrf_ficr.h>
+#endif
+#ifdef USE_ZEPHYR_VARIANT_FAMILY_ESP32
+#include <esp_efuse.h>
+#include <esp_efuse_table.h>
+#endif
+#if defined(USE_ZEPHYR_VARIANT_FAMILY_RPI_PICO) && defined(USE_WIFI)
+#include <zephyr/net/net_if.h>
+#endif
 
 // Probe rather than require: this header only exists once another component (sha256,
 // api encryption) has turned on the MBEDTLS Kconfig.
@@ -55,11 +65,41 @@ void get_mac_address_raw(uint8_t *mac) {  // NOLINT(readability-non-const-parame
 }
 #else
 void get_mac_address_raw(uint8_t *mac) {  // NOLINT(readability-non-const-parameter)
+#if defined(USE_ZEPHYR_VARIANT_FAMILY_NORDIC) && (NRF_FICR_HAS_DEVICE_ADDR || NRF_FICR_HAS_BLE_ADDR)
+  // Same address as platform: nrf52, so a device keeps its MAC when moved to nrf:
+  const uint32_t addr0 = nrf_ficr_deviceaddr_get(NRF_FICR, 0);
+  const uint32_t addr1 = nrf_ficr_deviceaddr_get(NRF_FICR, 1);
+  mac[0] = ((addr1 & 0xFFFF) >> 8) | 0xC0;
+  mac[1] = addr1 & 0xFF;
+  mac[2] = addr0 >> 24;
+  mac[3] = addr0 >> 16;
+  mac[4] = addr0 >> 8;
+  mac[5] = addr0;
+#else
+#ifdef USE_ZEPHYR_VARIANT_FAMILY_ESP32
+  // Custom MAC eFuse first, as on ESP-IDF; hwinfo below reads the factory MAC
+#ifdef CONFIG_SOC_SERIES_ESP32
+  const esp_efuse_desc_t **custom = ESP_EFUSE_MAC_CUSTOM;
+#else
+  const esp_efuse_desc_t **custom = ESP_EFUSE_USER_DATA_MAC_CUSTOM;
+#endif
+  if (esp_efuse_read_field_blob(custom, mac, 48) == ESP_OK && mac_address_is_valid(mac))
+    return;
+#endif
+#if defined(USE_ZEPHYR_VARIANT_FAMILY_RPI_PICO) && defined(USE_WIFI)
+  // Matches Arduino rp2, which reports the CYW43 MAC
+  struct net_if *iface = net_if_get_first_wifi();
+  if (iface != nullptr && net_if_get_link_addr(iface)->len == 6) {
+    memcpy(mac, net_if_get_link_addr(iface)->addr, 6);
+    return;
+  }
+#endif
   // SiWx91x has no hwinfo backend yet: the weak default returns -ENOSYS, giving an
   // all-zero MAC instead of a link failure.
   if (hwinfo_get_device_id(mac, 6) != 6) {
     memset(mac, 0, 6);
   }
+#endif
 }
 #endif
 

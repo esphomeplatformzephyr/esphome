@@ -273,7 +273,7 @@ size_t DebugComponent::get_device_info_(std::span<char, DEVICE_INFO_BUFFER_SIZE>
   char *buf = buffer.data();
 
 #ifndef USE_NRF52
-  // platform: zephyr only -- nrf52 keeps its original dev device_info output,
+  // Zephyr RTOS builds only -- nrf52 keeps its original dev device_info output,
   // unchanged by these newer fields.
   ESP_LOGD(TAG, "Zephyr: %s", KERNEL_VERSION_STRING);
   pos = buf_append_str(buf, size, pos, "|Zephyr: ");

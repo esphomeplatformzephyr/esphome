@@ -51,7 +51,7 @@ void SPIComponent::setup() {
   if (this->sdi_pin_ == nullptr)
     this->sdi_pin_ = NullPin::NULL_PIN;
   if (this->using_hw_) {
-    // On platform: zephyr the board pinctrl may supply the clock pin.
+    // On Zephyr RTOS builds the board pinctrl may supply the clock pin.
 #if !defined(USE_ZEPHYR) || defined(USE_NRF52)
     if (this->clk_pin_ == nullptr) {
       ESP_LOGE(TAG, "No clock pin");

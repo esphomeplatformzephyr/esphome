@@ -1,5 +1,5 @@
 esphome:
-  name: componenttestnrf52
+  name: componenttestnrf
   friendly_name: $component_name
 
 nrf:

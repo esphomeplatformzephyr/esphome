@@ -19,9 +19,14 @@ class ZephyrI2CBus final : public InternalI2CBus, public Component {
   float get_setup_priority() const override { return setup_priority::BUS; }
 
   void set_scan(bool scan) { scan_ = scan; }
+#ifdef USE_NRF52
+  void set_sda_pin(uint8_t sda_pin) { this->sda_pin_ = sda_pin; }
+  void set_scl_pin(uint8_t scl_pin) { this->scl_pin_ = scl_pin; }
+#else
   /// Display-only (dump_config) -- may be "board default" if unresolvable.
   void set_sda_pin(const char *sda_pin) { this->sda_pin_ = sda_pin; }
   void set_scl_pin(const char *scl_pin) { this->scl_pin_ = scl_pin; }
+#endif
   void set_frequency(uint32_t frequency);
 #ifdef I2C_PORT_FREQUENCY_COUNT
   ErrorCode switch_frequency(uint32_t frequency) override;
@@ -33,8 +38,13 @@ class ZephyrI2CBus final : public InternalI2CBus, public Component {
  protected:
   const device *i2c_dev_;
   int recovery_result_ = 0;
+#ifdef USE_NRF52
+  uint8_t sda_pin_{};
+  uint8_t scl_pin_{};
+#else
   const char *sda_pin_{""};
   const char *scl_pin_{""};
+#endif
   uint32_t dev_config_{};
 #ifdef I2C_PORT_FREQUENCY_COUNT
   uint32_t frequency_{};

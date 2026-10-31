@@ -447,6 +447,7 @@ def _base_to_code(config: ConfigType) -> None:
     # visible yet if it were decided here instead.
     if zephyr_framework_type() == "ncs":
         cg.add_define("USE_ZEPHYR_FRAMEWORK_NCS")
+    cg.add_define("ESPHOME_PLATFORM_NAME", CORE.target_platform.upper())
     # Without this, printf-style %f prints "*float*" on chips without an FPU (FPU enables it by default).
     zephyr_add_prj_conf("CBPRINTF_FP_SUPPORT", True)
 

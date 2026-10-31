@@ -373,7 +373,7 @@ async def to_code(config: ConfigType) -> None:
                     }};
                 """
             )
-            sda, scl = f"GPIO{config[CONF_SDA]}", f"GPIO{config[CONF_SCL]}"
+            sda, scl = config[CONF_SDA], config[CONF_SCL]
         else:
             i2c = resolve_zephyr_bus(
                 DOMAIN,

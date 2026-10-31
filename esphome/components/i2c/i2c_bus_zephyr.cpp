@@ -56,8 +56,13 @@ void ZephyrI2CBus::setup() {
 void ZephyrI2CBus::dump_config() {
   ESP_LOGCONFIG(TAG,
                 "I2C Bus:\n"
+#ifdef USE_NRF52
+                "  SDA Pin: GPIO%u\n"
+                "  SCL Pin: GPIO%u\n"
+#else
                 "  SDA Pin: %s\n"
                 "  SCL Pin: %s\n"
+#endif
                 "  Frequency: %s\n"
                 "  Name: %s",
                 this->sda_pin_, this->scl_pin_, get_speed(this->dev_config_), this->i2c_dev_->name);

@@ -786,10 +786,8 @@ async def _late_logger_init(config: ConfigType) -> None:
             zephyr_add_prj_conf("SERIAL", True)
             if config[CONF_HARDWARE_UART] == UART0:
                 zephyr_add_overlay("""&uart0 { status = "okay";};""")
-                cg.add_define("LOGGER_UART_NODE_LABEL", cg.RawExpression("uart0"))
             if config[CONF_HARDWARE_UART] == UART1:
                 zephyr_add_overlay("""&uart1 { status = "okay";};""")
-                cg.add_define("LOGGER_UART_NODE_LABEL", cg.RawExpression("uart1"))
             if config[CONF_HARDWARE_UART] == USB_CDC:
                 cg.add_define("USE_LOGGER_UART_SELECTION_USB_CDC")
                 zephyr_add_prj_conf("UART_LINE_CTRL", True)

@@ -9,6 +9,7 @@
 
 // Informative flags
 #define ESPHOME_BOARD "dummy_board"
+#define ESPHOME_PLATFORM_NAME "dummy_platform"
 #define ESPHOME_PROJECT_NAME "dummy project"
 #define ESPHOME_PROJECT_VERSION "v2"
 #define ESPHOME_PROJECT_VERSION_30 "v2"
@@ -880,14 +881,14 @@
 #define USE_ZEPHYR_TINYUF2_TOUCH
 #endif
 
-// Emitted by deep_sleep/__init__.py when wakeup_pin: is set on platform: zephyr, whose
+// Emitted by deep_sleep/__init__.py when wakeup_pin: is set on Zephyr RTOS builds, whose
 // deep_sleep families are these (see ZephyrGPIOPin::arm_wakeup()).
 #if defined(USE_ZEPHYR_VARIANT_FAMILY_NORDIC) || defined(USE_ZEPHYR_VARIANT_FAMILY_ESP32) || \
     defined(USE_ZEPHYR_VARIANT_FAMILY_STM32)
 #define USE_DEEP_SLEEP_ZEPHYR_WAKEUP_PIN
 #endif
 
-// Emitted by zephyr/__init__.py for platform: zephyr variants with a watchdog, unless
+// Emitted by zephyr_rtos/__init__.py for Zephyr RTOS variants with a watchdog, unless
 // watchdog_timeout: 0. platform: nrf52 never sets it.
 #if defined(USE_ZEPHYR_VARIANT_FAMILY_ESP32) || defined(USE_ZEPHYR_VARIANT_FAMILY_NORDIC) || \
     defined(USE_ZEPHYR_VARIANT_FAMILY_SILABS) || defined(USE_ZEPHYR_VARIANT_FAMILY_SILABS_SIWX91X) || \

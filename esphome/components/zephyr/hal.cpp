@@ -17,7 +17,7 @@ namespace esphome::zephyr {}  // namespace esphome::zephyr
 
 namespace esphome {
 
-// Armed only when ESPHome configured it: platform: nrf52 always, platform: zephyr unless
+// Armed only when ESPHome configured it: platform: nrf52 always, Zephyr RTOS builds unless
 // watchdog_timeout: 0. A user-enabled CONFIG_WATCHDOG alone must not arm a fallback timeout.
 #if defined(CONFIG_WATCHDOG) && (defined(USE_WATCHDOG) || defined(USE_NRF52))
 #define ESPHOME_ZEPHYR_ARM_WATCHDOG
