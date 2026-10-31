@@ -66,7 +66,7 @@ VARIANT = ZephyrVariant(
     watchdog_max_timeout_ms=60000,
     # Empty: the C5 Nucleo consoles differ (usart2, lpuart1), so they are found per board.
     uart_node_labels={},
-    die_temp_nodes=("die_temp", "adc1"),
+    die_temp_nodes=("die_temp", "adc1", "adc12_common"),
 )
 
 

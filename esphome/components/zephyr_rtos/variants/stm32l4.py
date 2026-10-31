@@ -66,7 +66,7 @@ VARIANT = ZephyrVariant(
     # console is usart2, nucleo_l496zg's is lpuart1 with no usart1 at all). Empty tells
     # resolve_uart_node_label() (dts_lookup.py) to resolve hardware_uart per board.
     uart_node_labels={},
-    die_temp_nodes=("die_temp", "adc1"),
+    die_temp_nodes=("die_temp", "adc1", "adc123_common"),
 )
 
 

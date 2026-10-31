@@ -43,7 +43,7 @@ async def _run_to_code() -> tuple[Mock, Mock, Mock]:
         ("ESP32C6", ["coretemp"]),
         ("NRF54L15", ["temp"]),
         ("RP2040", ["die_temp", "adc"]),
-        ("STM32F4", ["die_temp", "adc1"]),
+        ("STM32F4", ["die_temp", "adc1", "adc123_common"]),
     ],
 )
 async def test_variant_nodes_are_turned_on(variant: str, labels: list[str]) -> None:
