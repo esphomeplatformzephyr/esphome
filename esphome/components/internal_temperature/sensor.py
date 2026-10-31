@@ -1,15 +1,14 @@
+import logging
+
 import esphome.codegen as cg
 from esphome.components import sensor
-from esphome.components.esp32 import (
-    VARIANT_ESP32,
-    get_esp32_variant,
-    include_builtin_idf_component,
-)
+from esphome.components.esp32 import get_esp32_variant, include_builtin_idf_component
+from esphome.components.esp32.const import VARIANT_ESP32
 from esphome.components.zephyr import (
+    VARIANTS,
     zephyr_add_overlay,
     zephyr_add_prj_conf,
     zephyr_variant,
-    zephyr_variant_family,
 )
 from esphome.config_helpers import filter_source_files_from_platform
 import esphome.config_validation as cv
@@ -25,8 +24,10 @@ from esphome.const import (
     UNIT_CELSIUS,
     PlatformFramework,
 )
-from esphome.core import CORE, EsphomeError
+from esphome.core import CORE
 from esphome.types import ConfigType
+
+_LOGGER = logging.getLogger(__name__)
 
 internal_temperature_ns = cg.esphome_ns.namespace("internal_temperature")
 InternalTemperatureSensor = internal_temperature_ns.class_(
@@ -62,25 +63,23 @@ async def to_code(config: ConfigType) -> None:
         # temprature_sens_read() lives in the esp_phy blob, which is excluded by default
         include_builtin_idf_component("esp_phy")
 
-    if CORE.is_nrf52 or (CORE.using_zephyr and zephyr_variant_family() == "nordic"):
-        # Same physical TEMP peripheral (nrf52840.dtsi's `temp` node is status = "okay"
-        # by default -- no overlay needed) whether this is platform: nrf52 or
-        # a Zephyr RTOS build of a nordic-family variant.
+    if CORE.using_zephyr and CORE.is_nrf52:
         zephyr_add_prj_conf("SENSOR", True)
         zephyr_add_prj_conf("TEMP_NRF5", True)
-    elif (
-        CORE.using_zephyr
-        and zephyr_variant_family() == "esp32"
-        and zephyr_variant() != VARIANT_ESP32
-    ):
-        # "coretemp" is the DTS node label for every esp32-family chip's die temperature
-        # sensor. Original ESP32 has no such node, so it falls through below instead.
+    elif CORE.using_zephyr_rtos:
+        # Every Zephyr sensor driver needs it; the driver itself follows its node's status
         zephyr_add_prj_conf("SENSOR", True)
-        zephyr_add_overlay("""&coretemp { status = "okay";};""")
-    elif CORE.using_zephyr:
-        raise EsphomeError(
-            f"internal_temperature is not yet implemented for Zephyr variant '{zephyr_variant()}'"
-        )
+        if nodes := VARIANTS[zephyr_variant()].die_temp_nodes:
+            for label in nodes:
+                zephyr_add_overlay(f'&{label} {{ status = "okay"; }};')
+            cg.add_define("INTERNAL_TEMPERATURE_NODE_LABEL", cg.RawExpression(nodes[0]))
+        else:
+            _LOGGER.warning(
+                "internal_temperature is not implemented for Zephyr variant '%s'; it "
+                "reads the sensor that a 'die-temp0' devicetree alias points to, which "
+                "the board or your own 'framework: overlays:' must provide",
+                zephyr_variant(),
+            )
 
 
 FILTER_SOURCE_FILES = filter_source_files_from_platform(

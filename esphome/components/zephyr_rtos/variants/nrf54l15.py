@@ -110,6 +110,7 @@ VARIANT = ZephyrVariant(
         "mosi": _GPIO_MATRIX_PINS,
         "miso": _GPIO_MATRIX_PINS,
     },
+    die_temp_nodes=("temp",),
 )
 
 

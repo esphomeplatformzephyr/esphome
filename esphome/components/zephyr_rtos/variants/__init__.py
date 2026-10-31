@@ -247,6 +247,11 @@ class ZephyrVariant:
     # AIN name, via a separate `zephyr,input-positive` property. Empty = no SAADC
     # support wired up.
     adc_ain_map: dict[int, str] = field(default_factory=dict)
+    # Devicetree labels internal_temperature sets `status = "okay"` on: the on-chip die
+    # temperature sensor node first, then any node it reads through (its ADC). Only the
+    # status is set; the chip and board devicetree supply everything else. Empty = not
+    # wired up, and the sensor is found through a `die-temp0` alias the user provides.
+    die_temp_nodes: tuple[str, ...] = ()
     # GPIOs the ESP32 GPIO matrix can route to a UART TX/RX signal, from Zephyr's
     # dt-bindings pinctrl header -- a fixed per-chip pinmux fact, not always identical
     # between tx/rx (e.g. original ESP32's GPIO34-39 are RX-only). Empty = no

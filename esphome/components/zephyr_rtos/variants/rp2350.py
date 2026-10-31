@@ -107,6 +107,7 @@ VARIANT = ZephyrVariant(
     # RP2350) -- real ceiling ~16.78s, above the 10s default but below the generic
     # 60s schema max.
     watchdog_max_timeout_ms=16000,
+    die_temp_nodes=("die_temp", "adc"),
 )
 
 

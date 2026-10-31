@@ -10,14 +10,15 @@ namespace esphome::internal_temperature {
 
 ESPHOME_LOG_TAG(TAG, "internal_temperature");
 
-#if defined(USE_NRF52) || defined(USE_ZEPHYR_VARIANT_FAMILY_NORDIC)
+#ifdef USE_NRF52
 // nRF52 boards don't define the standard "die-temp0" alias other Zephyr
 // vendors use, so it's looked up by compatible string instead.
 static const struct device *const DIE_TEMPERATURE_SENSOR = DEVICE_DT_GET_ONE(nordic_nrf_temp);
+#elif defined(INTERNAL_TEMPERATURE_NODE_LABEL)
+// The variant's die sensor node (die_temp_nodes), turned on by sensor.py
+static const struct device *const DIE_TEMPERATURE_SENSOR = DEVICE_DT_GET(DT_NODELABEL(INTERNAL_TEMPERATURE_NODE_LABEL));
 #else
-// "die-temp0" is a standard Zephyr alias used broadly across vendors (the
-// whole Espressif family, RP2040, NXP i.MX RT, ...) for the on-chip die
-// temperature sensor -- this works for any such variant with zero new code.
+// Not wired up for this variant: a "die-temp0" alias from the board or the user's overlay
 static const struct device *const DIE_TEMPERATURE_SENSOR = DEVICE_DT_GET(DT_ALIAS(die_temp0));
 #endif
 

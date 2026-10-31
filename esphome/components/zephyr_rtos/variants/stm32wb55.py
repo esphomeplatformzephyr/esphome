@@ -80,6 +80,7 @@ VARIANT = ZephyrVariant(
     # console is usart1, other STM32WB55 boards may use a different instance). Empty
     # tells resolve_uart_node_label() (dts_lookup.py) to resolve hardware_uart per board.
     uart_node_labels={},
+    die_temp_nodes=("die_temp", "adc1"),
 )
 
 
