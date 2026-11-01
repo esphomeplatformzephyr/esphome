@@ -364,6 +364,18 @@ def get_rng_node_label(board: str, compat: str = "st,stm32-rng") -> str | None:
     return _find_node_label_by_compat(board, compat, enabled_only=False)
 
 
+def get_nfct_pins_node_label(board: str) -> str | None:
+    """Label of the node that takes `nfct-pins-as-gpios`: the NFCT node itself on
+    nRF54 (nordic,nrf-nfct-v2), the UICR on nRF52/nRF5340, or None without NFCT."""
+    if label := _find_node_label_by_compat(
+        board, "nordic,nrf-nfct-v2", enabled_only=False
+    ):
+        return label
+    if _find_node_label_by_compat(board, "nordic,nrf-nfct", enabled_only=False):
+        return _find_node_label_by_compat(board, "nordic,nrf-uicr", enabled_only=False)
+    return None
+
+
 def dts_node_enabled(board: str, label: str) -> bool:
     """Return True if the node labeled `label` has status "okay"; False if it is disabled,
     missing, or DTS is unavailable."""

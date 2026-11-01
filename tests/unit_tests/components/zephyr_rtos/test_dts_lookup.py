@@ -1556,3 +1556,32 @@ def test_get_edt_leaves_no_temp_files(
     CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(dts_base_path=str(tmp_path))
     assert _get_edt("my_board") is None
     assert not list(temp_dir.iterdir())
+
+
+_UICR = _FakeNode(labels=["uicr"], compats=["nordic,nrf-uicr"])
+
+
+@pytest.mark.parametrize(
+    ("nodes", "expected"),
+    [
+        # nRF52 / nRF5340: the property goes on the UICR
+        ([_UICR, _FakeNode(labels=["nfct"], compats=["nordic,nrf-nfct"])], "uicr"),
+        # nRF54: on the (disabled) NFCT node itself
+        (
+            [
+                _FakeNode(
+                    labels=["nfct"], compats=["nordic,nrf-nfct-v2"], status="disabled"
+                )
+            ],
+            "nfct",
+        ),
+        # A chip without NFCT keeps its UICR untouched
+        ([_UICR], None),
+    ],
+)
+def test_get_nfct_pins_node_label(
+    monkeypatch: pytest.MonkeyPatch, nodes: list[_FakeNode], expected: str | None
+) -> None:
+    CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data()
+    monkeypatch.setattr(dts_lookup, "_get_edt", lambda board: _FakeEdt(nodes))
+    assert dts_lookup.get_nfct_pins_node_label("some_board") == expected

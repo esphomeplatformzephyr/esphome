@@ -59,6 +59,13 @@ def to_code(config: ConfigType) -> None:
         zephyr_add_prj_conf("EXCEPTION_STACK_TRACE", True)
     # Consumed by C++ code shared across every nordic-family variant (core.cpp, etc.).
     cg.add_build_flag("-DUSE_ZEPHYR_VARIANT_FAMILY_NORDIC")
+    # As platform: nrf52: the NFC antenna pins are ordinary GPIO
+    from .. import zephyr_add_overlay, zephyr_rtos_data  # noqa: PLC0415
+    from ..const import KEY_BOARD  # noqa: PLC0415
+    from ..dts_lookup import get_nfct_pins_node_label  # noqa: PLC0415
+
+    if (label := get_nfct_pins_node_label(zephyr_rtos_data()[KEY_BOARD])) is not None:
+        zephyr_add_overlay(f"&{label} {{ nfct-pins-as-gpios; }};")
 
 
 # I2C pinctrl group/state to assume when DTS resolution fails -- nordic's I2C
