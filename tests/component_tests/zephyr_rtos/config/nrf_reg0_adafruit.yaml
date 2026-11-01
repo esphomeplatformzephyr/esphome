@@ -1,0 +1,13 @@
+esphome:
+  name: test
+
+nrf:
+  variant: NRF52
+  framework:
+    type: zephyr
+    advanced:
+      bootloader: adafruit_nrf52_sd140_v6
+      reg0:
+        voltage: 3.0V
+
+logger:

@@ -109,3 +109,28 @@ def test_split_default_keys(platform: str, variant: str, expected: list[str]) ->
     CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: platform}
     with patch("esphome.components.zephyr.zephyr_variant", return_value=variant):
         assert cv._zephyr_rtos_default_keys() == expected
+
+
+@pytest.mark.parametrize(
+    ("fixture", "vout", "uicr_erase", "adafruit"),
+    [
+        # Index into 1.8, 2.1, 2.4, 2.7, 3.0, 3.3 V, as platform: nrf52
+        ("nrf_reg0.yaml", "5", True, False),
+        ("nrf_reg0_adafruit.yaml", "4", False, True),
+        ("nrf.yaml", None, False, False),
+    ],
+)
+def test_nrf52_reg0(
+    generate_main: Callable[[str | Path], str],
+    fixture: str,
+    vout: str | None,
+    uicr_erase: bool,
+    adafruit: bool,
+) -> None:
+    generate_main(CONFIG_DIR / fixture)
+    defines = {d.name: str(d.value) for d in CORE.defines}
+    assert defines.get("USE_NRF52_REG0_VOUT") == vout
+    assert ("USE_NRF52_UICR_ERASE" in defines) is uicr_erase
+    assert ("USE_ZEPHYR_NRF52_ADAFRUIT_BOOTLOADER" in defines) is adafruit
+    prj_conf = zephyr_data()[KEY_PRJ_CONF][""]
+    assert ("CONFIG_NRFX_NVMC" in prj_conf) is uicr_erase

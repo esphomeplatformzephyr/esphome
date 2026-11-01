@@ -1,0 +1,13 @@
+esphome:
+  name: test
+
+nrf:
+  variant: NRF52
+  framework:
+    type: zephyr
+    advanced:
+      reg0:
+        voltage: 3.3V
+        uicr_erase: true
+
+logger:

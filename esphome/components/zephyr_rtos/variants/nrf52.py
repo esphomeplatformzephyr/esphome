@@ -18,6 +18,7 @@ from esphome.const import (
     CONF_PLATFORM,
     CONF_RESET_PIN,
     CONF_SOURCE,
+    CONF_VOLTAGE,
     KEY_CORE,
     KEY_FRAMEWORK_VERSION,
     ThreadModel,
@@ -101,8 +102,22 @@ def _dfu_schema(value: bool | ConfigType) -> ConfigType | None:
     return _DFU_SCHEMA(value)
 
 
+# As platform: nrf52: REGOUT0, the GPIO voltage of a board powered through VDDH
+CONF_REG0 = "reg0"
+CONF_UICR_ERASE = "uicr_erase"
+VOLTAGE_LEVELS = [1.8, 2.1, 2.4, 2.7, 3.0, 3.3]
+
 _ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
     {
+        cv.Optional(CONF_REG0): cv.Schema(
+            {
+                cv.Required(CONF_VOLTAGE): cv.All(
+                    cv.voltage,
+                    cv.one_of(*VOLTAGE_LEVELS, float=True),
+                ),
+                cv.Optional(CONF_UICR_ERASE, default=False): cv.boolean,
+            }
+        ),
         # 1200 baud touch -> Adafruit UF2 bootloader, 2001 baud -> plain reboot.
         # Validated in config_schema() once the target platform is known (pin lookup).
         cv.Optional(CONF_DFU): cv.Any(cv.boolean, dict),
@@ -265,6 +280,17 @@ async def to_code(config: ConfigType) -> None:
 
         # The board DTS enables uart0 on edge GPIOs (P0.17, P0.22, P0.24) although nothing is wired to it
         zephyr_add_overlay('&uart0 { status = "disabled"; };')
+
+    if reg0_config := config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_REG0):
+        # Written to UICR at boot by uicr.cpp
+        cg.add_define(
+            "USE_NRF52_REG0_VOUT", VOLTAGE_LEVELS.index(reg0_config[CONF_VOLTAGE])
+        )
+        if reg0_config[CONF_UICR_ERASE]:
+            cg.add_define("USE_NRF52_UICR_ERASE")
+            zephyr_add_prj_conf("NRFX_NVMC", True)
+        if sd_end is not None:
+            cg.add_define("USE_ZEPHYR_NRF52_ADAFRUIT_BOOTLOADER")
 
     CORE.add_job(_bootloader_to_code, config)
     if dfu_config := config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_DFU):

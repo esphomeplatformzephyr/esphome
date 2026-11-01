@@ -1,0 +1,11 @@
+# REGOUT0 written at boot, with the Adafruit bootloader's UICR entries
+nrf:
+  variant: NRF52
+  board: adafruit_itsybitsy
+  framework:
+    type: zephyr
+    advanced:
+      bootloader: adafruit_nrf52_sd140_v6
+      reg0:
+        voltage: 3.3V
+        uicr_erase: true
