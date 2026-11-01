@@ -778,6 +778,10 @@ def get_download_types(storage_json):
     the shape stable so the download panel
     doesn't have to special-case per-platform schemas.
     """
+    if storage_json.framework == "zephyr":
+        from esphome.components import zephyr_rtos
+
+        return zephyr_rtos.get_download_types(storage_json)
     # No recorded firmware path means nothing was built; no downloads.
     if storage_json.firmware_bin_path is None:
         return []

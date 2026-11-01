@@ -15,7 +15,18 @@ import pytest
 
 from esphome.storage_json import StorageJSON
 
-PLATFORMS = ["esp32", "esp8266", "rp2", "libretiny", "nrf52"]
+PLATFORMS = [
+    "esp32",
+    "esp8266",
+    "rp2",
+    "libretiny",
+    "nrf52",
+    "nrf",
+    "nxp",
+    "renesas",
+    "silabs",
+    "stm32",
+]
 
 
 def _download_types(platform: str, storage: StorageJSON) -> list[dict[str, Any]]:
@@ -117,3 +128,58 @@ def test_nrf52_offers_the_mcumgr_image_whenever_it_was_built(
 ) -> None:
     """The mcumgr update image is offered beside a UF2 as well as beside a HEX."""
     assert _nrf52_files(tmp_path, *built) == expected
+
+
+def _zephyr_files(
+    tmp_path: Path, *built: str, platform: str = "nrf", framework: str | None = None
+) -> list[str]:
+    """The files a Zephyr RTOS platform offers for a build holding *built*."""
+    app_dir = tmp_path / ".west_build" / "zephyr" / "zephyr"
+    app_dir.mkdir(parents=True)
+    for name in built:
+        (tmp_path / name).touch()
+    storage = _wizard_storage()
+    storage.firmware_bin_path = app_dir / "zephyr.signed.bin"
+    storage.framework = framework
+    return [entry["file"] for entry in _download_types(platform, storage)]
+
+
+APP = ".west_build/zephyr/zephyr/"
+
+
+@pytest.mark.parametrize(
+    ("built", "expected"),
+    [
+        # RP2040/RP2350 with MCUboot
+        (
+            [f"{APP}zephyr.uf2", f"{APP}zephyr.hex", f"{APP}zephyr.signed.bin"],
+            ["zephyr.uf2", "zephyr.signed.bin"],
+        ),
+        # Most families with MCUboot: the HEX is the app only, as nrf52's on SDK 3.4+
+        (
+            [f"{APP}zephyr.hex", f"{APP}zephyr.signed.bin"],
+            ["zephyr.hex", "zephyr.signed.bin"],
+        ),
+        # nRF52 with an Adafruit bootloader: its serial DFU package sits in the build directory
+        (
+            [f"{APP}zephyr.uf2", "firmware.zip"],
+            ["zephyr.uf2", "../../../firmware.zip"],
+        ),
+        # No MCUboot, so no app update image
+        ([f"{APP}zephyr.hex"], ["zephyr.hex"]),
+    ],
+)
+def test_zephyr_rtos_offers_what_the_build_made(
+    tmp_path: Path, built: list[str], expected: list[str]
+) -> None:
+    assert _zephyr_files(tmp_path, *built) == expected
+
+
+@pytest.mark.parametrize("platform", ["esp32", "rp2"])
+def test_zephyr_builds_on_esp32_and_rp2_use_the_zephyr_list(
+    tmp_path: Path, platform: str
+) -> None:
+    files = _zephyr_files(
+        tmp_path, f"{APP}zephyr.signed.bin", platform=platform, framework="zephyr"
+    )
+    assert files == ["zephyr.hex", "zephyr.signed.bin"]

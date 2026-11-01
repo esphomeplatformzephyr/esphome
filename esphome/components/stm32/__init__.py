@@ -2,6 +2,7 @@
 
 from esphome.components.zephyr_rtos import (  # noqa: F401
     copy_files,
+    get_download_types,
     process_stacktrace,
     run_compile,
     upload_program,

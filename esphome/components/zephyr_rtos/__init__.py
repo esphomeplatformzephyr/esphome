@@ -54,6 +54,7 @@ from esphome.core import CORE, CoroPriority, EsphomeError, coroutine_with_priori
 from esphome.cpp_generator import MockObj
 from esphome.helpers import copy_file_if_changed, rmtree, write_file_if_changed
 from esphome.schema_extractors import SCHEMA_EXTRACT, schema_extractor
+from esphome.storage_json import StorageJSON
 from esphome.types import ConfigType
 from esphome.writer import clean_cmake_cache
 
@@ -1516,6 +1517,56 @@ def reset_over_usb(config: ConfigType, port: str, timeout: float = 10.0) -> bool
         gone = gone or not present
         time.sleep(0.5)
     return False
+
+
+def get_download_types(storage_json: StorageJSON) -> list[dict[str, str]]:
+    """Binary-download entries for a built Zephyr RTOS firmware, as nrf52's for SDK 3.4+.
+
+    Files are relative to the recorded firmware, the MCUboot app image's directory.
+    """
+    # No recorded firmware path means nothing was built; no downloads.
+    if storage_json.firmware_bin_path is None:
+        return []
+    app_dir = Path(storage_json.firmware_bin_path).parent
+    if (app_dir / "zephyr.uf2").is_file():
+        types = [
+            {
+                "title": "UF2 package (recommended)",
+                "description": "For flashing via a UF2 bootloader as a flash drive.",
+                "file": "zephyr.uf2",
+                "download": f"{storage_json.name}.uf2",
+            },
+        ]
+    else:
+        types = [
+            {
+                "title": "HEX package",
+                "description": "For flashing via a debug probe.",
+                "file": "zephyr.hex",
+                "download": f"{storage_json.name}.hex",
+            },
+        ]
+    # nRF52 serial DFU package, written next to the build's zephyr/ directory
+    dfu_package = Path("..", "..", "..", "firmware.zip")
+    if (app_dir / dfu_package).is_file():
+        types.append(
+            {
+                "title": "DFU package",
+                "description": "For flashing via nrfutil using USB CDC.",
+                "file": dfu_package.as_posix(),
+                "download": f"dfu-{storage_json.name}.zip",
+            }
+        )
+    if (app_dir / "zephyr.signed.bin").is_file():
+        types.append(
+            {
+                "title": "App update package",
+                "description": "For OTA updating a device.",
+                "file": "zephyr.signed.bin",
+                "download": f"app-{storage_json.name}.img",
+            }
+        )
+    return types
 
 
 def has_network_ota(config: ConfigType) -> bool:
