@@ -75,6 +75,13 @@ bool g_sta_manual_ip = false;  // NOLINT
 // Set once from WiFiComponent::wifi_pre_setup_(); read from the producer thread to
 // drop weak scan results before they ever reach the event queue.
 int8_t g_min_scan_rssi = -128;  // NOLINT
+// Set when wifi_sta_connect_() disconnects the current AP itself, so wifi_loop_() does not let
+// that AP's DISCONNECT_RESULT end the attempt started after it. Main loop only.
+bool g_expect_disconnect = false;  // NOLINT
+// Given on every DISCONNECT_RESULT; the ESP32 driver refuses a connect until it has sent one.
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+K_SEM_DEFINE(disconnect_sem, 0, 1);
+constexpr int32_t DISCONNECT_WAIT_MS = 1000;
 
 // Kernel message queue of event pointers, from the net_mgmt thread to wifi_loop_().
 constexpr uint8_t EVENT_QUEUE_SIZE = 16;
@@ -112,6 +119,7 @@ void wifi_event_handler(net_mgmt_event_callback *cb, uint64_t mgmt_event, net_if
     case NET_EVENT_WIFI_DISCONNECT_RESULT: {
       const auto *status = static_cast<const wifi_status *>(cb->info);
       push_event(ZephyrWiFiEvent::Type::DISCONNECT_RESULT, status != nullptr ? status->status : -1);
+      k_sem_give(&disconnect_sem);
       break;
     }
     case NET_EVENT_WIFI_AP_ENABLE_RESULT: {
@@ -421,6 +429,20 @@ bool WiFiComponent::wifi_sta_connect_(const WiFiAP &ap) {
   params.channel = ap.has_channel() ? ap.get_channel() : WIFI_CHANNEL_ANY;
   params.timeout = SYS_FOREVER_MS;
 
+  // Roaming connects while still connected; the drivers refuse that or drop the old AP themselves
+  const bool was_connected = g_sta_status == WiFiSTAConnectStatus::CONNECTED;
+  g_expect_disconnect = false;
+  if (was_connected) {
+    k_sem_reset(&disconnect_sem);
+    UnavoidableBlockingScope scope;
+    if (net_mgmt(NET_REQUEST_WIFI_DISCONNECT, sta_iface, nullptr, 0) == 0) {
+      g_expect_disconnect = true;
+      if (k_sem_take(&disconnect_sem, K_MSEC(DISCONNECT_WAIT_MS)) != 0) {
+        ESP_LOGW(TAG, "No disconnect event from the previous AP");
+      }
+    }
+  }
+
   g_sta_status = WiFiSTAConnectStatus::CONNECTING;
   g_wifi_started = true;
 #if USE_NETWORK_IPV4
@@ -555,6 +577,7 @@ bool WiFiComponent::wifi_disconnect_() {
   if (sta_iface == nullptr) {
     return false;
   }
+  g_expect_disconnect = false;
   int ret = net_mgmt(NET_REQUEST_WIFI_DISCONNECT, sta_iface, nullptr, 0);
   return ret == 0;
 }
@@ -673,6 +696,7 @@ bool WiFiComponent::wifi_loop_() {
     switch (event->type) {
       case ZephyrWiFiEvent::Type::CONNECT_RESULT:
         if (event->status == 0) {
+          g_expect_disconnect = false;
           g_sta_status = WiFiSTAConnectStatus::CONNECTED;
           if (g_sta_manual_ip) {
             // A static address re-added on reconnect raises no IPV4_ADDR_ADD event.
@@ -709,7 +733,13 @@ bool WiFiComponent::wifi_loop_() {
         }
         break;
       case ZephyrWiFiEvent::Type::DISCONNECT_RESULT:
-        g_sta_status = WiFiSTAConnectStatus::IDLE;
+        if (g_expect_disconnect) {
+          // The previous AP's leave; the attempt started after it keeps CONNECTING
+          ESP_LOGD(TAG, "Expected disconnect from previous AP");
+          g_expect_disconnect = false;
+        } else {
+          g_sta_status = WiFiSTAConnectStatus::IDLE;
+        }
 #if USE_NETWORK_IPV4
         this->got_ipv4_address_ = false;
 #endif
@@ -798,6 +828,8 @@ bool WiFiComponent::wifi_loop_() {
   const atomic_val_t dropped = atomic_clear(&dropped_events);
   if (dropped > 0) {
     ESP_LOGW(TAG, "Dropped %ld WiFi events due to buffer overflow", static_cast<long>(dropped));
+    // The previous AP's leave event may be among them, so it can no longer be told apart
+    g_expect_disconnect = false;
   }
   return true;
 }
