@@ -175,11 +175,18 @@ def test_zephyr_rtos_offers_what_the_build_made(
     assert _zephyr_files(tmp_path, *built) == expected
 
 
-@pytest.mark.parametrize("platform", ["esp32", "rp2"])
+@pytest.mark.parametrize(
+    ("platform", "expected"),
+    [
+        # ESP32 Zephyr builds make no HEX file
+        ("esp32", ["zephyr.signed.bin"]),
+        ("rp2", ["zephyr.hex", "zephyr.signed.bin"]),
+    ],
+)
 def test_zephyr_builds_on_esp32_and_rp2_use_the_zephyr_list(
-    tmp_path: Path, platform: str
+    tmp_path: Path, platform: str, expected: list[str]
 ) -> None:
     files = _zephyr_files(
         tmp_path, f"{APP}zephyr.signed.bin", platform=platform, framework="zephyr"
     )
-    assert files == ["zephyr.hex", "zephyr.signed.bin"]
+    assert files == expected

@@ -781,7 +781,12 @@ def get_download_types(storage_json):
     if storage_json.framework == "zephyr":
         from esphome.components import zephyr_rtos
 
-        return zephyr_rtos.get_download_types(storage_json)
+        # ESP32 Zephyr builds make no HEX file
+        return [
+            entry
+            for entry in zephyr_rtos.get_download_types(storage_json)
+            if entry["file"] != "zephyr.hex"
+        ]
     # No recorded firmware path means nothing was built; no downloads.
     if storage_json.firmware_bin_path is None:
         return []
