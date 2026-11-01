@@ -6,6 +6,7 @@ from esphome.components.zephyr_rtos import (  # noqa: F401
     has_network_ota,
     process_stacktrace,
     run_compile,
+    show_logs,
     upload_program,
     zephyr_rtos_platform_config,
 )

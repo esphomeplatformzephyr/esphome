@@ -1569,6 +1569,13 @@ def get_download_types(storage_json: StorageJSON) -> list[dict[str, str]]:
     return types
 
 
+def show_logs(config: ConfigType, args, devices: list[str]) -> bool:
+    """Logs over BLE (ble_nus), as nrf52; False for any other device."""
+    from esphome.components.nrf52 import show_logs as nrf52_show_logs
+
+    return nrf52_show_logs(config, args, devices)
+
+
 def has_network_ota(config: ConfigType) -> bool:
     """True when zephyr_mcumgr OTA listens on UDP."""
     from esphome.components.nrf52.const import CONF_TRANSPORT, CONF_UDP

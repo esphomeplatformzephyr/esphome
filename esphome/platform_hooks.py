@@ -96,7 +96,7 @@ STACKTRACE_GATES: Final[dict[str, str]] = {
 }
 
 PLATFORM_HOOKS: Final[dict[str, frozenset[str]]] = {
-    "show_logs": frozenset({PLATFORM_NRF52}),
+    "show_logs": frozenset({PLATFORM_NRF, PLATFORM_NRF52}),
     # esp32 and rp2 only for framework: type: zephyr
     "upload_program": frozenset(
         {PLATFORM_ESP32, PLATFORM_NRF52, PLATFORM_RP2, *_ZEPHYR_RTOS_PLATFORMS}
