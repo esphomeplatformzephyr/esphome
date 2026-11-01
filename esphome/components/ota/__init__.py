@@ -1,3 +1,5 @@
+import logging
+
 from esphome import automation
 import esphome.codegen as cg
 from esphome.components.const import CONF_ON_STATE_CHANGE
@@ -7,10 +9,12 @@ from esphome.config_helpers import (
 )
 import esphome.config_validation as cv
 from esphome.const import (
+    CONF_DISABLED,
     CONF_ESPHOME,
     CONF_ON_ERROR,
     CONF_OTA,
     CONF_PLATFORM,
+    CONF_SAFE_MODE,
     CONF_TRIGGER_ID,
     PlatformFramework,
 )
@@ -18,6 +22,8 @@ from esphome.core import CORE, coroutine_with_priority
 from esphome.coroutine import CoroPriority
 from esphome.cpp_generator import MockObj
 from esphome.types import ConfigType
+
+_LOGGER = logging.getLogger(__name__)
 
 OTA_STATE_LISTENER_KEY = "ota_state_listener"
 
@@ -208,9 +214,14 @@ async def to_code(config: ConfigType) -> None:
         zephyr_add_prj_conf("BOOTLOADER_MCUBOOT", True)
         zephyr_add_sysbuild_conf("BOOTLOADER_MCUBOOT", True)
         cg.add_define("USE_OTA_MCUBOOT")
-        # Only confirm the new image after a verified-good boot (safe_mode does the
-        # confirming); see safe_mode.cpp's USE_ZEPHYR branch of mark_successful().
-        cg.add_define("USE_OTA_ROLLBACK")
+        # safe_mode confirms the new image after a verified-good boot; without it,
+        # zephyr/hal.cpp confirms it at boot and a bad image is not rolled back
+        if CORE.config.get(CONF_SAFE_MODE, {}).get(CONF_DISABLED, True):
+            _LOGGER.warning(
+                "OTA rollback requires safe_mode, disabling rollback support"
+            )
+        else:
+            cg.add_define("USE_OTA_ROLLBACK")
 
 
 async def ota_to_code(var: MockObj, config: ConfigType) -> None:

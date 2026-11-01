@@ -6,6 +6,9 @@
 #include <cstdio>
 #include <zephyr/drivers/watchdog.h>
 #include <zephyr/sys/reboot.h>
+#if defined(USE_OTA_MCUBOOT) && !defined(USE_OTA_ROLLBACK)
+#include <zephyr/dfu/mcuboot.h>
+#endif
 #ifdef USE_LOGGER
 #include "esphome/components/logger/logger.h"
 #endif
@@ -69,6 +72,12 @@ static void wdt_warning_cb(const device *dev, int channel_id) {
 
 void arch_init() {
   main_loop_thread() = k_current_get();
+#if defined(USE_OTA_MCUBOOT) && !defined(USE_OTA_ROLLBACK)
+  // Without safe_mode nothing confirms the image later, so MCUboot would revert it
+  if (!boot_is_img_confirmed()) {
+    boot_write_img_confirmed();
+  }
+#endif
 #ifdef ESPHOME_ZEPHYR_ARM_WATCHDOG
   if (device_is_ready(WDT)) {
     static wdt_timeout_cfg wdt_config{};
