@@ -100,7 +100,7 @@ async def to_code(config: ConfigType) -> None:
     cg.add_build_flag("-DUSE_ZEPHYR_VARIANT_MCXN236")
     cg.add_define("ESPHOME_BOARD", config[CONF_BOARD])
     cg.add_define("ESPHOME_VARIANT", "MCXN236")
-    cg.add_define(ThreadModel.SINGLE)
+    cg.add_define(ThreadModel.MULTI_ATOMICS)
     zephyr_setup_preferences()
     # NVS can't mount on this flash's 128-byte write blocks; settings picks ZMS when it is enabled.
     zephyr_add_prj_conf("ZMS", True)

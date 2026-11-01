@@ -3,6 +3,7 @@
 #ifdef USE_WIFI
 #ifdef USE_ZEPHYR
 
+#include <zephyr/kernel.h>
 #include <zephyr/net/dhcpv4.h>
 #include <zephyr/net/dhcpv4_server.h>
 #include <zephyr/net/dns_resolve.h>
@@ -11,6 +12,7 @@
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/net_mgmt.h>
 #include <zephyr/net/wifi_mgmt.h>
+#include <zephyr/sys/atomic.h>
 
 #include <cstring>
 #include <iterator>
@@ -74,10 +76,17 @@ bool g_sta_manual_ip = false;  // NOLINT
 // drop weak scan results before they ever reach the event queue.
 int8_t g_min_scan_rssi = -128;  // NOLINT
 
-// Fixed pool backing event_queue_. Up to 16 queued + 1 being read by wifi_loop_() are live,
-// and a slot is written before push() can fail, so the pool needs one spare beyond that.
+// Kernel message queue of event pointers, from the net_mgmt thread to wifi_loop_().
+constexpr uint8_t EVENT_QUEUE_SIZE = 16;
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-ZephyrWiFiEvent event_pool[ZEPHYR_WIFI_EVENT_QUEUE_SIZE + 1];
+K_MSGQ_DEFINE(event_queue, sizeof(ZephyrWiFiEvent *), EVENT_QUEUE_SIZE, alignof(ZephyrWiFiEvent *));
+// Events lost to a full queue, reported by wifi_loop_().
+atomic_t dropped_events = ATOMIC_INIT(0);  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+
+// Fixed pool backing event_queue. Up to 16 queued + 1 being read by wifi_loop_() are live,
+// and a slot is written before the push can fail, so the pool needs one spare beyond that.
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+ZephyrWiFiEvent event_pool[EVENT_QUEUE_SIZE + 2];
 uint8_t next_pool_slot = 0;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
 ZephyrWiFiEvent *claim_pool_slot() { return &event_pool[next_pool_slot]; }
@@ -207,7 +216,11 @@ void first_ipv4(net_if *iface, net_if_addr *addr, void *user_data) {
 }  // namespace
 
 bool WiFiComponent::push_zephyr_wifi_event(void *event) {
-  return this->event_queue_.push(static_cast<ZephyrWiFiEvent *>(event));
+  if (k_msgq_put(&event_queue, &event, K_NO_WAIT) != 0) {
+    atomic_inc(&dropped_events);
+    return false;
+  }
+  return true;
 }
 
 void WiFiComponent::wifi_pre_setup_() {
@@ -651,8 +664,8 @@ network::IPAddress WiFiComponent::wifi_dns_ip_(int num) {
 }
 
 bool WiFiComponent::wifi_loop_() {
-  ZephyrWiFiEvent *event = this->event_queue_.pop();
-  if (event == nullptr) {
+  ZephyrWiFiEvent *event = nullptr;
+  if (k_msgq_get(&event_queue, &event, K_NO_WAIT) != 0) {
     return false;
   }
 
@@ -780,11 +793,11 @@ bool WiFiComponent::wifi_loop_() {
 #endif
     }
     // event points into the static pool (see push_event()/claim_pool_slot()), not owned here.
-  } while ((event = this->event_queue_.pop()) != nullptr);
+  } while (k_msgq_get(&event_queue, &event, K_NO_WAIT) == 0);
 
-  uint16_t dropped = this->event_queue_.get_and_reset_dropped_count();
+  const atomic_val_t dropped = atomic_clear(&dropped_events);
   if (dropped > 0) {
-    ESP_LOGW(TAG, "Dropped %u WiFi events due to buffer overflow", dropped);
+    ESP_LOGW(TAG, "Dropped %ld WiFi events due to buffer overflow", static_cast<long>(dropped));
   }
   return true;
 }

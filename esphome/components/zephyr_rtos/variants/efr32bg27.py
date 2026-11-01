@@ -138,7 +138,7 @@ async def to_code(config: ConfigType) -> None:
     cg.add_build_flag("-DUSE_ZEPHYR_VARIANT_EFR32BG27")
     cg.add_define("ESPHOME_BOARD", config[CONF_BOARD])
     cg.add_define("ESPHOME_VARIANT", "EFR32BG27")
-    cg.add_define(ThreadModel.SINGLE)
+    cg.add_define(ThreadModel.MULTI_ATOMICS)
     zephyr_setup_preferences()
     zephyr_add_prj_conf("REBOOT", True)
     zephyr_add_prj_conf("HWINFO", True)

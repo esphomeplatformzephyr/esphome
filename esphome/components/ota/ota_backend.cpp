@@ -1,6 +1,9 @@
 #include "ota_backend.h"
 
-#ifdef ESPHOME_THREAD_MULTI_ATOMICS
+#if defined(ESPHOME_THREAD_MULTI_ATOMICS) && defined(USE_ZEPHYR)
+// atomic_t, not std::atomic, which doesn't link on ESP32-C3/RP2040
+#include <zephyr/sys/atomic.h>
+#elif defined(ESPHOME_THREAD_MULTI_ATOMICS)
 #include <atomic>
 #endif
 
@@ -35,7 +38,12 @@ bool version_is_older(const char *candidate, const char *reference) {
 }
 
 // Non-blocking; may be released by another task than the one that took it.
-#ifdef ESPHOME_THREAD_MULTI_ATOMICS
+#if defined(ESPHOME_THREAD_MULTI_ATOMICS) && defined(USE_ZEPHYR)
+static atomic_t update_locked{ATOMIC_INIT(0)};  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+
+static bool update_lock_test_and_set() { return atomic_set(&update_locked, 1) == 0; }
+static void update_lock_clear() { atomic_clear(&update_locked); }
+#elif defined(ESPHOME_THREAD_MULTI_ATOMICS)
 // uint32_t: narrower atomics compile to a masked CAS on Xtensa.
 static std::atomic<uint32_t> update_locked{0};  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 

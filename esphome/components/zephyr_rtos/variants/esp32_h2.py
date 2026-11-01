@@ -98,7 +98,7 @@ async def to_code(config: ConfigType) -> None:
     cg.add_build_flag("-DUSE_ZEPHYR_VARIANT_ESP32_H2")
     cg.add_define("ESPHOME_BOARD", config[CONF_BOARD])
     cg.add_define("ESPHOME_VARIANT", "ESP32H2")
-    cg.add_define(ThreadModel.SINGLE)
+    cg.add_define(ThreadModel.MULTI_ATOMICS)
     zephyr_setup_preferences()
     zephyr_add_prj_conf("REBOOT", True)
     # get_mac_address_raw() (zephyr/core.cpp) reads the efuse MAC via hwinfo_get_device_id().

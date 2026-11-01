@@ -15,7 +15,7 @@ K_SEM_DEFINE(esphome_wake_sem, 0, 1);
 // === Wake-requested flag storage ===
 #ifdef ESPHOME_THREAD_MULTI_ATOMICS
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-std::atomic<uint8_t> g_wake_requested{0};
+atomic_t g_wake_requested{ATOMIC_INIT(0)};
 #else
 // Cortex-M0: aligned 8-bit store/load is a single non-tearing instruction,
 // and k_sem_give()/k_sem_take() provide the release/acquire barriers.

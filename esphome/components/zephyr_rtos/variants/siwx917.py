@@ -193,7 +193,7 @@ async def to_code(config: ConfigType) -> None:
     cg.add_build_flag("-DUSE_ZEPHYR_VARIANT_SIWX917")
     cg.add_define("ESPHOME_BOARD", config[CONF_BOARD])
     cg.add_define("ESPHOME_VARIANT", "SIWX917")
-    cg.add_define(ThreadModel.SINGLE)
+    cg.add_define(ThreadModel.MULTI_ATOMICS)
     zephyr_setup_preferences()
     zephyr_add_prj_conf("REBOOT", True)
     # This board's own defconfig (siwx917_dk2605a_defconfig) is unusually minimal --

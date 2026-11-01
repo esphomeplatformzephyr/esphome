@@ -5,7 +5,12 @@
 #include <string>
 #include <vector>
 #ifdef ESPHOME_THREAD_MULTI_ATOMICS
+#ifdef USE_ZEPHYR
+// atomic_t, not std::atomic, which doesn't link on ESP32-C3/RP2040
+#include <zephyr/sys/atomic.h>
+#else
 #include <atomic>
+#endif
 #endif
 
 #include "esphome/core/component.h"
@@ -168,7 +173,11 @@ class Scheduler {
     // std::atomic<bool> is not used because GCC on Xtensa generates an indirect
     // function call for std::atomic<bool>::load() instead of inlining it.
     // std::atomic<uint8_t> inlines correctly on all platforms.
+#ifdef USE_ZEPHYR
+    atomic_t remove{ATOMIC_INIT(0)};
+#else
     std::atomic<uint8_t> remove{0};
+#endif
 
     // Bit-packed fields (4 bits used, 4 bits padding in 1 byte)
     enum Type : uint8_t { TIMEOUT, INTERVAL } type : 1;
@@ -452,7 +461,11 @@ class Scheduler {
   bool is_item_removed_(SchedulerItem *item) const {
 #ifdef ESPHOME_THREAD_MULTI_ATOMICS
     // Multi-threaded with atomics: use atomic load for lock-free access
+#ifdef USE_ZEPHYR
+    return atomic_get(&item->remove) != 0;
+#else
     return item->remove.load(std::memory_order_acquire);
+#endif
 #else
     // Single-threaded (ESPHOME_THREAD_SINGLE) or
     // multi-threaded without atomics (ESPHOME_THREAD_MULTI_NO_ATOMICS): direct read
@@ -467,7 +480,11 @@ class Scheduler {
   bool is_item_removed_locked_(SchedulerItem *item) const {
 #ifdef ESPHOME_THREAD_MULTI_ATOMICS
     // Lock already held - relaxed is sufficient, mutex provides ordering
+#ifdef USE_ZEPHYR
+    return atomic_get(&item->remove) != 0;
+#else
     return item->remove.load(std::memory_order_relaxed);
+#endif
 #else
     return item->remove;
 #endif
@@ -482,7 +499,11 @@ class Scheduler {
     // Multi-threaded with atomics: use atomic store with appropriate ordering
     // Release ordering when setting to true ensures cancellation is visible to other threads
     // Relaxed ordering when setting to false is sufficient for initialization
+#ifdef USE_ZEPHYR
+    atomic_set(&item->remove, removed ? 1 : 0);
+#else
     item->remove.store(removed ? 1 : 0, removed ? std::memory_order_release : std::memory_order_relaxed);
+#endif
 #else
     // Single-threaded (ESPHOME_THREAD_SINGLE) or
     // multi-threaded without atomics (ESPHOME_THREAD_MULTI_NO_ATOMICS): direct write
@@ -531,7 +552,9 @@ class Scheduler {
   // NO_ATOMICS — compiles to a plain LDR (aligned 32-bit load is naturally
   // atomic on ARMv5TE) but expresses the concurrent-access intent in the C++
   // memory model. Writes live behind *_locked_ helpers and must hold lock_.
-#ifdef ESPHOME_THREAD_MULTI_ATOMICS
+#if defined(ESPHOME_THREAD_MULTI_ATOMICS) && defined(USE_ZEPHYR)
+  atomic_t to_add_count_{ATOMIC_INIT(0)};
+#elif defined(ESPHOME_THREAD_MULTI_ATOMICS)
   std::atomic<uint32_t> to_add_count_{0};
 #else
   uint32_t to_add_count_{0};
@@ -542,8 +565,10 @@ class Scheduler {
   bool to_add_empty_() const {
 #ifdef ESPHOME_THREAD_SINGLE
     return this->to_add_.empty();
+#elif defined(ESPHOME_THREAD_MULTI_ATOMICS) && defined(USE_ZEPHYR)
+    return atomic_get(&this->to_add_count_) == 0;
 #elif defined(ESPHOME_THREAD_MULTI_ATOMICS)
-    return this->to_add_count_.load(std::memory_order_relaxed) == 0;
+  return this->to_add_count_.load(std::memory_order_relaxed) == 0;
 #else
   return __atomic_load_n(&this->to_add_count_, __ATOMIC_RELAXED) == 0;
 #endif
@@ -557,8 +582,10 @@ class Scheduler {
   void to_add_count_increment_locked_() {
 #if defined(ESPHOME_THREAD_SINGLE)
     // No counter needed — to_add_empty_() checks the vector directly
+#elif defined(ESPHOME_THREAD_MULTI_ATOMICS) && defined(USE_ZEPHYR)
+    atomic_inc(&this->to_add_count_);
 #elif defined(ESPHOME_THREAD_MULTI_ATOMICS)
-    this->to_add_count_.fetch_add(1, std::memory_order_relaxed);
+  this->to_add_count_.fetch_add(1, std::memory_order_relaxed);
 #else
   uint32_t v = __atomic_load_n(&this->to_add_count_, __ATOMIC_RELAXED);
   __atomic_store_n(&this->to_add_count_, v + 1, __ATOMIC_RELAXED);
@@ -569,8 +596,10 @@ class Scheduler {
   void to_add_count_clear_locked_() {
 #if defined(ESPHOME_THREAD_SINGLE)
     // No counter needed — to_add_empty_() checks the vector directly
+#elif defined(ESPHOME_THREAD_MULTI_ATOMICS) && defined(USE_ZEPHYR)
+    atomic_clear(&this->to_add_count_);
 #elif defined(ESPHOME_THREAD_MULTI_ATOMICS)
-    this->to_add_count_.store(0, std::memory_order_relaxed);
+  this->to_add_count_.store(0, std::memory_order_relaxed);
 #else
   __atomic_store_n(&this->to_add_count_, 0, __ATOMIC_RELAXED);
 #endif
@@ -585,7 +614,9 @@ class Scheduler {
 
   // Fast-path counter for process_defer_queue_() to skip lock when nothing to
   // process. See to_add_count_ above for the NO_ATOMICS rationale.
-#ifdef ESPHOME_THREAD_MULTI_ATOMICS
+#if defined(ESPHOME_THREAD_MULTI_ATOMICS) && defined(USE_ZEPHYR)
+  atomic_t defer_count_{ATOMIC_INIT(0)};
+#elif defined(ESPHOME_THREAD_MULTI_ATOMICS)
   std::atomic<uint32_t> defer_count_{0};
 #else
   uint32_t defer_count_{0};
@@ -593,7 +624,9 @@ class Scheduler {
 
   bool defer_empty_() const {
     // defer_queue_ only exists on multi-threaded platforms, so no ESPHOME_THREAD_SINGLE path
-#ifdef ESPHOME_THREAD_MULTI_ATOMICS
+#if defined(ESPHOME_THREAD_MULTI_ATOMICS) && defined(USE_ZEPHYR)
+    return atomic_get(&this->defer_count_) == 0;
+#elif defined(ESPHOME_THREAD_MULTI_ATOMICS)
     return this->defer_count_.load(std::memory_order_relaxed) == 0;
 #else
     return __atomic_load_n(&this->defer_count_, __ATOMIC_RELAXED) == 0;
@@ -601,7 +634,9 @@ class Scheduler {
   }
 
   void defer_count_increment_locked_() {
-#ifdef ESPHOME_THREAD_MULTI_ATOMICS
+#if defined(ESPHOME_THREAD_MULTI_ATOMICS) && defined(USE_ZEPHYR)
+    atomic_inc(&this->defer_count_);
+#elif defined(ESPHOME_THREAD_MULTI_ATOMICS)
     this->defer_count_.fetch_add(1, std::memory_order_relaxed);
 #else
     uint32_t v = __atomic_load_n(&this->defer_count_, __ATOMIC_RELAXED);
@@ -610,7 +645,9 @@ class Scheduler {
   }
 
   void defer_count_clear_locked_() {
-#ifdef ESPHOME_THREAD_MULTI_ATOMICS
+#if defined(ESPHOME_THREAD_MULTI_ATOMICS) && defined(USE_ZEPHYR)
+    atomic_clear(&this->defer_count_);
+#elif defined(ESPHOME_THREAD_MULTI_ATOMICS)
     this->defer_count_.store(0, std::memory_order_relaxed);
 #else
     __atomic_store_n(&this->defer_count_, 0, __ATOMIC_RELAXED);
@@ -622,60 +659,72 @@ class Scheduler {
   // Counter for items marked for removal. Incremented cross-thread in
   // cancel_item_locked_(). See to_add_count_ above for the NO_ATOMICS
   // rationale.
-#ifdef ESPHOME_THREAD_MULTI_ATOMICS
+#if defined(ESPHOME_THREAD_MULTI_ATOMICS) && defined(USE_ZEPHYR)
+  atomic_t to_remove_{ATOMIC_INIT(0)};
+#elif defined(ESPHOME_THREAD_MULTI_ATOMICS)
   std::atomic<uint32_t> to_remove_{0};
 #else
-  uint32_t to_remove_{0};
+uint32_t to_remove_{0};
 #endif
 
   // Lock-free check if there are items to remove (for fast-path in cleanup_)
   bool to_remove_empty_() const {
-#if defined(ESPHOME_THREAD_MULTI_ATOMICS)
+#if defined(ESPHOME_THREAD_MULTI_ATOMICS) && defined(USE_ZEPHYR)
+    return atomic_get(&this->to_remove_) == 0;
+#elif defined(ESPHOME_THREAD_MULTI_ATOMICS)
     return this->to_remove_.load(std::memory_order_relaxed) == 0;
 #elif defined(ESPHOME_THREAD_MULTI_NO_ATOMICS)
-    return __atomic_load_n(&this->to_remove_, __ATOMIC_RELAXED) == 0;
+  return __atomic_load_n(&this->to_remove_, __ATOMIC_RELAXED) == 0;
 #else
   return this->to_remove_ == 0;
 #endif
   }
 
   void to_remove_add_locked_(uint32_t count) {
-#if defined(ESPHOME_THREAD_MULTI_ATOMICS)
+#if defined(ESPHOME_THREAD_MULTI_ATOMICS) && defined(USE_ZEPHYR)
+    atomic_add(&this->to_remove_, static_cast<atomic_val_t>(count));
+#elif defined(ESPHOME_THREAD_MULTI_ATOMICS)
     this->to_remove_.fetch_add(count, std::memory_order_relaxed);
 #elif defined(ESPHOME_THREAD_MULTI_NO_ATOMICS)
-    uint32_t v = __atomic_load_n(&this->to_remove_, __ATOMIC_RELAXED);
-    __atomic_store_n(&this->to_remove_, v + count, __ATOMIC_RELAXED);
+  uint32_t v = __atomic_load_n(&this->to_remove_, __ATOMIC_RELAXED);
+  __atomic_store_n(&this->to_remove_, v + count, __ATOMIC_RELAXED);
 #else
   this->to_remove_ += count;
 #endif
   }
 
   void to_remove_decrement_locked_() {
-#if defined(ESPHOME_THREAD_MULTI_ATOMICS)
+#if defined(ESPHOME_THREAD_MULTI_ATOMICS) && defined(USE_ZEPHYR)
+    atomic_dec(&this->to_remove_);
+#elif defined(ESPHOME_THREAD_MULTI_ATOMICS)
     this->to_remove_.fetch_sub(1, std::memory_order_relaxed);
 #elif defined(ESPHOME_THREAD_MULTI_NO_ATOMICS)
-    uint32_t v = __atomic_load_n(&this->to_remove_, __ATOMIC_RELAXED);
-    __atomic_store_n(&this->to_remove_, v - 1, __ATOMIC_RELAXED);
+  uint32_t v = __atomic_load_n(&this->to_remove_, __ATOMIC_RELAXED);
+  __atomic_store_n(&this->to_remove_, v - 1, __ATOMIC_RELAXED);
 #else
   this->to_remove_--;
 #endif
   }
 
   void to_remove_clear_locked_() {
-#if defined(ESPHOME_THREAD_MULTI_ATOMICS)
+#if defined(ESPHOME_THREAD_MULTI_ATOMICS) && defined(USE_ZEPHYR)
+    atomic_clear(&this->to_remove_);
+#elif defined(ESPHOME_THREAD_MULTI_ATOMICS)
     this->to_remove_.store(0, std::memory_order_relaxed);
 #elif defined(ESPHOME_THREAD_MULTI_NO_ATOMICS)
-    __atomic_store_n(&this->to_remove_, 0, __ATOMIC_RELAXED);
+  __atomic_store_n(&this->to_remove_, 0, __ATOMIC_RELAXED);
 #else
   this->to_remove_ = 0;
 #endif
   }
 
   uint32_t to_remove_count_() const {
-#if defined(ESPHOME_THREAD_MULTI_ATOMICS)
+#if defined(ESPHOME_THREAD_MULTI_ATOMICS) && defined(USE_ZEPHYR)
+    return static_cast<uint32_t>(atomic_get(&this->to_remove_));
+#elif defined(ESPHOME_THREAD_MULTI_ATOMICS)
     return this->to_remove_.load(std::memory_order_relaxed);
 #elif defined(ESPHOME_THREAD_MULTI_NO_ATOMICS)
-    return __atomic_load_n(&this->to_remove_, __ATOMIC_RELAXED);
+  return __atomic_load_n(&this->to_remove_, __ATOMIC_RELAXED);
 #else
   return this->to_remove_;
 #endif

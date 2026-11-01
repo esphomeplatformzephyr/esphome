@@ -6,7 +6,7 @@
 #include "esphome/core/automation.h"
 #include "esphome/core/component.h"
 #include "esphome/core/helpers.h"
-#if defined(USE_ESP32) || defined(USE_ZEPHYR)
+#ifdef USE_ESP32
 #include "esphome/core/lock_free_queue.h"
 #endif
 #if defined(USE_LIBRETINY) && defined(ESPHOME_THREAD_MULTI_ATOMICS)
@@ -407,8 +407,6 @@ struct LTWiFiEvent;
 
 #ifdef USE_ZEPHYR
 struct ZephyrWiFiEvent;
-// Ring buffer reserves one slot, so 16 usable.
-static constexpr uint8_t ZEPHYR_WIFI_EVENT_QUEUE_SIZE = 17;
 #endif
 
 /** Listener interface for WiFi IP state changes.
@@ -1225,7 +1223,6 @@ class WiFiComponent final : public Component {
 #endif
 
 #ifdef USE_ZEPHYR
-  LockFreeQueue<ZephyrWiFiEvent, ZEPHYR_WIFI_EVENT_QUEUE_SIZE> event_queue_;
   // Scan results weaker than this (dBm) are dropped before queuing. -128 (default) is
   // below any real RSSI, so filtering is off unless min_rssi: is configured.
   int8_t min_scan_rssi_{-128};

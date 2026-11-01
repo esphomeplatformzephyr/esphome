@@ -10,9 +10,10 @@
 // SINGLE: volatile state, the callback never runs beside loop().
 // MULTI_NO_ATOMICS: volatile state plus a generation; BK72xx has no
 // compare_exchange and the DNS callback runs on the tcpip thread.
+// Zephyr: volatile state too, getaddrinfo() resolves without a callback.
 #if defined(ESPHOME_THREAD_MULTI_NO_ATOMICS)
 #define IPV4_RESOLVE_VOLATILE_EPOCH
-#elif defined(ESPHOME_THREAD_SINGLE)
+#elif defined(ESPHOME_THREAD_SINGLE) || defined(USE_ZEPHYR)
 #define IPV4_RESOLVE_VOLATILE
 #else
 #define IPV4_RESOLVE_ATOMIC_STATE

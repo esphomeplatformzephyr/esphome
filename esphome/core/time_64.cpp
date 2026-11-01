@@ -9,7 +9,10 @@
 #include "esphome/core/log.h"
 #include <cinttypes>
 #endif
-#ifdef ESPHOME_THREAD_MULTI_ATOMICS
+#if defined(ESPHOME_THREAD_MULTI_ATOMICS) && defined(USE_ZEPHYR)
+// atomic_t, not std::atomic, which doesn't link on ESP32-C3/RP2040
+#include <zephyr/sys/atomic.h>
+#elif defined(ESPHOME_THREAD_MULTI_ATOMICS)
 #include <atomic>
 #endif
 #include <limits>
@@ -37,6 +40,11 @@ uint64_t Millis64Impl::compute(uint32_t now) {
   // preemptive single-core RTOS platforms due to priority inversion: a high-priority
   // task spinning would prevent the lock holder from running to release it.
   static Mutex lock;
+#ifdef USE_ZEPHYR
+  // Same roles as the std::atomic pair below; Zephyr atomics are full barriers.
+  static atomic_t last_millis{ATOMIC_INIT(0)};
+  static atomic_t millis_major{ATOMIC_INIT(0)};
+#else
   /*
    * Multi-threaded platforms with atomic support: last_millis needs atomic for lock-free updates.
    * Writers publish last_millis with memory_order_release and readers use memory_order_acquire.
@@ -50,6 +58,7 @@ uint64_t Millis64Impl::compute(uint32_t now) {
    * to last_millis is provided by its release store and the corresponding acquire loads.
    */
   static std::atomic<uint16_t> millis_major{0};
+#endif
 #else /* ESPHOME_THREAD_MULTI_NO_ATOMICS */
   static Mutex lock;
   static uint32_t last_millis{0};
@@ -121,6 +130,37 @@ uint64_t Millis64Impl::compute(uint32_t now) {
 
   // Combine major (high 32 bits) and now (low 32 bits) into 64-bit time
   return now + (static_cast<uint64_t>(major) << 32);
+
+#elif defined(ESPHOME_THREAD_MULTI_ATOMICS) && defined(USE_ZEPHYR)
+  // The std::atomic algorithm below on atomic_t; keep the two in sync.
+  for (;;) {
+    auto major = static_cast<uint16_t>(atomic_get(&millis_major));
+    auto last = static_cast<uint32_t>(atomic_get(&last_millis));
+
+    if (now < last && (last - now) > HALF_MAX_UINT32) {
+      LockGuard guard{lock};
+      last = static_cast<uint32_t>(atomic_get(&last_millis));
+
+      if (now < last && (last - now) > HALF_MAX_UINT32) {
+        atomic_inc(&millis_major);
+        major++;
+#ifdef ESPHOME_DEBUG_SCHEDULER
+        ESP_LOGD(TAG, "Detected true 32-bit rollover at %" PRIu32 "ms (was %" PRIu32 ")", now, last);
+#endif /* ESPHOME_DEBUG_SCHEDULER */
+      }
+      atomic_set(&last_millis, static_cast<atomic_val_t>(now));
+    } else {
+      while (now > last && (now - last) < HALF_MAX_UINT32) {
+        if (atomic_cas(&last_millis, static_cast<atomic_val_t>(last), static_cast<atomic_val_t>(now))) {
+          break;
+        }
+        last = static_cast<uint32_t>(atomic_get(&last_millis));
+      }
+    }
+    if (static_cast<uint16_t>(atomic_get(&millis_major)) == major)
+      return now + (static_cast<uint64_t>(major) << 32);
+  }
+  __builtin_unreachable();
 
 #elif defined(ESPHOME_THREAD_MULTI_ATOMICS)
   // Uses atomic operations with acquire/release semantics to ensure coherent

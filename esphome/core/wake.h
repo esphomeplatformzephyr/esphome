@@ -11,7 +11,10 @@
 #include "esphome/core/defines.h"
 #include "esphome/core/hal.h"
 
-#ifdef ESPHOME_THREAD_MULTI_ATOMICS
+#if defined(ESPHOME_THREAD_MULTI_ATOMICS) && defined(USE_ZEPHYR)
+// atomic_t, not std::atomic, which doesn't link on ESP32-C3/RP2040
+#include <zephyr/sys/atomic.h>
+#elif defined(ESPHOME_THREAD_MULTI_ATOMICS)
 #include <atomic>
 #endif
 
@@ -36,7 +39,13 @@ extern volatile bool g_main_loop_woke;
 // loads/stores are atomic on every supported MCU, and the platform signal
 // that follows wake_request_set() (FreeRTOS task-notify, esp_schedule, socket
 // send) provides the cross-thread/cross-core memory barrier.
-#ifdef ESPHOME_THREAD_MULTI_ATOMICS
+#if defined(ESPHOME_THREAD_MULTI_ATOMICS) && defined(USE_ZEPHYR)
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
+extern atomic_t g_wake_requested;
+
+__attribute__((always_inline)) inline void wake_request_set() { atomic_set(&g_wake_requested, 1); }
+__attribute__((always_inline)) inline bool wake_request_take() { return atomic_clear(&g_wake_requested) != 0; }
+#elif defined(ESPHOME_THREAD_MULTI_ATOMICS)
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 extern std::atomic<uint8_t> g_wake_requested;
 
