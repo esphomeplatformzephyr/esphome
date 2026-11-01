@@ -253,6 +253,8 @@ def check_mcuboot_swap_limit(build_dir: Path, image: Path) -> None:
     )
     size = image.stat().st_size
     if size > limit:
+        # As nrf52, which never copies an oversized image: nothing to send by mistake
+        image.unlink()
         raise EsphomeError(
             f"The application image is {size} bytes, but MCUboot can only swap in "
             f"{limit} bytes on this board. Remove at least {size - limit} bytes, for "

@@ -82,6 +82,8 @@ def test_check_mcuboot_swap_limit(
         else:
             with pytest.raises(EsphomeError, match=error):
                 check_mcuboot_swap_limit(tmp_path, image)
+    # An image MCUboot would refuse is not left for a later upload to send
+    assert image.is_file() is (error is None)
 
 
 @pytest.mark.parametrize(
