@@ -29,6 +29,8 @@ def _udp_values() -> tuple[object, ...]:
         # Thread's 1280 byte link MTU less the IPv6 (48) or IPv4 (28) and UDP headers
         ("udp_ipv6.yaml", (True, False, 1232, 1232)),
         ("udp_ipv4.yaml", (True, True, 1252, 1252)),
+        # ESP32 on Zephyr RTOS: an mcumgr variant other than nrf52; IPv4 is on by default
+        ("udp_esp32_zephyr.yaml", (True, True, 1252, 1252)),
         ("ble_only.yaml", (None, None, None, None)),
         ("uart_only.yaml", (None, None, None, None)),
     ],

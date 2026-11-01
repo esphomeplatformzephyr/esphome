@@ -1,3 +1,4 @@
+import asyncio
 from collections.abc import Callable
 import logging
 import os
@@ -28,8 +29,10 @@ from esphome.const import (
     CONF_FRAMEWORK,
     CONF_LOG_LEVEL,
     CONF_NAME,
+    CONF_OTA,
     CONF_PASSWORD,
     CONF_PATH,
+    CONF_PLATFORM,
     CONF_REF,
     CONF_REFRESH,
     CONF_SOURCE,
@@ -1515,6 +1518,58 @@ def reset_over_usb(config: ConfigType, port: str, timeout: float = 10.0) -> bool
     return False
 
 
+def has_network_ota(config: ConfigType) -> bool:
+    """True when zephyr_mcumgr OTA listens on UDP."""
+    from esphome.components.nrf52.const import CONF_TRANSPORT, CONF_UDP
+
+    return any(
+        ota.get(CONF_PLATFORM) == "zephyr_mcumgr"
+        and ota.get(CONF_TRANSPORT, {}).get(CONF_UDP)
+        for ota in config.get(CONF_OTA, [])
+    )
+
+
+def _upload_mcumgr(config: ConfigType, args, host: str) -> bool:
+    """Upload over zephyr_mcumgr's BLE or UDP transport; False when neither applies."""
+    from esphome.components.nrf52.const import CONF_TRANSPORT, CONF_UDP
+
+    transport = next(
+        (
+            ota.get(CONF_TRANSPORT, {})
+            for ota in config.get(CONF_OTA, [])
+            if ota.get(CONF_PLATFORM) == "zephyr_mcumgr"
+        ),
+        None,
+    )
+    if transport is None:
+        return False
+
+    from esphome.components import network
+    from esphome.components.nrf52 import _resolve_smp_udp_hosts, _upload_over_udp
+    from esphome.components.nrf52.ble_logger import is_ble_address
+    from esphome.components.zephyr_mcumgr.ota import CONF_BLE
+    from esphome.upload_targets import PortType, get_port_type
+
+    file = getattr(args, "file", None) or str(CORE.firmware_bin)
+    if transport.get(CONF_BLE) and (host == "BLE" or is_ble_address(host)):
+        asyncio.run(_upload_mcumgr_ble(host, file))
+        return True
+    if transport.get(CONF_UDP) and get_port_type(host) == PortType.NETWORK:
+        ipv4 = config.get(network.DOMAIN, {}).get(network.CONF_ENABLE_IPV4, False)
+        addresses = _resolve_smp_udp_hosts(host, ipv4)
+        asyncio.run(_upload_over_udp(host, addresses, file))
+        return True
+    return False
+
+
+async def _upload_mcumgr_ble(host: str, file: str) -> None:
+    from esphome.components.nrf52 import _smpmgr_upload
+    from esphome.components.nrf52.ota import smpmgr_scan
+
+    address = await smpmgr_scan(CORE.name) if host == "BLE" else host
+    await _smpmgr_upload(address, file)
+
+
 def upload_program(config: ConfigType, args, host: str) -> bool:
     if KEY_ZEPHYR_RTOS not in CORE.data:
         zephyr_config = config.get(CORE.target_platform)
@@ -1591,6 +1646,9 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
             return True
         if nrf52.uses_serial_dfu() and get_port_type(host) == PortType.SERIAL:
             return nrf52.upload_serial_dfu(host)
+
+    if _upload_mcumgr(config, args, host):
+        return True
 
     # rpi_pico-family variants (RP2040/RP2350) given a normal serial port instead of
     # BOOTSEL: the board's default west runner (uf2) only works once already in

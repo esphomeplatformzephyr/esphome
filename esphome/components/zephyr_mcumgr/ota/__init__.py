@@ -3,6 +3,14 @@ import logging
 from esphome import pins
 import esphome.codegen as cg
 from esphome.components import network
+from esphome.components.esp32.const import (
+    VARIANT_ESP32,
+    VARIANT_ESP32C3,
+    VARIANT_ESP32C5,
+    VARIANT_ESP32C6,
+    VARIANT_ESP32H2,
+    VARIANT_ESP32S3,
+)
 from esphome.components.nrf.const import (
     VARIANT_NRF52,
     VARIANT_NRF54L15,
@@ -101,6 +109,12 @@ def _validate_transport(conf: ConfigType) -> ConfigType:
 # against. Zephyr RTOS on other variants has its own hardened OTA path
 # instead, ota_backend_zephyr.cpp, reached via platform: esphome.
 ZEPHYR_VARIANTS = (
+    VARIANT_ESP32,
+    VARIANT_ESP32C3,
+    VARIANT_ESP32C5,
+    VARIANT_ESP32C6,
+    VARIANT_ESP32H2,
+    VARIANT_ESP32S3,
     VARIANT_NRF52,
     VARIANT_NRF54L15,
     VARIANT_NRF54LM20A,
@@ -145,8 +159,8 @@ def _validate_platform(conf: ConfigType) -> ConfigType:
     ):
         raise cv.Invalid(
             "This feature is only available on nrf52 (platform: nrf52, or "
-            "a Zephyr RTOS build with variant: nrf52, nrf54l15, nrf54lm20a, efr32mg24, "
-            "rp2040, or rp2350)."
+            "a Zephyr RTOS build with variant: esp32, esp32c3, esp32c5, esp32c6, esp32h2, "
+            "esp32s3, nrf52, nrf54l15, nrf54lm20a, efr32mg24, efr32bg27, rp2040, or rp2350)."
         )
     hw_uart = conf[CONF_TRANSPORT].get(CONF_HARDWARE_UART)
     if hw_uart in CDC_IDS and not (
@@ -156,11 +170,6 @@ def _validate_platform(conf: ConfigType) -> ConfigType:
             f"'{hw_uart}' is not available on this variant -- it has no USB "
             f"peripheral. Use 'UART0'/'UART1', or 'ble: true', instead.",
             [CONF_TRANSPORT, CONF_HARDWARE_UART],
-        )
-    if conf[CONF_TRANSPORT][CONF_UDP] and not CORE.is_nrf52:
-        raise cv.Invalid(
-            f"'{CONF_UDP}' is only available on platform: nrf52.",
-            [CONF_TRANSPORT, CONF_UDP],
         )
     if CONF_STATUS in conf and not CORE.is_nrf52:
         # The overlay this generates assumes Nordic's 32-pins-per-port &gpio{N}

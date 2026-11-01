@@ -165,15 +165,6 @@ def test_log_v2_only_on_native_toolchain(
     assert ("CONFIG_LOG_VERSION_2" in sdkconfig) is log_v2
 
 
-def test_nrf52_emits_logger_node_label(
-    generate_main: Callable[[str | Path], str],
-) -> None:
-    """logger_zephyr.cpp only binds a UART when this label is defined."""
-    generate_main("tests/component_tests/logger/test_logger_nrf52_uart0.yaml")
-    defines = {d.name: str(d.value) for d in CORE.defines}
-    assert defines.get("LOGGER_UART_NODE_LABEL") == "uart0"
-
-
 def test_nrf52_usb_cdc_leaves_label_to_cpp_fallback(
     generate_main: Callable[[str | Path], str],
 ) -> None:

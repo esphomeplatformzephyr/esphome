@@ -4190,6 +4190,14 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
     return zephyr_rtos.upload_program(config, args, host)
 
 
+def has_network_ota(config: ConfigType) -> bool:
+    if not CORE.using_zephyr_rtos:
+        return False
+    from esphome.components import zephyr_rtos
+
+    return zephyr_rtos.has_network_ota(config)
+
+
 def process_stacktrace(config, line, backtrace_state):
     if CORE.using_zephyr_rtos:
         from esphome.components import zephyr_rtos

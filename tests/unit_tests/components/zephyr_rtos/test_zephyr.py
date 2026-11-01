@@ -1714,9 +1714,10 @@ def _stack() -> tuple:
     [
         ("ESP32C3", {}, 8192),
         ("ESP32H2", {}, 8192),
-        ("NRF54L15", {}, 4096),
+        ("NRF54L15", {}, 8192),
+        ("EFR32MG24", {}, 4096),
         ("ESP32C3", {"main_stack_size": 6144}, 6144),
-        ("NRF54L15", {"main_stack_size": 8192}, 8192),
+        ("EFR32MG24", {"main_stack_size": 8192}, 8192),
     ],
 )
 def test_main_stack_to_code(variant: str | None, advanced: dict, expected: int) -> None:

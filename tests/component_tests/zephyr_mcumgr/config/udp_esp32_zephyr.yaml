@@ -1,0 +1,14 @@
+esphome:
+  name: mcumgrtest
+
+esp32:
+  variant: ESP32C6
+  framework:
+    type: zephyr
+
+network:
+
+ota:
+  - platform: zephyr_mcumgr
+    transport:
+      udp: true

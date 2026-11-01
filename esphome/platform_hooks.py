@@ -102,7 +102,10 @@ PLATFORM_HOOKS: Final[dict[str, frozenset[str]]] = {
         {PLATFORM_ESP32, PLATFORM_NRF52, PLATFORM_RP2, *_ZEPHYR_RTOS_PLATFORMS}
     ),
     # Whether the config has a network OTA that upload_program handles
-    "has_network_ota": frozenset({PLATFORM_NRF52}),
+    # (the zephyr_rtos ones only through zephyr_mcumgr's variants)
+    "has_network_ota": frozenset(
+        {PLATFORM_ESP32, PLATFORM_NRF, PLATFORM_NRF52, PLATFORM_RP2, PLATFORM_SILABS}
+    ),
     "process_stacktrace": frozenset(STACKTRACE_GATES),
     # The file an app update sends, when it is not the build output itself
     "ota_image": frozenset({PLATFORM_BK72XX, PLATFORM_LN882X, PLATFORM_RTL87XX}),
