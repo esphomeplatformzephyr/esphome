@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+import subprocess
 import tempfile
 from types import SimpleNamespace
 from typing import Any, NoReturn
@@ -1470,6 +1471,25 @@ def test_cpp_candidate_check_uses_real_command(
 
 def test_cpp_candidate_check_missing_binary() -> None:
     assert not dts_lookup._cpp_candidate_works("/nonexistent/cpp")
+
+
+def _timed_out_run(cmd: list[str], **kwargs: Any) -> NoReturn:
+    raise subprocess.TimeoutExpired(cmd, kwargs["timeout"])
+
+
+def test_cpp_candidate_check_timeout(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(dts_lookup.subprocess, "run", _timed_out_run)
+    assert not dts_lookup._cpp_candidate_works("/usr/bin/cpp")
+
+
+def test_preprocess_dts_file_timeout(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(dts_lookup, "_find_cpp", lambda: "/usr/bin/cpp")
+    monkeypatch.setattr(dts_lookup, "_get_dts_include_paths", lambda base: [])
+    monkeypatch.setattr(dts_lookup.subprocess, "run", _timed_out_run)
+    with pytest.raises(dts_lookup._DtsReadError, match="cpp timed out"):
+        dts_lookup._preprocess_dts_file(tmp_path / "board.dts", tmp_path, [])
 
 
 # ---------------------------------------------------------------------------

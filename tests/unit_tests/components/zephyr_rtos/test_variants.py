@@ -20,6 +20,7 @@ from esphome.components.zephyr_rtos.variants import (
 )
 import esphome.config_validation as cv
 from esphome.const import (
+    CONF_ADVANCED,
     CONF_FRAMEWORK,
     CONF_REFRESH,
     CONF_SOURCE,
@@ -298,6 +299,19 @@ def test_simg301_accepts_4_5(version: str) -> None:
 def test_simg301_rejects_4_4_2() -> None:
     with pytest.raises(cv.Invalid, match=r"requires zephyr >= 4\.5\.0"):
         _simg301_schema({CONF_VERSION: "4.4.2"})
+
+
+def test_simg301_sets_the_runner() -> None:
+    from esphome.components.zephyr_rtos.const import KEY_ZEPHYR_RTOS  # noqa: PLC0415
+    from esphome.core import CORE  # noqa: PLC0415
+
+    _simg301_schema({CONF_ADVANCED: {"runner": "jlink"}})
+    assert CORE.data[KEY_ZEPHYR_RTOS]["runner"] == "jlink"
+
+
+def test_simg301_rejects_an_unknown_advanced_key() -> None:
+    with pytest.raises(cv.Invalid, match="extra keys not allowed"):
+        _simg301_schema({CONF_ADVANCED: {"runer": "jlink"}})
 
 
 def test_every_family_names_its_vendor_hals() -> None:

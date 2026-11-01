@@ -2,6 +2,7 @@ import esphome.codegen as cg
 from esphome.components.silabs.const import VARIANT_SIMG301
 import esphome.config_validation as cv
 from esphome.const import (
+    CONF_ADVANCED,
     CONF_BOARD,
     CONF_FRAMEWORK,
     CONF_SOURCE,
@@ -10,7 +11,7 @@ from esphome.const import (
 )
 from esphome.types import ConfigType
 
-from ..const import BOOTLOADER_MCUBOOT
+from ..const import ADVANCED_SCHEMA, BOOTLOADER_MCUBOOT, CONF_RUNNER
 from ..partitions import BootLayout
 from . import (
     MAINLINE,
@@ -26,6 +27,8 @@ _DEFAULT_BOARD = "simg301_ek2719a"
 
 # EUSART0, the only UART, reaches PA0-PA8 and PB0-PB3 only (six301-pinctrl.h).
 _EUSART0_PINS = frozenset([*range(9), *range(16, 20)])
+
+_ADVANCED_SCHEMA = ADVANCED_SCHEMA
 
 # Registry entries — collected by variants/__init__.py
 VARIANT_NAME = VARIANT_SIMG301
@@ -61,6 +64,9 @@ def config_schema(config: ConfigType) -> ConfigType:
     if CONF_BOARD not in config:
         config[CONF_BOARD] = _DEFAULT_BOARD
     config[CONF_BOARD] = qualify_board(VARIANT, config[CONF_BOARD])
+    config[CONF_FRAMEWORK][CONF_ADVANCED] = _ADVANCED_SCHEMA(
+        config[CONF_FRAMEWORK].get(CONF_ADVANCED, {})
+    )
     _, framework_ver, sdk_name, _ = resolve_framework_version(
         VARIANT, "simg301", config, "the six301 SoC support first in 4.5.0"
     )
@@ -72,6 +78,7 @@ def config_schema(config: ConfigType) -> ConfigType:
         config,
         framework_type=sdk_name,
         sdk_source=config[CONF_FRAMEWORK].get(CONF_SOURCE),
+        runner=config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_RUNNER),
     )
     return config
 

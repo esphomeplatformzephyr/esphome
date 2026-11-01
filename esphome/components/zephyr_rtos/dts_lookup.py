@@ -889,13 +889,17 @@ def _preprocess_dts_file(
     cmd = _cpp_command(cpp, include_dirs, src_file)
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=True)  # noqa: S603
+        result = subprocess.run(  # noqa: S603
+            cmd, capture_output=True, text=True, check=True, timeout=30
+        )
         return result.stdout
     except subprocess.CalledProcessError as exc:
         lines = (exc.stderr or "").strip().splitlines()
         raise _DtsReadError(
             f"cpp failed: {lines[-1] if lines else 'no output'}"
         ) from exc
+    except subprocess.TimeoutExpired as exc:
+        raise _DtsReadError("cpp timed out") from exc
 
 
 def _find_in_search_roots(
@@ -995,9 +999,12 @@ def _cpp_candidate_works(path: str) -> bool:
         src.write_text("")
         try:
             result = subprocess.run(  # noqa: S603
-                _cpp_command(path, [], src), capture_output=True, check=False
+                _cpp_command(path, [], src),
+                capture_output=True,
+                check=False,
+                timeout=10,
             )
-        except OSError:
+        except (OSError, subprocess.TimeoutExpired):
             return False
     return result.returncode == 0
 
