@@ -1,6 +1,8 @@
 """Tests for the MCUboot swap-size check after a Zephyr RTOS build."""
 
+from dataclasses import dataclass, field
 from pathlib import Path
+import pickle
 from unittest.mock import patch
 
 import pytest
@@ -8,6 +10,7 @@ import pytest
 from esphome.components.zephyr_rtos import mcuboot
 from esphome.components.zephyr_rtos.mcuboot import (
     _mcuboot_swap_limit,
+    _read_slot_layout,
     check_mcuboot_swap_limit,
 )
 from esphome.core import EsphomeError
@@ -134,3 +137,94 @@ def test_check_mcuboot_swap_limit_uses_the_configured_sector_count(
         pytest.raises(EsphomeError, match="can only swap in 389120 bytes"),
     ):
         check_mcuboot_swap_limit(tmp_path, image)
+
+
+# Stand-ins for the edtlib objects edt.pickle holds; edtlib isn't installed for tests
+
+
+@dataclass
+class _Reg:
+    size: int
+
+
+@dataclass
+class _Prop:
+    val: int
+
+
+@dataclass
+class _Node:
+    path: str
+    regs: list[_Reg] = field(default_factory=list)
+    props: dict[str, _Prop] = field(default_factory=dict)
+    parent: "_Node | None" = None
+
+
+@dataclass
+class _Edt:
+    label2node: dict[str, _Node]
+
+
+def _edt(flash_props: dict[str, int], scratch: bool = False) -> _Edt:
+    flash = _Node("/soc/flash@0", props={k: _Prop(v) for k, v in flash_props.items()})
+    partitions = _Node("/soc/flash@0/partitions", parent=flash)
+    labels = {
+        f"slot{index}_partition": _Node(
+            f"/soc/flash@0/partitions/slot{index}", [_Reg(0xD0000)], parent=partitions
+        )
+        for index in (0, 1)
+    }
+    if scratch:
+        labels["scratch_partition"] = _Node(
+            "/soc/flash@0/partitions/scratch", [_Reg(0x2000)], parent=partitions
+        )
+    return _Edt(labels)
+
+
+FLASH_PROPS = {"erase-block-size": 4096, "write-block-size": 1}
+# Imported inside _read_slot_layout(), so patched where it is defined
+_LOAD_EDTLIB = "esphome.components.zephyr_rtos.dts_lookup._load_edtlib"
+
+
+def _mcuboot_dir(tmp_path: Path, edt: object | bytes | None) -> Path:
+    mcuboot_dir = tmp_path / "mcuboot"
+    (mcuboot_dir / "zephyr").mkdir(parents=True)
+    (mcuboot_dir / "CMakeCache.txt").write_text(
+        "CMAKE_BUILD_TYPE:STRING=MinSizeRel\nZEPHYR_BASE:PATH=/sdk/zephyr\n"
+    )
+    if edt is not None:
+        data = edt if isinstance(edt, bytes) else pickle.dumps(edt)
+        (mcuboot_dir / "zephyr" / "edt.pickle").write_bytes(data)
+    return mcuboot_dir
+
+
+@pytest.mark.parametrize("scratch", [False, True])
+def test_read_slot_layout(tmp_path: Path, scratch: bool) -> None:
+    mcuboot_dir = _mcuboot_dir(tmp_path, _edt(FLASH_PROPS, scratch))
+    with patch(_LOAD_EDTLIB, return_value=object()) as load_edtlib:
+        layout = _read_slot_layout(mcuboot_dir)
+    load_edtlib.assert_called_once_with(Path("/sdk/zephyr"))
+    assert layout == {**PICO_W_LAYOUT, "scratch": 0x2000 if scratch else None}
+
+
+@pytest.mark.parametrize(
+    ("edt", "edtlib", "message"),
+    [
+        (_edt(FLASH_PROPS), None, "edtlib is not available"),
+        (b"not a pickle", object(), "edt.pickle"),
+        (_Edt({}), object(), "no slot0/slot1 partition"),
+        (_edt({"erase-block-size": 4096}), object(), "has no erase-block-size"),
+    ],
+)
+def test_read_slot_layout_warns_when_it_cannot_read(
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+    edt: object,
+    edtlib: object,
+    message: str,
+) -> None:
+    mcuboot_dir = _mcuboot_dir(tmp_path, edt)
+    with patch(_LOAD_EDTLIB, return_value=edtlib):
+        assert _read_slot_layout(mcuboot_dir) is None
+    assert "Skipping the MCUboot slot size check" in caplog.text
+    assert message in caplog.text
