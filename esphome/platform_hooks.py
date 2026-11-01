@@ -43,8 +43,11 @@ _LOGGER = logging.getLogger(__name__)
 # Hooks whose loss only degrades diagnostics or upload size; skipping one
 # of these is logged at debug, while skipping a hook that changes what the
 # CLI does (upload method, log transport) warns. A new hook is loud by
-# default.
-COSMETIC_HOOKS: Final = frozenset({"process_stacktrace", "ota_image"})
+# default. has_network_ota is asked several times per run, and losing it
+# is already reported by the upload_program warning.
+COSMETIC_HOOKS: Final = frozenset(
+    {"process_stacktrace", "ota_image", "has_network_ota"}
+)
 
 # Platforms built by zephyr_rtos
 _ZEPHYR_RTOS_PLATFORMS: Final = (
@@ -98,6 +101,8 @@ PLATFORM_HOOKS: Final[dict[str, frozenset[str]]] = {
     "upload_program": frozenset(
         {PLATFORM_ESP32, PLATFORM_NRF52, PLATFORM_RP2, *_ZEPHYR_RTOS_PLATFORMS}
     ),
+    # Whether the config has a network OTA that upload_program handles
+    "has_network_ota": frozenset({PLATFORM_NRF52}),
     "process_stacktrace": frozenset(STACKTRACE_GATES),
     # The file an app update sends, when it is not the build output itself
     "ota_image": frozenset({PLATFORM_BK72XX, PLATFORM_LN882X, PLATFORM_RTL87XX}),

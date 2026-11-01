@@ -23,11 +23,6 @@
 #include <algorithm>
 #include <new>
 #include <utility>
-#ifndef USE_ZEPHYR
-// Zephyr doesn't ship lwIP.
-#include "lwip/dns.h"
-#include "lwip/err.h"
-#endif
 
 #include "esphome/core/application.h"
 #include "esphome/core/hal.h"
