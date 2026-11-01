@@ -502,7 +502,7 @@ def _base_to_code(config: ConfigType) -> None:
 
 def _main_stack_to_code(config: ConfigType) -> None:
     # Espressif matches platform: esp32's 8192 loop task; UDP OTA overflows 4096
-    default_stack = 8192 if zephyr_variant_family() == "esp32" else 4096
+    default_stack = 8192 if zephyr_variant_family() in ("esp32", "rpi_pico") else 4096
     zephyr_add_prj_conf(
         "MAIN_STACK_SIZE",
         config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_MAIN_STACK_SIZE, default_stack),
