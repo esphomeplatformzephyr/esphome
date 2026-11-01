@@ -109,6 +109,8 @@ async def to_code(config: ConfigType) -> None:
     zephyr_add_prj_conf("REBOOT", True)
     # get_mac_address_raw() (zephyr/core.cpp) derives the MAC from the unique ID via hwinfo.
     zephyr_add_prj_conf("HWINFO", True)
+    # The board's defconfig makes no HEX file, which the dashboard offers for a debug probe.
+    zephyr_add_prj_conf("BUILD_OUTPUT_HEX", True)
     if config[CONF_WATCHDOG_TIMEOUT].total_milliseconds:
         # Without a warning time the driver rejects hal.cpp's callback plus reset.
         zephyr_add_prj_conf("WDT_MCUX_WWDT_WARNING_INTERRUPT_CFG", 1023)

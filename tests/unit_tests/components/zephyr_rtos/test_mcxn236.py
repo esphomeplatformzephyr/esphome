@@ -53,6 +53,11 @@ def test_to_code_switches_settings_to_zms() -> None:
     mock_conf.assert_any_call("ZMS_CUSTOM_BLOCK_SIZE", 128)
 
 
+def test_to_code_builds_a_hex_file() -> None:
+    mock_conf, _, _ = _run_to_code()
+    mock_conf.assert_any_call("BUILD_OUTPUT_HEX", True)
+
+
 @pytest.mark.parametrize(("watchdog_ms", "set_warning"), [(10000, True), (0, False)])
 def test_to_code_sets_the_watchdog_warning_only_with_a_watchdog(
     watchdog_ms: int, set_warning: bool
