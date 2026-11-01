@@ -429,6 +429,10 @@ def _check_and_install(
     if install_venv:
         rmdir(python_env, msg=f"Clean up {ver_tag} Python environment")
         create_venv(python_env, msg=ver_tag)
+        # As nrf52: west init's manifest move fails on Windows without it
+        from esphome.components.nrf52.framework import _install_sitecustomize
+
+        _install_sitecustomize(python_env)
 
     if install_venv or requirements_changed:
         _LOGGER.info("Installing Python packages: %s", effective_requirements.split())

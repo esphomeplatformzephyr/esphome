@@ -732,3 +732,15 @@ def test_patch_west_build_tolerates_a_source_dir_on_another_drive(
     _patch_west_build_source_dir_relpath(tmp_path)  # idempotent
     assert build.read_text() == patched
     _patch_west_build_source_dir_relpath(tmp_path / "absent")  # tolerant
+
+
+def test_new_venv_gets_the_windows_rmtree_fix(tmp_path: Path) -> None:
+    """As nrf52: west init's manifest move needs it on Windows; only a new venv gets it."""
+    with patch(
+        "esphome.components.nrf52.framework._install_sitecustomize"
+    ) as install_sitecustomize:
+        _run_check_and_install(tmp_path, None)
+        _run_check_and_install(tmp_path, None)
+    install_sitecustomize.assert_called_once_with(
+        tmp_path / "sdk-zephyr" / "penvs" / "v4.4.1"
+    )
