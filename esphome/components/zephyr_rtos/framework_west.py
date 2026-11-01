@@ -562,7 +562,7 @@ def _check_and_install(
             sentinel.unlink(missing_ok=True)
         if not is_local and not grow_only:
             # A patched tracked file can block west update's checkout.
-            _restore_gen_defines(zephyr_dir)
+            _restore_patched_scripts(zephyr_dir)
         # With `framework: modules:`, a fetch that hasn't finished can't load its manifest
         check_first = not git_modules or not (needs_init or incomplete)
         if hal_filter is not None:
@@ -644,19 +644,37 @@ def _check_and_install(
     if not is_local:
         # Never edit a sdk_source: local checkout; it is the user's own tree.
         _patch_gen_defines_dts_path(zephyr_dir)
+        _patch_west_build_source_dir_relpath(zephyr_dir)
     return python_bin, framework, west_env
 
 
 _GEN_DEFINES = Path("scripts") / "dts" / "gen_defines.py"
+_WEST_BUILD = Path("scripts") / "west_commands" / "build.py"
 
 
-def _restore_gen_defines(zephyr_dir: Path) -> None:
-    if (zephyr_dir / _GEN_DEFINES).is_file():
-        subprocess.run(
-            ["git", "-C", str(zephyr_dir), "checkout", "--", _GEN_DEFINES.as_posix()],
-            check=False,
-            capture_output=True,
-        )
+def _restore_patched_scripts(zephyr_dir: Path) -> None:
+    for script in (_GEN_DEFINES, _WEST_BUILD):
+        if (zephyr_dir / script).is_file():
+            subprocess.run(
+                ["git", "-C", str(zephyr_dir), "checkout", "--", script.as_posix()],
+                check=False,
+                capture_output=True,
+            )
+
+
+def _write_script(path: Path, content: str) -> None:
+    """Replace a framework script atomically, keeping its mode."""
+    # Unique sibling tmp: two builds may patch at once.
+    fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    tmp = Path(tmp_name)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        shutil.copymode(path, tmp)
+        tmp.replace(path)
+    except BaseException:
+        tmp.unlink(missing_ok=True)
+        raise
 
 
 def _patch_gen_defines_dts_path(zephyr_dir: Path) -> None:
@@ -676,14 +694,27 @@ def _patch_gen_defines_dts_path(zephyr_dir: Path) -> None:
             "stays per device and ccache sharing between devices degrades"
         )
         return
-    # Unique sibling tmp: two builds may patch at once.
-    fd, tmp_name = tempfile.mkstemp(dir=gen_defines.parent, suffix=".tmp")
-    tmp = Path(tmp_name)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(patched)
-        shutil.copymode(gen_defines, tmp)
-        tmp.replace(gen_defines)
-    except BaseException:
-        tmp.unlink(missing_ok=True)
-        raise
+    _write_script(gen_defines, patched)
+
+
+_WEST_BUILD_RELPATH = "        srcrel = os.path.relpath(self.source_dir)\n"
+# Zephyr main's replacement, verbatim (zephyr commit dfbdca0e13)
+_WEST_BUILD_RELPATH_SAFE = """        try:
+            srcrel = pathlib.Path(self.source_dir).relative_to(pathlib.Path.cwd(), walk_up=True)
+        except ValueError:
+            srcrel = self.source_dir
+"""
+
+
+def _patch_west_build_source_dir_relpath(zephyr_dir: Path) -> None:
+    """As nrf52's patch: west build names the source dir relative to the
+    workspace, which Python refuses on Windows when the project is on another
+    drive. SDKs that carry Zephyr main's fix (4.5.0) have no line to patch."""
+    build = zephyr_dir / _WEST_BUILD
+    if not build.is_file():
+        return
+    content = build.read_text(encoding="utf-8")
+    if _WEST_BUILD_RELPATH in content:
+        _write_script(
+            build, content.replace(_WEST_BUILD_RELPATH, _WEST_BUILD_RELPATH_SAFE)
+        )

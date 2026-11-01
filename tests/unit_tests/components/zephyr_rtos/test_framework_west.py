@@ -702,3 +702,33 @@ def test_patch_gen_defines_dts_path_without_the_script(tmp_path: Path) -> None:
     )
 
     _patch_gen_defines_dts_path(tmp_path)
+
+
+def test_patch_west_build_tolerates_a_source_dir_on_another_drive(
+    tmp_path: Path,
+) -> None:
+    """West build's relative source path raises across Windows drives; the
+    patch applies Zephyr main's fallback to the absolute path."""
+    from esphome.components.zephyr_rtos.framework_west import (
+        _patch_west_build_source_dir_relpath,
+    )
+
+    build = tmp_path / "scripts" / "west_commands" / "build.py"
+    build.parent.mkdir(parents=True)
+    build.write_text(
+        "    def _sanity_check_source_dir(self):\n"
+        "        srcrel = os.path.relpath(self.source_dir)\n"
+        "        self.check_force(True, srcrel)\n"
+    )
+    _patch_west_build_source_dir_relpath(tmp_path)
+    patched = build.read_text()
+    assert "relative_to(pathlib.Path.cwd(), walk_up=True)" in patched
+    assert (
+        "        except ValueError:\n            srcrel = self.source_dir\n" in patched
+    )
+    assert "os.path.relpath" not in patched
+    assert "        self.check_force(True, srcrel)\n" in patched
+    assert not list(build.parent.glob("*.tmp"))
+    _patch_west_build_source_dir_relpath(tmp_path)  # idempotent
+    assert build.read_text() == patched
+    _patch_west_build_source_dir_relpath(tmp_path / "absent")  # tolerant
