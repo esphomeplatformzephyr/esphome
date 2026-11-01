@@ -1,4 +1,4 @@
-# REGOUT0 written at boot, with the Adafruit bootloader's UICR entries
+# The nRF52 regulator options; REGOUT0 written at boot, with the Adafruit bootloader's UICR entries
 nrf:
   variant: NRF52
   board: adafruit_itsybitsy
@@ -6,6 +6,7 @@ nrf:
     type: zephyr
     advanced:
       bootloader: adafruit_nrf52_sd140_v6
+      dcdc: true
       reg0:
         voltage: 3.3V
         uicr_erase: true

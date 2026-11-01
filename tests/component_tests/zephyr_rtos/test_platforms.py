@@ -8,7 +8,7 @@ import pytest
 
 from esphome.components import logger
 from esphome.components.zephyr import zephyr_data
-from esphome.components.zephyr.const import KEY_PRJ_CONF
+from esphome.components.zephyr.const import KEY_OVERLAY, KEY_PRJ_CONF
 from esphome.config import read_config
 import esphome.config_validation as cv
 from esphome.const import (
@@ -112,22 +112,29 @@ def test_split_default_keys(platform: str, variant: str, expected: list[str]) ->
 
 
 @pytest.mark.parametrize(
-    ("fixture", "vout", "uicr_erase", "adafruit"),
+    ("fixture", "vout", "uicr_erase", "adafruit", "reg1_mode"),
     [
         # Index into 1.8, 2.1, 2.4, 2.7, 3.0, 3.3 V, as platform: nrf52
-        ("nrf_reg0.yaml", "5", True, False),
-        ("nrf_reg0_adafruit.yaml", "4", False, True),
-        ("nrf.yaml", None, False, False),
+        ("nrf_reg0.yaml", "5", True, False, "NRF5X_REG_MODE_DCDC"),
+        ("nrf_reg0_adafruit.yaml", "4", False, True, "NRF5X_REG_MODE_LDO"),
+        # Without either option the board's own devicetree decides
+        ("nrf.yaml", None, False, False, None),
     ],
 )
-def test_nrf52_reg0(
+def test_nrf52_regulators(
     generate_main: Callable[[str | Path], str],
     fixture: str,
     vout: str | None,
     uicr_erase: bool,
     adafruit: bool,
+    reg1_mode: str | None,
 ) -> None:
     generate_main(CONFIG_DIR / fixture)
+    overlay = "".join(zephyr_data()[KEY_OVERLAY].values())
+    if reg1_mode is None:
+        assert "&reg1" not in overlay
+    else:
+        assert f"&reg1 {{ regulator-initial-mode = <{reg1_mode}>; }};" in overlay
     defines = {d.name: str(d.value) for d in CORE.defines}
     assert defines.get("USE_NRF52_REG0_VOUT") == vout
     assert ("USE_NRF52_UICR_ERASE" in defines) is uicr_erase

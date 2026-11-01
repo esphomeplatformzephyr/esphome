@@ -102,6 +102,8 @@ def _dfu_schema(value: bool | ConfigType) -> ConfigType | None:
     return _DFU_SCHEMA(value)
 
 
+# As platform: nrf52: DC/DC or LDO for REG1; only boards with the DC/DC inductor can use DC/DC
+CONF_DCDC = "dcdc"
 # As platform: nrf52: REGOUT0, the GPIO voltage of a board powered through VDDH
 CONF_REG0 = "reg0"
 CONF_UICR_ERASE = "uicr_erase"
@@ -109,6 +111,7 @@ VOLTAGE_LEVELS = [1.8, 2.1, 2.4, 2.7, 3.0, 3.3]
 
 _ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
     {
+        cv.Optional(CONF_DCDC): cv.boolean,
         cv.Optional(CONF_REG0): cv.Schema(
             {
                 cv.Required(CONF_VOLTAGE): cv.All(
@@ -251,7 +254,12 @@ def config_schema(config: ConfigType) -> ConfigType:
 
 
 async def to_code(config: ConfigType) -> None:
-    from .. import zephyr_add_prj_conf, zephyr_set_boot_layout, zephyr_setup_preferences
+    from .. import (
+        zephyr_add_overlay,
+        zephyr_add_prj_conf,
+        zephyr_set_boot_layout,
+        zephyr_setup_preferences,
+    )
 
     cg.add_build_flag("-DUSE_ZEPHYR_VARIANT_NRF52")
     cg.add_define("ESPHOME_BOARD", config[CONF_BOARD])
@@ -276,11 +284,12 @@ async def to_code(config: ConfigType) -> None:
     elif config[CONF_FRAMEWORK][CONF_ADVANCED][CONF_BOOTLOADER] == BOOTLOADER_NRF:
         zephyr_set_boot_layout(_OPEN_DFU_LAYOUT)
     if _board_name(config[CONF_BOARD]) == _DONGLE_BOARD:
-        from .. import zephyr_add_overlay
-
         # The board DTS enables uart0 on edge GPIOs (P0.17, P0.22, P0.24) although nothing is wired to it
         zephyr_add_overlay('&uart0 { status = "disabled"; };')
 
+    if (dcdc := config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_DCDC)) is not None:
+        mode = "NRF5X_REG_MODE_DCDC" if dcdc else "NRF5X_REG_MODE_LDO"
+        zephyr_add_overlay(f"&reg1 {{ regulator-initial-mode = <{mode}>; }};")
     if reg0_config := config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_REG0):
         # Written to UICR at boot by uicr.cpp
         cg.add_define(

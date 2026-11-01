@@ -6,6 +6,7 @@ nrf:
   framework:
     type: zephyr
     advanced:
+      dcdc: false
       bootloader: adafruit_nrf52_sd140_v6
       reg0:
         voltage: 3.0V

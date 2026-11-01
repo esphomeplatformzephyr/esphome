@@ -6,6 +6,7 @@ nrf:
   framework:
     type: zephyr
     advanced:
+      dcdc: true
       reg0:
         voltage: 3.3V
         uicr_erase: true
