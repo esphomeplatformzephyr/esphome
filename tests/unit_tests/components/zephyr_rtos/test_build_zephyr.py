@@ -15,6 +15,7 @@ from esphome.components.zephyr_rtos.build_zephyr import (
     _ccache_env,
     _runner_supports_dev_id,
     check_bootloader_built,
+    generate_cmake_lists,
     resolve_dev_id,
     run_west_blobs_fetch,
     run_west_build,
@@ -312,3 +313,50 @@ def test_check_bootloader_built_without_mcuboot(tmp_path: Path) -> None:
     _domains(tmp_path, "zephyr")
     check_bootloader_built(tmp_path)
     check_bootloader_built(tmp_path / "never-built")
+
+
+# ---------------------------------------------------------------------------
+# generate_cmake_lists
+# ---------------------------------------------------------------------------
+
+
+def _cmake_lists(tmp_path: Path, build_flags: set[str]) -> str:
+    CORE.config_path = tmp_path / "test.yaml"
+    CORE.build_path = tmp_path / "build"
+    CORE.name = "livingroom"
+    CORE.build_flags = build_flags
+    with patch("esphome.build_helpers.pch.pch_enabled", return_value=False):
+        generate_cmake_lists()
+    return (tmp_path / "build" / "zephyr" / "CMakeLists.txt").read_text()
+
+
+def test_build_flags_are_split_and_quoted(tmp_path: Path) -> None:
+    """Entries are split like the other builds do, each flag is quoted as a
+    CMake argument, and the linker flags of one entry stay one group."""
+    text = _cmake_lists(
+        tmp_path,
+        {
+            '-DSTR=\\"hi\\" -DSP="a b" -Wno-unused',
+            "-Wl,--start-group -Wl,-lfoo -Wl,--end-group",
+            "-Wl,--start-group -Wl,-lbar -Wl,--end-group",
+        },
+    )
+    assert (
+        'target_compile_options(app PRIVATE\n  "-DSTR=\\"hi\\""\n  "-DSP=a b"\n)'
+    ) in text
+    assert '  COMPILE_OPTIONS "-Wno-unused"\n' in text
+    assert (
+        "zephyr_ld_options(\n"
+        '  "-Wl,--start-group,-lbar,--end-group"\n'
+        '  "-Wl,--start-group,-lfoo,--end-group"\n'
+        ")"
+    ) in text
+
+
+def test_build_flag_with_semicolon_is_dropped(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    text = _cmake_lists(tmp_path, {"-DLIST=a;b", "-DKEEP=1"})
+    assert "-DLIST" not in text
+    assert '"-DKEEP=1"' in text
+    assert "CMake splits arguments at ';'" in caplog.text

@@ -241,6 +241,7 @@ async def test_app_is_default_initialized(
         (Toolchain.PLATFORMIO, True),
         (Toolchain.ESP_IDF, False),
         (Toolchain.SDK_NRF, False),
+        (Toolchain.SDK_ZEPHYR, False),
     ],
 )
 async def test_no_exceptions_flag_skipped_on_native_cmake_builds(

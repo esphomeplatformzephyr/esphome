@@ -8,8 +8,11 @@ from esphome.build_helpers import pch
 from esphome.const import KEY_CORE, KEY_FRAMEWORK_VERSION
 from esphome.core import CORE, EsphomeError
 from esphome.framework_helpers import (
-    get_project_compile_flags,
-    get_project_link_flags,
+    cmake_escape,
+    get_cmake_compile_flags,
+    get_cmake_link_flags,
+    lex_cmake_build_flags,
+    quote_cmake_args,
     run_command_ok,
 )
 from esphome.helpers import write_file_if_changed
@@ -238,8 +241,9 @@ def generate_cmake_lists() -> bool:
     """
     from esphome.components.zephyr.library import library_compile_options_cmake
 
-    compile_flags = get_project_compile_flags()
-    link_flags = get_project_link_flags()
+    entries = lex_cmake_build_flags("Zephyr")
+    compile_flags = get_cmake_compile_flags(entries)
+    link_flags = get_cmake_link_flags(entries)
 
     lines = [
         "cmake_minimum_required(VERSION 3.20.0)",
@@ -263,7 +267,7 @@ def generate_cmake_lists() -> bool:
         lines += [
             "",
             "target_compile_options(app PRIVATE",
-            *[f'  "{flag}"' for flag in defines],
+            *[f"  {arg}" for arg in quote_cmake_args(defines)],
             ")",
         ]
     if options:
@@ -271,7 +275,7 @@ def generate_cmake_lists() -> bool:
         lines += [
             "",
             "set_source_files_properties(${APP_SOURCES} PROPERTIES",
-            f'  COMPILE_OPTIONS "{";".join(options)}"',
+            f'  COMPILE_OPTIONS "{";".join(cmake_escape(flag) for flag in options)}"',
             ")",
         ]
 
@@ -282,7 +286,7 @@ def generate_cmake_lists() -> bool:
         lines += [
             "",
             "zephyr_ld_options(",
-            *[f'  "{flag}"' for flag in link_flags],
+            *[f"  {arg}" for arg in quote_cmake_args(link_flags)],
             ")",
         ]
 
