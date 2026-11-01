@@ -1804,6 +1804,9 @@ def run_compile(args, config: ConfigType) -> bool:
         snippet_root=zephyr_rtos_data().get(KEY_SNIPPET_ROOT),
         requested_runner=zephyr_rtos_data().get(KEY_RUNNER),
     )
+    from .mcuboot import check_mcuboot_swap_limit
+
+    check_mcuboot_swap_limit(build_dir, CORE.firmware_bin)
     if zephyr_variant() == VARIANT_NRF52:
         from .variants import nrf52
 
