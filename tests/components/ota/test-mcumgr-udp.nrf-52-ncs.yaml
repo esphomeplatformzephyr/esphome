@@ -1,0 +1,8 @@
+# UDP over Thread; kept apart from BLE, which is not run beside 802.15.4 here
+openthread:
+  tlv: 0E080000000000010000
+
+ota:
+  - platform: zephyr_mcumgr
+    transport:
+      udp: true

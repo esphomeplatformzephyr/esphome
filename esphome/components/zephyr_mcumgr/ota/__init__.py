@@ -344,6 +344,8 @@ async def to_code(config: ConfigType) -> None:
                 VARIANTS[zephyr_variant()].uart_node_labels,
             )
         zephyr_add_prj_conf("MCUMGR_TRANSPORT_UART", True)
+        # The mcumgr serial driver; MCUMGR_TRANSPORT_UART depends on it and is dropped without it
+        zephyr_add_prj_conf("UART_MCUMGR", True)
         zephyr_add_prj_conf("BASE64", True)
         zephyr_add_prj_conf("CONSOLE", True)
         zephyr_add_overlay(

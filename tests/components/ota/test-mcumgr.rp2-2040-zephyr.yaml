@@ -1,0 +1,4 @@
+ota:
+  - platform: zephyr_mcumgr
+    transport:
+      hardware_uart: CDC

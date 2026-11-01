@@ -1,0 +1,14 @@
+# zephyr_mcumgr on ESP32: BLE, and UDP over Wi-Fi
+packages:
+  wifi: !include wifi.yaml
+
+network:
+  enable_ipv6: true
+
+zephyr_ble_server:
+
+ota:
+  - platform: zephyr_mcumgr
+    transport:
+      ble: true
+      udp: true

@@ -1,0 +1,8 @@
+# Mainline Zephyr BLE, without NCS's transfer speedup
+zephyr_ble_server:
+
+ota:
+  - platform: zephyr_mcumgr
+    transport:
+      ble: true
+      hardware_uart: UART0
