@@ -24,17 +24,21 @@
 #ifdef CONFIG_PM_STATS
 #include <zephyr/pm/state.h>
 #endif
-#ifdef USE_NRF52
+// The nRF52 details, for platform: nrf52 and the Zephyr RTOS nRF52 variant
+#if defined(USE_NRF52) || defined(USE_ZEPHYR_VARIANT_NRF52)
+#define ESPHOME_DEBUG_NRF52
+#endif
+#ifdef ESPHOME_DEBUG_NRF52
 #include <hal/nrf_power.h>
 
 #define BOOTLOADER_VERSION_REGISTER NRF_TIMER2->CC[0]
-#endif  // USE_NRF52
+#endif  // ESPHOME_DEBUG_NRF52
 
 namespace esphome::debug {
 
 ESPHOME_LOG_TAG(TAG, "debug");
 
-#ifdef USE_NRF52
+#ifdef ESPHOME_DEBUG_NRF52
 constexpr std::uintptr_t MBR_PARAM_PAGE_ADDR = 0xFFC;
 constexpr std::uintptr_t MBR_BOOTLOADER_ADDR = 0xFF8;
 
@@ -70,7 +74,7 @@ static inline uint32_t sd_version_get() {
   }
   return 0;
 }
-#endif  // USE_NRF52
+#endif  // ESPHOME_DEBUG_NRF52
 
 #ifdef CONFIG_THREAD_MONITOR
 static void log_thread_cb(const struct k_thread *thread, void *) {
@@ -199,7 +203,7 @@ void DebugComponent::log_partition_info_() {
 #endif  // CONFIG_FLASH_MAP
 }
 
-#ifdef USE_NRF52
+#ifdef ESPHOME_DEBUG_NRF52
 #ifdef ESPHOME_LOG_HAS_VERBOSE
 // Check if an nRF peripheral's ENABLE register indicates it is enabled.
 // periph: peripheral register prefix (e.g. USBD, UARTE, SPI)
@@ -266,7 +270,7 @@ static const char *regout0_to_str(uint32_t value) {
   }
   return "???V";
 }
-#endif  // USE_NRF52
+#endif  // ESPHOME_DEBUG_NRF52
 
 size_t DebugComponent::get_device_info_(std::span<char, DEVICE_INFO_BUFFER_SIZE> buffer, size_t pos) {
   constexpr size_t size = DEVICE_INFO_BUFFER_SIZE;
@@ -284,7 +288,7 @@ size_t DebugComponent::get_device_info_(std::span<char, DEVICE_INFO_BUFFER_SIZE>
   pos = buf_append_printf(buf, size, pos, "|Cycle counter: %" PRIu32 " Hz", cpu_freq);
 #endif  // !USE_NRF52
 
-#ifdef USE_NRF52
+#ifdef ESPHOME_DEBUG_NRF52
   // Main supply status
   // NOLINTNEXTLINE(clang-analyzer-core.FixedAddressDereference) -- NRF_POWER is MMIO at a fixed address
   auto regstatus = nrf_power_mainregstatus_get(NRF_POWER);
@@ -493,6 +497,8 @@ size_t DebugComponent::get_device_info_(std::span<char, DEVICE_INFO_BUFFER_SIZE>
   }
 #ifdef USE_BOOTLOADER_MCUBOOT
   ESP_LOGD(TAG, "  Bootloader: mcuboot");
+#elif defined(USE_ZEPHYR_VARIANT_NRF52) && !defined(USE_ZEPHYR_NRF52_ADAFRUIT_BOOTLOADER)
+  ESP_LOGD(TAG, "  Bootloader: Nordic Open DFU");
 #else
   ESP_LOGD(TAG, "  Bootloader: Adafruit, version %u.%u.%u", (BOOTLOADER_VERSION_REGISTER >> 16) & 0xFF,
            (BOOTLOADER_VERSION_REGISTER >> 8) & 0xFF, BOOTLOADER_VERSION_REGISTER & 0xFF);
@@ -538,7 +544,7 @@ size_t DebugComponent::get_device_info_(std::span<char, DEVICE_INFO_BUFFER_SIZE>
 #ifdef ESPHOME_LOG_HAS_VERBOSE
   log_peripherals_info();
 #endif
-#endif  // USE_NRF52
+#endif  // ESPHOME_DEBUG_NRF52
   return pos;
 }
 

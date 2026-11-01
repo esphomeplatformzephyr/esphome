@@ -1,0 +1,11 @@
+# The nRF52 details with the Adafruit bootloader and SoftDevice
+packages:
+  debug: !include common.yaml
+
+nrf:
+  variant: NRF52
+  board: adafruit_itsybitsy
+  framework:
+    type: zephyr
+    advanced:
+      bootloader: adafruit_nrf52_sd140_v6

@@ -139,5 +139,9 @@ def test_nrf52_regulators(
     assert defines.get("USE_NRF52_REG0_VOUT") == vout
     assert ("USE_NRF52_UICR_ERASE" in defines) is uicr_erase
     assert ("USE_ZEPHYR_NRF52_ADAFRUIT_BOOTLOADER" in defines) is adafruit
+    # The debug component's bootloader report, as platform: nrf52's
+    assert ("USE_BOOTLOADER_MCUBOOT" in defines) is not adafruit
+    assert defines.get("USE_SOFTDEVICE_ID") == ("140" if adafruit else None)
+    assert defines.get("USE_SOFTDEVICE_VERSION") == ("6" if adafruit else None)
     prj_conf = zephyr_data()[KEY_PRJ_CONF][""]
     assert ("CONFIG_NRFX_NVMC" in prj_conf) is uicr_erase

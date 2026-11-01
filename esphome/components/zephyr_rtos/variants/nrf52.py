@@ -81,6 +81,11 @@ _SOFTDEVICE_END = {
     BOOTLOADER_ADAFRUIT_NRF52_SD140_V6: 0x26000,
     BOOTLOADER_ADAFRUIT_NRF52_SD140_V7: 0x27000,
 }
+# S140 SoftDevice major version of each Adafruit bootloader
+_SOFTDEVICE_VERSION = {
+    BOOTLOADER_ADAFRUIT_NRF52_SD140_V6: 6,
+    BOOTLOADER_ADAFRUIT_NRF52_SD140_V7: 7,
+}
 _ADAFRUIT_BOOTLOADER_START = 0xF4000
 _FLASH_SIZE = 0x100000  # nRF52840
 
@@ -298,8 +303,14 @@ async def to_code(config: ConfigType) -> None:
         if reg0_config[CONF_UICR_ERASE]:
             cg.add_define("USE_NRF52_UICR_ERASE")
             zephyr_add_prj_conf("NRFX_NVMC", True)
-        if sd_end is not None:
-            cg.add_define("USE_ZEPHYR_NRF52_ADAFRUIT_BOOTLOADER")
+    # Read by uicr.cpp and the debug component's bootloader report, as platform: nrf52's
+    bootloader = config[CONF_FRAMEWORK][CONF_ADVANCED][CONF_BOOTLOADER]
+    if bootloader == BOOTLOADER_MCUBOOT:
+        cg.add_define("USE_BOOTLOADER_MCUBOOT")
+    elif (softdevice := _SOFTDEVICE_VERSION.get(bootloader)) is not None:
+        cg.add_define("USE_ZEPHYR_NRF52_ADAFRUIT_BOOTLOADER")
+        cg.add_define("USE_SOFTDEVICE_ID", 140)
+        cg.add_define("USE_SOFTDEVICE_VERSION", softdevice)
 
     CORE.add_job(_bootloader_to_code, config)
     if dfu_config := config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_DFU):
