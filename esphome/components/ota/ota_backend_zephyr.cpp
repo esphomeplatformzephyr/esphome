@@ -20,8 +20,8 @@ ESPHOME_LOG_TAG(TAG, "ota.zephyr");
 std::unique_ptr<ZephyrOTABackend> make_ota_backend() { return make_unique<ZephyrOTABackend>(); }
 
 void ZephyrOTABackend::set_update_md5(const char *md5) {
-  if (parse_hex(md5, this->expected_md5_, 16))
-    this->md5_set_ = true;
+  this->md5_set_ = true;
+  this->md5_valid_ = parse_hex(md5, this->expected_md5_, 16);
 }
 
 // flash_img_init() targets the secondary (slot1) partition, which is the
@@ -79,15 +79,18 @@ OTAResponseTypes ZephyrOTABackend::end() {
     return OTA_RESPONSE_ERROR_UPDATE_END;
   }
 
-  // A hash that failed to parse must fail the update, not skip the check.
-  if (!this->md5_set_) {
-    ESP_LOGE(TAG, "No valid MD5 received");
-    return OTA_RESPONSE_ERROR_MD5_MISMATCH;
-  }
-  this->md5_.calculate();
-  if (!this->md5_.equals_bytes(this->expected_md5_)) {
-    ESP_LOGE(TAG, "MD5 mismatch");
-    return OTA_RESPONSE_ERROR_MD5_MISMATCH;
+  // The check is optional, as on the other backends, but a hash that failed to parse must fail
+  // the update, not skip the check. Without one, MCUboot still validates the image before the swap.
+  if (this->md5_set_) {
+    if (!this->md5_valid_) {
+      ESP_LOGE(TAG, "No valid MD5 received");
+      return OTA_RESPONSE_ERROR_MD5_MISMATCH;
+    }
+    this->md5_.calculate();
+    if (!this->md5_.equals_bytes(this->expected_md5_)) {
+      ESP_LOGE(TAG, "MD5 mismatch");
+      return OTA_RESPONSE_ERROR_MD5_MISMATCH;
+    }
   }
 
   // Mark the secondary slot pending as a test boot: MCUboot will swap it in
