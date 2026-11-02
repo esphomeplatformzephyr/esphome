@@ -28,6 +28,7 @@ class ZephyrOTABackend final {
   size_t bytes_written_{0};
   uint8_t expected_md5_[16]{};
   bool md5_set_{false};
+  bool md5_valid_{false};
 
   // Streams the image into the secondary (slot1) partition; MCUboot swaps it in on reboot.
   flash_img_context img_ctx_{};
