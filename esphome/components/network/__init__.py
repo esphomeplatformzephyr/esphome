@@ -711,6 +711,9 @@ async def to_code(config: ConfigType) -> None:
             "NET_IF_UNICAST_IPV6_ADDR_COUNT",
             max(config[CONF_MIN_IPV6_ADDR_COUNT], ipv6_addr_floor),
         )
+        # The listening sockets are IPv6, so IPv4 clients arrive as mapped addresses.
+        if enable_ipv4:
+            zephyr_add_prj_conf("NET_IPV4_MAPPING_TO_IPV6", True)
 
     cg.add_define("USE_NETWORK_IPV4", enable_ipv4)
     if CORE.is_esp32:

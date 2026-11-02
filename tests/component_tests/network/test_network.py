@@ -1,18 +1,22 @@
 """Tests for network component."""
 
+import asyncio
 from collections.abc import Callable
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from voluptuous import Invalid
 
 from esphome.components.network import (
     CONF_ENABLE_IPV4,
+    CONF_MIN_IPV6_ADDR_COUNT,
     _final_validate,
     _get_data,
     request_ipv4_off,
     require_ipv4,
     require_ipv6,
+    to_code,
 )
 from esphome.config import load_config
 from esphome.const import CONF_ENABLE_IPV6, KEY_FRAMEWORK_VERSION, PlatformFramework
@@ -189,3 +193,27 @@ def test_no_ip_defines_without_network_component(
     generate_main(component_config_path(config_file))
     assert _define_value("USE_NETWORK_IPV4") is None
     assert _define_value("USE_NETWORK_IPV6") is None
+
+
+@pytest.mark.parametrize(
+    ("ipv4", "ipv6", "mapped"),
+    [(True, True, True), (True, False, False), (False, True, False)],
+)
+def test_zephyr_maps_ipv4_only_when_both_families_are_on(
+    set_core_config: SetCoreConfigCallable, ipv4: bool, ipv6: bool, mapped: bool
+) -> None:
+    """IPv6 listening sockets need the mapping to accept IPv4 clients."""
+    set_core_config(PlatformFramework.ESP32_ZEPHYR)
+    CORE.config = {}
+    config = {
+        CONF_ENABLE_IPV4: ipv4,
+        CONF_ENABLE_IPV6: ipv6,
+        CONF_MIN_IPV6_ADDR_COUNT: 0,
+    }
+    with (
+        patch("esphome.components.network.zephyr_add_prj_conf") as mock_conf,
+        patch("esphome.components.network.zephyr_configure_net_contexts"),
+    ):
+        asyncio.run(to_code(config))
+    names = [call.args[0] for call in mock_conf.call_args_list]
+    assert ("NET_IPV4_MAPPING_TO_IPV6" in names) is mapped

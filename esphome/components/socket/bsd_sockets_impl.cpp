@@ -91,6 +91,13 @@ static std::unique_ptr<BSDSocketImpl> create_socket(int domain, int type, int pr
   int ret = ::socket(domain, type, protocol);
   if (ret == -1)
     return nullptr;
+#if USE_NETWORK_IPV4 && USE_NETWORK_IPV6
+  // The default varies by stack; Zephyr's IPv6-only default would refuse IPv4 clients.
+  if (domain == AF_INET6) {
+    int v6only = 0;
+    ::setsockopt(ret, IPPROTO_IPV6, IPV6_V6ONLY, &v6only, sizeof(v6only));
+  }
+#endif
   return make_unique<BSDSocketImpl>(ret, loop_monitored);
 }
 
