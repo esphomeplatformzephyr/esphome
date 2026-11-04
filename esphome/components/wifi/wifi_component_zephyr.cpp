@@ -14,6 +14,8 @@
 #include <zephyr/net/wifi_mgmt.h>
 #include <zephyr/sys/atomic.h>
 
+#include <algorithm>
+#include <array>
 #include <cstring>
 #include <iterator>
 
@@ -26,7 +28,8 @@ namespace esphome::wifi {
 
 ESPHOME_LOG_TAG(TAG, "wifi_zephyr");
 
-// Must match the forward declaration in wifi_component.h -- not in the anonymous namespace below.
+namespace {
+
 struct ZephyrWiFiEvent {
   enum class Type : uint8_t {
     CONNECT_RESULT,
@@ -37,23 +40,14 @@ struct ZephyrWiFiEvent {
     AP_STA_CONNECTED,
     AP_STA_DISCONNECTED,
 #endif
-    SCAN_RESULT,
-    SCAN_DONE,
     IPV4_ADDR_ADD,
 #if USE_NETWORK_IPV6
     IPV6_ADDR_ADD,
 #endif
   };
   Type type;
-  // Only one member is valid, matching type (see wifi_loop_()'s switch) -- union avoids
-  // paying ~50 bytes for wifi_scan_result on the other 7 event types.
-  union {
-    int status;
-    wifi_scan_result scan_result;
-  };
+  int status;
 };
-
-namespace {
 
 net_if *sta_iface = nullptr;              // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 net_if *ap_iface = nullptr;               // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
@@ -72,9 +66,6 @@ bool g_ap_enabled = false;                                       // NOLINT
 // connect/scan/AP-enable, not interface registration) -- deferred until after.
 bool g_wifi_started = false;   // NOLINT
 bool g_sta_manual_ip = false;  // NOLINT
-// Set once from WiFiComponent::wifi_pre_setup_(); read from the producer thread to
-// drop weak scan results before they ever reach the event queue.
-int8_t g_min_scan_rssi = -128;  // NOLINT
 // Set when wifi_sta_connect_() disconnects the current AP itself, so wifi_loop_() does not let
 // that AP's DISCONNECT_RESULT end the attempt started after it. Main loop only.
 bool g_expect_disconnect = false;  // NOLINT
@@ -83,29 +74,116 @@ bool g_expect_disconnect = false;  // NOLINT
 K_SEM_DEFINE(disconnect_sem, 0, 1);
 constexpr int32_t DISCONNECT_WAIT_MS = 1000;
 
-// Kernel message queue of event pointers, from the net_mgmt thread to wifi_loop_().
+// Kernel message queue of events, from the net_mgmt thread to wifi_loop_().
 constexpr uint8_t EVENT_QUEUE_SIZE = 16;
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-K_MSGQ_DEFINE(event_queue, sizeof(ZephyrWiFiEvent *), EVENT_QUEUE_SIZE, alignof(ZephyrWiFiEvent *));
+K_MSGQ_DEFINE(event_queue, sizeof(ZephyrWiFiEvent), EVENT_QUEUE_SIZE, alignof(ZephyrWiFiEvent));
 // Events lost to a full queue, reported by wifi_loop_().
 atomic_t dropped_events = ATOMIC_INIT(0);  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
-// Fixed pool backing event_queue. Up to 16 queued + 1 being read by wifi_loop_() are live,
-// and a slot is written before the push can fail, so the pool needs one spare beyond that.
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
-ZephyrWiFiEvent event_pool[EVENT_QUEUE_SIZE + 2];
-uint8_t next_pool_slot = 0;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
-
-ZephyrWiFiEvent *claim_pool_slot() { return &event_pool[next_pool_slot]; }
-
-void commit_pool_slot() { next_pool_slot = (next_pool_slot + 1) % std::size(event_pool); }
-
 void push_event(ZephyrWiFiEvent::Type type, int status = 0) {
-  ZephyrWiFiEvent *event = claim_pool_slot();
-  event->type = type;
-  event->status = status;
-  if (global_wifi_component != nullptr && global_wifi_component->push_zephyr_wifi_event(event)) {
-    commit_pool_slot();
+  const ZephyrWiFiEvent event{type, status};
+  if (k_msgq_put(&event_queue, &event, K_NO_WAIT) != 0) {
+    atomic_inc(&dropped_events);
+  }
+}
+
+// Scan records stay out of the event queue, since a scan can report every AP in range at once.
+// The main loop prepares this storage and reads it only after the handler reports the scan done.
+struct ScanCandidate {
+  uint8_t bssid[6];
+  uint8_t channel;
+  int8_t rssi;
+  bool with_auth;
+  uint8_t sta_index;
+};
+
+// Used when every network is wanted, not only the configured ones.
+struct ScanRecord {
+  uint8_t bssid[6];
+  uint8_t channel;
+  int8_t rssi;
+  bool with_auth;
+  uint8_t ssid_length;
+  char ssid[WIFI_SSID_MAX_LEN + 1];
+};
+
+constexpr size_t SCAN_RECORD_BOUND = 32;
+constexpr uint16_t SCAN_DWELL_TIME_MS = 300;
+
+constexpr atomic_val_t SCAN_STATE_IDLE = 0;
+constexpr atomic_val_t SCAN_STATE_RUNNING = 1;
+constexpr atomic_val_t SCAN_STATE_DONE = 2;
+constexpr atomic_val_t SCAN_STATE_FAILED = 3;
+atomic_t scan_state = ATOMIC_INIT(SCAN_STATE_IDLE);  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
+FixedVector<uint32_t> scan_targets;  // SSID hashes, one per entry of sta_, so the event thread never reads sta_
+std::array<ScanCandidate, WIFI_SCAN_RESULT_BOUND> scan_candidates;
+size_t scan_candidate_count = 0;
+ScanRecord *scan_records = nullptr;  // Allocated on first use and kept, so scans do not churn the heap
+bool scan_keep_all = false;
+size_t scan_record_count = 0;
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
+
+uint32_t scan_ssid_hash(const uint8_t *ssid, size_t length) {
+  uint32_t hash = FNV1_OFFSET_BASIS;
+  for (size_t i = 0; i < length; i++) {
+    hash = fnv1a_hash_extend(hash, ssid[i]);
+  }
+  return hash;
+}
+
+// Records arrive in scan order, not by signal: a full store replaces its weakest entry.
+template<typename T> void keep_strongest(T *store, size_t &count, size_t bound, const T &record) {
+  T *weakest = nullptr;
+  for (size_t i = 0; i < count; i++) {
+    if (std::memcmp(store[i].bssid, record.bssid, sizeof(record.bssid)) == 0) {
+      if (record.rssi > store[i].rssi) {
+        store[i] = record;
+      }
+      return;
+    }
+    if (weakest == nullptr || store[i].rssi < weakest->rssi) {
+      weakest = &store[i];
+    }
+  }
+  if (count < bound) {
+    store[count++] = record;
+  } else if (weakest != nullptr && record.rssi > weakest->rssi) {
+    *weakest = record;
+  }
+}
+
+// Runs on the net_mgmt thread, so no logging: a busy site would flood the log from a small stack.
+void store_scan_result(const wifi_scan_result &result) {
+  if (atomic_get(&scan_state) != SCAN_STATE_RUNNING) {
+    return;
+  }
+  const bool with_auth = result.security != WIFI_SECURITY_TYPE_NONE;
+  if (scan_keep_all) {
+    ScanRecord record{};
+    std::memcpy(record.bssid, result.mac, sizeof(record.bssid));
+    record.channel = result.channel;
+    record.rssi = result.rssi;
+    record.with_auth = with_auth;
+    record.ssid_length = std::min<size_t>(result.ssid_length, WIFI_SSID_MAX_LEN);
+    std::memcpy(record.ssid, result.ssid, record.ssid_length);
+    keep_strongest(scan_records, scan_record_count, SCAN_RECORD_BOUND, record);
+    return;
+  }
+  const uint32_t hash = scan_ssid_hash(result.ssid, result.ssid_length);
+  for (size_t i = 0; i < scan_targets.size(); i++) {
+    if (scan_targets[i] == hash) {
+      ScanCandidate candidate{};
+      std::memcpy(candidate.bssid, result.mac, sizeof(candidate.bssid));
+      candidate.channel = result.channel;
+      candidate.rssi = result.rssi;
+      candidate.with_auth = with_auth;
+      candidate.sta_index = i;
+      keep_strongest(scan_candidates.data(), scan_candidate_count, scan_candidates.size(), candidate);
+      return;
+    }
   }
 }
 
@@ -140,24 +218,15 @@ void wifi_event_handler(net_mgmt_event_callback *cb, uint64_t mgmt_event, net_if
       push_event(ZephyrWiFiEvent::Type::AP_STA_DISCONNECTED);
       break;
 #endif
-    case NET_EVENT_WIFI_SCAN_RESULT: {
-      const auto *result = static_cast<const wifi_scan_result *>(cb->info);
-      ESP_LOGV(TAG, "Scan result: ssid='%.*s' rssi=%d min=%d", result->ssid_length,
-               reinterpret_cast<const char *>(result->ssid), result->rssi, g_min_scan_rssi);
-      if (result->rssi < g_min_scan_rssi) {
-        break;  // too weak -- drop before it ever reaches the queue
-      }
-      ZephyrWiFiEvent *event = claim_pool_slot();
-      event->type = ZephyrWiFiEvent::Type::SCAN_RESULT;
-      event->scan_result = *result;
-      if (global_wifi_component != nullptr && global_wifi_component->push_zephyr_wifi_event(event)) {
-        commit_pool_slot();
-      }
+    case NET_EVENT_WIFI_SCAN_RESULT:
+      store_scan_result(*static_cast<const wifi_scan_result *>(cb->info));
+      break;
+    case NET_EVENT_WIFI_SCAN_DONE: {
+      const auto *status = static_cast<const wifi_status *>(cb->info);
+      const bool failed = status == nullptr || status->status != 0;
+      atomic_cas(&scan_state, SCAN_STATE_RUNNING, failed ? SCAN_STATE_FAILED : SCAN_STATE_DONE);
       break;
     }
-    case NET_EVENT_WIFI_SCAN_DONE:
-      push_event(ZephyrWiFiEvent::Type::SCAN_DONE);
-      break;
     default:
       break;
   }
@@ -223,16 +292,7 @@ void first_ipv4(net_if *iface, net_if_addr *addr, void *user_data) {
 
 }  // namespace
 
-bool WiFiComponent::push_zephyr_wifi_event(void *event) {
-  if (k_msgq_put(&event_queue, &event, K_NO_WAIT) != 0) {
-    atomic_inc(&dropped_events);
-    return false;
-  }
-  return true;
-}
-
 void WiFiComponent::wifi_pre_setup_() {
-  g_min_scan_rssi = this->min_scan_rssi_;
   sta_iface = net_if_get_wifi_sta();
   ap_iface = net_if_get_wifi_sap();
   uint64_t wifi_events = NET_EVENT_WIFI_CONNECT_RESULT | NET_EVENT_WIFI_DISCONNECT_RESULT |
@@ -483,16 +543,120 @@ bool WiFiComponent::wifi_scan_start_(bool passive) {
   if (sta_iface == nullptr) {
     return false;
   }
-  this->scan_result_.clear();
-  this->scan_done_ = false;
+  atomic_set(&scan_state, SCAN_STATE_IDLE);
+  // Allocated on first use and kept; a failure is covered by keep_all below
+  if (scan_targets.capacity() < this->sta_.size()) {
+    scan_targets.try_init(this->sta_.size());
+  }
+  scan_targets.clear();
+  scan_candidate_count = 0;
+  scan_record_count = 0;
+
   wifi_scan_params params{};
   params.scan_type = passive ? WIFI_SCAN_TYPE_PASSIVE : WIFI_SCAN_TYPE_ACTIVE;
+  params.dwell_time_active = SCAN_DWELL_TIME_MS;
+  params.dwell_time_passive = SCAN_DWELL_TIME_MS;
+
+  // A network configured by BSSID alone has no SSID to match on, so it needs every record too
+  bool keep_all = this->needs_full_scan_results_() || this->sta_.size() > scan_targets.capacity();
+  for (const auto &sta : this->sta_) {
+    keep_all |= sta.ssid_.empty();
+    scan_targets.push_back(scan_ssid_hash(reinterpret_cast<const uint8_t *>(sta.ssid_.c_str()), sta.ssid_.size()));
+  }
+  if (keep_all && scan_records == nullptr) {
+    scan_records = RAMAllocator<ScanRecord>().allocate(SCAN_RECORD_BOUND);
+    if (scan_records == nullptr) {
+      ESP_LOGW(TAG, "No memory for %zu scan results", SCAN_RECORD_BOUND);
+    }
+  }
+  scan_keep_all = keep_all && scan_records != nullptr;
+  if (!keep_all) {
+    // These only reduce what the driver reports; store_scan_result() still does the filtering
+    if (this->sta_.size() <= std::size(params.ssids)) {
+      for (size_t i = 0; i < this->sta_.size(); i++) {
+        params.ssids[i] = this->sta_[i].ssid_.c_str();
+      }
+    }
+    size_t channels = 0;
+    bool all_channels_known = true;
+    for (const auto &sta : this->sta_) {
+      if (!sta.has_channel()) {
+        all_channels_known = false;
+        break;
+      }
+      bool known = false;
+      for (size_t i = 0; i < channels; i++) {
+        known |= params.band_chan[i].channel == sta.get_channel();
+      }
+      if (known) {
+        continue;
+      }
+      if (channels == std::size(params.band_chan)) {
+        all_channels_known = false;
+        break;
+      }
+      params.band_chan[channels++] = {WIFI_FREQ_BAND_2_4_GHZ, sta.get_channel()};
+    }
+    if (!all_channels_known) {
+      std::memset(params.band_chan, 0, sizeof(params.band_chan));
+    }
+  }
+
   g_wifi_started = true;
+  atomic_set(&scan_state, SCAN_STATE_RUNNING);
   int ret = net_mgmt(NET_REQUEST_WIFI_SCAN, sta_iface, &params, sizeof(params));
   if (ret != 0) {
+    atomic_set(&scan_state, SCAN_STATE_IDLE);
     ESP_LOGV(TAG, "NET_REQUEST_WIFI_SCAN failed: %d", ret);
+    return false;
   }
-  return ret == 0;
+  this->scan_done_ = false;
+  return true;
+}
+
+void WiFiComponent::wifi_scan_finished_(bool success) {
+  const bool needs_full = this->needs_full_scan_results_();
+  const size_t stored = scan_keep_all ? scan_record_count : scan_candidate_count;
+  const size_t wanted = success ? stored : 0;
+  {
+    ScanResultsLock lock(this);
+    this->scan_result_.clear();
+    this->scan_done_ = true;
+    if (wanted > 0 && this->scan_result_.capacity() < wanted && !this->scan_result_.try_init(wanted)) {
+      // The retry logic scans again
+      ESP_LOGW(TAG, "No memory for %zu scan results", wanted);
+    } else if (wanted > 0 && scan_keep_all) {
+      for (size_t i = 0; i < scan_record_count; i++) {
+        const ScanRecord &record = scan_records[i];
+        if (!needs_full && !this->matches_configured_network_(record.ssid, record.bssid)) {
+          this->log_discarded_scan_result_(record.ssid, record.bssid, record.rssi, record.channel);
+          continue;
+        }
+        bssid_t bssid{};
+        std::copy(std::begin(record.bssid), std::end(record.bssid), bssid.begin());
+        this->scan_result_.emplace_back(bssid, record.ssid, record.ssid_length, record.channel, record.rssi,
+                                        record.with_auth, record.ssid_length == 0);
+      }
+    } else if (wanted > 0) {
+      for (size_t i = 0; i < scan_candidate_count; i++) {
+        const ScanCandidate &candidate = scan_candidates[i];
+        // The networks can change during a scan
+        if (candidate.sta_index >= this->sta_.size()) {
+          continue;
+        }
+        const WiFiAP &sta = this->sta_[candidate.sta_index];
+        bssid_t bssid{};
+        std::copy(std::begin(candidate.bssid), std::end(candidate.bssid), bssid.begin());
+        this->scan_result_.emplace_back(bssid, sta.ssid_.c_str(), sta.ssid_.size(), candidate.channel, candidate.rssi,
+                                        candidate.with_auth, false);
+      }
+    }
+  }
+  atomic_set(&scan_state, SCAN_STATE_IDLE);
+  ESP_LOGV(TAG, "Scan complete: %zu stored", this->scan_result_.size());
+#ifdef USE_WIFI_SCAN_RESULTS_LISTENERS
+  this->notify_scan_results_listeners_();
+#endif
 }
 
 #ifdef USE_WIFI_AP
@@ -687,15 +851,13 @@ network::IPAddress WiFiComponent::wifi_dns_ip_(int num) {
 }
 
 bool WiFiComponent::wifi_loop_() {
-  ZephyrWiFiEvent *event = nullptr;
-  if (k_msgq_get(&event_queue, &event, K_NO_WAIT) != 0) {
-    return false;
-  }
-
-  do {
-    switch (event->type) {
+  bool processed = false;
+  ZephyrWiFiEvent event;
+  while (k_msgq_get(&event_queue, &event, K_NO_WAIT) == 0) {
+    processed = true;
+    switch (event.type) {
       case ZephyrWiFiEvent::Type::CONNECT_RESULT:
-        if (event->status == 0) {
+        if (event.status == 0) {
           g_expect_disconnect = false;
           g_sta_status = WiFiSTAConnectStatus::CONNECTED;
           if (g_sta_manual_ip) {
@@ -749,18 +911,18 @@ bool WiFiComponent::wifi_loop_() {
 #endif
         break;
       case ZephyrWiFiEvent::Type::AP_ENABLE_RESULT:
-        if (event->status == 0) {
+        if (event.status == 0) {
           ESP_LOGD(TAG, "AP enabled");
         } else {
-          ESP_LOGE(TAG, "AP enable failed: %d", event->status);
+          ESP_LOGE(TAG, "AP enable failed: %d", event.status);
           g_ap_enabled = false;
         }
         break;
       case ZephyrWiFiEvent::Type::AP_DISABLE_RESULT:
-        if (event->status == 0) {
+        if (event.status == 0) {
           ESP_LOGD(TAG, "AP disabled");
         } else {
-          ESP_LOGW(TAG, "AP disable failed: %d", event->status);
+          ESP_LOGW(TAG, "AP disable failed: %d", event.status);
           g_ap_enabled = true;
         }
         break;
@@ -775,31 +937,6 @@ bool WiFiComponent::wifi_loop_() {
         ESP_LOGV(TAG, "AP client disconnected");
         break;
 #endif
-      case ZephyrWiFiEvent::Type::SCAN_RESULT: {
-        const wifi_scan_result &result = event->scan_result;
-        char ssid_buf[SSID_BUFFER_SIZE];
-        size_t len = std::min(static_cast<size_t>(result.ssid_length), sizeof(ssid_buf) - 1);
-        memcpy(ssid_buf, result.ssid, len);
-        ssid_buf[len] = '\0';
-        if (!this->needs_full_scan_results_() && !this->matches_configured_network_(ssid_buf, result.mac)) {
-          this->log_discarded_scan_result_(ssid_buf, result.mac, result.rssi, result.channel);
-          break;
-        }
-        bssid_t bssid{};
-        std::copy(std::begin(result.mac), std::begin(result.mac) + 6, bssid.begin());
-        WiFiScanResult scan_result(bssid, ssid_buf, len, result.channel, result.rssi,
-                                   result.security != WIFI_SECURITY_TYPE_NONE, len == 0);
-        if (std::find(this->scan_result_.begin(), this->scan_result_.end(), scan_result) == this->scan_result_.end()) {
-          this->scan_result_.push_back(scan_result);
-        }
-        break;
-      }
-      case ZephyrWiFiEvent::Type::SCAN_DONE:
-        this->scan_done_ = true;
-#ifdef USE_WIFI_SCAN_RESULTS_LISTENERS
-        this->notify_scan_results_listeners_();
-#endif
-        break;
       case ZephyrWiFiEvent::Type::IPV4_ADDR_ADD:
 #if USE_NETWORK_IPV4
         this->got_ipv4_address_ = true;
@@ -822,8 +959,13 @@ bool WiFiComponent::wifi_loop_() {
         break;
 #endif
     }
-    // event points into the static pool (see push_event()/claim_pool_slot()), not owned here.
-  } while (k_msgq_get(&event_queue, &event, K_NO_WAIT) == 0);
+  }
+
+  const atomic_val_t state = atomic_get(&scan_state);
+  if (state == SCAN_STATE_DONE || state == SCAN_STATE_FAILED) {
+    this->wifi_scan_finished_(state == SCAN_STATE_DONE);
+    processed = true;
+  }
 
   const atomic_val_t dropped = atomic_clear(&dropped_events);
   if (dropped > 0) {
@@ -831,7 +973,7 @@ bool WiFiComponent::wifi_loop_() {
     // The previous AP's leave event may be among them, so it can no longer be told apart
     g_expect_disconnect = false;
   }
-  return true;
+  return processed;
 }
 
 }  // namespace esphome::wifi

@@ -207,12 +207,11 @@ struct EAPAuth {
 using bssid_t = std::array<uint8_t, 6>;
 
 // ESP32 with one configured network: the driver filters the scan by its SSID and only this many of
-// its BSSIDs are kept, the strongest ones
+// its BSSIDs are kept, the strongest ones. Zephyr keeps this many matches of all its configured networks.
 static constexpr size_t WIFI_SCAN_RESULT_BOUND = 12;
 
-// RP2040's callback delivers results one at a time with no count, so it needs a growable vector.
-// Zephyr's callback is likewise one NET_EVENT_WIFI_SCAN_RESULT per AP with no advance count.
-#if defined(USE_RP2) || defined(USE_ZEPHYR)
+// RP2040's callback delivers results one at a time with no count, so it needs a growable vector
+#if defined(USE_RP2)
 template<typename T> using wifi_scan_vector_t = std::vector<T>;
 #else
 template<typename T> using wifi_scan_vector_t = FixedVector<T>;
@@ -403,10 +402,6 @@ struct IDFWiFiEvent;
 
 #ifdef USE_LIBRETINY
 struct LTWiFiEvent;
-#endif
-
-#ifdef USE_ZEPHYR
-struct ZephyrWiFiEvent;
 #endif
 
 /** Listener interface for WiFi IP state changes.
@@ -740,12 +735,6 @@ class WiFiComponent final : public Component {
   }
 #endif  // USE_ESP32 && USE_WIFI_RUNTIME_ROAMING_SUPPRESSION
 
-#ifdef USE_ZEPHYR
-  /// Returns false (caller keeps ownership) if the queue is full.
-  bool push_zephyr_wifi_event(void *event);
-  void set_min_scan_rssi(int8_t min_rssi) { this->min_scan_rssi_ = min_rssi; }
-#endif
-
  protected:
 #ifdef USE_WIFI_AP
   void setup_ap_config_();
@@ -838,6 +827,9 @@ class WiFiComponent final : public Component {
   }
 
   bool wifi_loop_();
+#ifdef USE_ZEPHYR
+  void wifi_scan_finished_(bool success);
+#endif
 #ifdef USE_ESP8266
   void process_pending_callbacks_();
 #endif
@@ -1220,12 +1212,6 @@ class WiFiComponent final : public Component {
 #else
   FreeRTOSQueue<LTWiFiEvent, LT_EVENT_QUEUE_SIZE> event_queue_;
 #endif
-#endif
-
-#ifdef USE_ZEPHYR
-  // Scan results weaker than this (dBm) are dropped before queuing. -128 (default) is
-  // below any real RSSI, so filtering is off unless min_rssi: is configured.
-  int8_t min_scan_rssi_{-128};
 #endif
 
  private:

@@ -48,7 +48,6 @@ from esphome.const import (
     CONF_IDENTITY,
     CONF_KEY,
     CONF_MANUAL_IP,
-    CONF_MIN_RSSI,
     CONF_NETWORKS,
     CONF_ON_CONNECT,
     CONF_ON_DISCONNECT,
@@ -811,11 +810,6 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_USE_PSRAM): cv.All(
                 cv.only_on_esp32, cv.requires_component("psram"), cv.boolean
             ),
-            cv.Optional(CONF_MIN_RSSI): cv.All(
-                cv.decibel,
-                cv.int_range(min=-100, max=-20),
-                cv.only_on_zephyr_rtos,
-            ),
         }
     ),
     cv.key_requires(CONF_ON_DPP_URI, CONF_DPP),
@@ -1105,7 +1099,10 @@ async def to_code(config):
         if CONF_AP in config:
             # AP-mode code (wifi_component_zephyr.cpp) needs this for DHCP to work.
             zephyr_add_prj_conf("NET_DHCPV4_SERVER", True)
-        cg.add_optional(var.set_min_scan_rssi, config.get(CONF_MIN_RSSI))
+        # Room for the scan to name each network's channel; the Kconfig default is 3
+        channels = {network.get(CONF_CHANNEL) for network in networks}
+        if None not in channels and len(channels) > 3:
+            zephyr_add_prj_conf("WIFI_MGMT_SCAN_CHAN_MAX_MANUAL", len(channels))
 
     if CORE.is_esp32:
         if config[CONF_ENABLE_BTM] or config[CONF_ENABLE_RRM]:
