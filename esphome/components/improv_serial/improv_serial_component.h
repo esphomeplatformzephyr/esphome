@@ -28,6 +28,8 @@
 #endif
 #elif defined(USE_ARDUINO)
 #include <HardwareSerial.h>
+#elif defined(USE_ZEPHYR)
+#include <zephyr/drivers/uart.h>
 #endif
 
 namespace esphome::improv_serial {
@@ -156,6 +158,10 @@ class ImprovSerialComponent final : public Component, public improv_base::Improv
       this->hw_serial_->readBytes(&data, 1);
       byte = data;
     }
+#elif defined(USE_ZEPHYR)
+    if (this->uart_dev_ != nullptr && uart_poll_in(this->uart_dev_, &data) == 0) {
+      byte = data;
+    }
 #endif
     return byte;
   }
@@ -183,6 +189,8 @@ class ImprovSerialComponent final : public Component, public improv_base::Improv
   logger::UARTSelection uart_selection_{logger::UART_SELECTION_UART0};
 #elif defined(USE_ARDUINO)
   Stream *hw_serial_{nullptr};
+#elif defined(USE_ZEPHYR)
+  const device *uart_dev_{nullptr};
 #endif
 
   std::vector<uint8_t> rx_buffer_;
