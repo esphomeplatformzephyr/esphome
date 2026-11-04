@@ -146,7 +146,7 @@ struct ScanCandidate {
   uint8_t bssid[6];
   uint8_t channel;
   int8_t rssi;
-  bool with_auth;
+  uint8_t security;  // wifi_security_type
   uint8_t sta_index;
 };
 
@@ -155,7 +155,7 @@ struct ScanRecord {
   uint8_t bssid[6];
   uint8_t channel;
   int8_t rssi;
-  bool with_auth;
+  uint8_t security;  // wifi_security_type
   uint8_t ssid_length;
   char ssid[WIFI_SSID_MAX_LEN + 1];
 };
@@ -212,13 +212,12 @@ void store_scan_result(const wifi_scan_result &result) {
   if (atomic_get(&scan_state) != SCAN_STATE_RUNNING) {
     return;
   }
-  const bool with_auth = result.security != WIFI_SECURITY_TYPE_NONE;
   if (scan_keep_all) {
     ScanRecord record{};
     std::memcpy(record.bssid, result.mac, sizeof(record.bssid));
     record.channel = result.channel;
     record.rssi = result.rssi;
-    record.with_auth = with_auth;
+    record.security = result.security;
     record.ssid_length = std::min<size_t>(result.ssid_length, WIFI_SSID_MAX_LEN);
     std::memcpy(record.ssid, result.ssid, record.ssid_length);
     keep_strongest(scan_records, scan_record_count, SCAN_RECORD_BOUND, record);
@@ -231,7 +230,7 @@ void store_scan_result(const wifi_scan_result &result) {
       std::memcpy(candidate.bssid, result.mac, sizeof(candidate.bssid));
       candidate.channel = result.channel;
       candidate.rssi = result.rssi;
-      candidate.with_auth = with_auth;
+      candidate.security = result.security;
       candidate.sta_index = i;
       keep_strongest(scan_candidates.data(), scan_candidate_count, scan_candidates.size(), candidate);
       return;
@@ -591,6 +590,81 @@ void fill_ssid_and_security(wifi_connect_req_params &params, const CompactString
   }
 }
 
+// What the last scan saw on this AP. UNKNOWN when it saw nothing, as with fast_connect.
+wifi_security_type scanned_security(const uint8_t *bssid) {
+  if (atomic_get(&scan_state) == SCAN_STATE_IDLE) {
+    for (size_t i = 0; i < scan_candidate_count; i++) {
+      if (std::memcmp(scan_candidates[i].bssid, bssid, sizeof(scan_candidates[i].bssid)) == 0) {
+        return static_cast<wifi_security_type>(scan_candidates[i].security);
+      }
+    }
+    for (size_t i = 0; scan_records != nullptr && i < scan_record_count; i++) {
+      if (std::memcmp(scan_records[i].bssid, bssid, sizeof(scan_records[i].bssid)) == 0) {
+        return static_cast<wifi_security_type>(scan_records[i].security);
+      }
+    }
+  }
+  return WIFI_SECURITY_TYPE_UNKNOWN;
+}
+
+bool meets_min_auth_mode(wifi_security_type security, WifiMinAuthMode min_auth_mode) {
+  switch (security) {
+    case WIFI_SECURITY_TYPE_WPA_PSK:
+      return min_auth_mode == WIFI_MIN_AUTH_MODE_WPA;
+    case WIFI_SECURITY_TYPE_PSK:
+    case WIFI_SECURITY_TYPE_PSK_SHA256:
+    case WIFI_SECURITY_TYPE_WPA_AUTO_PERSONAL:
+      return min_auth_mode != WIFI_MIN_AUTH_MODE_WPA3;
+    case WIFI_SECURITY_TYPE_SAE:
+    case WIFI_SECURITY_TYPE_SAE_H2E:
+    case WIFI_SECURITY_TYPE_SAE_AUTO:
+      return true;
+    default:
+      return false;
+  }
+}
+
+#ifdef USE_WIFI_WPA2_EAP
+// The driver keeps its own copy of the certificates, sent ahead of the connect.
+bool fill_eap(wifi_connect_req_params &params, const EAPAuth &eap) {
+  const auto bytes = [](const char *text) { return reinterpret_cast<const uint8_t *>(text); };
+  params.anon_id = bytes(eap.identity.c_str());
+  params.aid_length = eap.identity.size();
+  params.eap_identity = bytes(eap.username.c_str());
+  params.eap_id_length = eap.username.size();
+  params.eap_password = bytes(eap.password.c_str());
+  params.eap_passwd_length = eap.password.size();
+
+  const bool has_ca_cert = eap.ca_cert != nullptr && eap.ca_cert[0] != '\0';
+  const bool has_client_cert = eap.client_cert != nullptr && eap.client_cert[0] != '\0';
+  wifi_enterprise_creds_params creds{};
+  // The length counts the terminator, which the PEM parser needs
+  const auto set_cred = [](uint8_t *&cred, uint32_t &length, const char *pem) {
+    cred =
+        const_cast<uint8_t *>(reinterpret_cast<const uint8_t *>(pem));  // NOLINT(cppcoreguidelines-pro-type-const-cast)
+    length = strlen(pem) + 1;
+  };
+  if (has_ca_cert) {
+    set_cred(creds.ca_cert, creds.ca_cert_len, eap.ca_cert);
+    params.verify_peer_cert = true;
+  }
+  if (has_client_cert) {
+    set_cred(creds.client_cert, creds.client_cert_len, eap.client_cert);
+    set_cred(creds.client_key, creds.client_key_len, eap.client_key);
+    params.key_passwd = params.eap_password;
+    params.key_passwd_length = params.eap_passwd_length;
+    params.security = WIFI_SECURITY_TYPE_EAP_TLS;
+  } else {
+    params.security = eap.use_ttls ? WIFI_SECURITY_TYPE_EAP_TTLS_MSCHAPV2 : WIFI_SECURITY_TYPE_EAP_PEAP_MSCHAPV2;
+  }
+  const int ret = net_mgmt(NET_REQUEST_WIFI_ENTERPRISE_CREDS, sta_iface, &creds, sizeof(creds));
+  if (ret != 0) {
+    ESP_LOGW(TAG, "NET_REQUEST_WIFI_ENTERPRISE_CREDS failed: %d", ret);
+  }
+  return ret == 0;
+}
+#endif  // USE_WIFI_WPA2_EAP
+
 bool get_iface_status(net_if *iface, wifi_iface_status *status) {
   if (iface == nullptr) {
     return false;
@@ -618,6 +692,22 @@ bool WiFiComponent::wifi_sta_connect_(const WiFiAP &ap) {
   }
   params.channel = ap.has_channel() ? ap.get_channel() : WIFI_CHANNEL_ANY;
   params.timeout = SYS_FOREVER_MS;
+  if (!ap.password_.empty()) {
+    wifi_security_type security = ap.has_bssid() ? scanned_security(ap.get_bssid().data()) : WIFI_SECURITY_TYPE_UNKNOWN;
+    if (security == WIFI_SECURITY_TYPE_UNKNOWN) {
+      security = WIFI_SECURITY_TYPE_WPA_AUTO_PERSONAL;
+    }
+    // A mixed AP joins at the strongest level the setting allows
+    if (security == WIFI_SECURITY_TYPE_WPA_AUTO_PERSONAL && this->min_auth_mode_ == WIFI_MIN_AUTH_MODE_WPA3) {
+      security = WIFI_SECURITY_TYPE_SAE;
+    }
+    if (!meets_min_auth_mode(security, this->min_auth_mode_)) {
+      ESP_LOGW(TAG, "AP security '%s' is below min_auth_mode", wifi_security_txt(security));
+      g_sta_status = WiFiSTAConnectStatus::ERROR_CONNECT_FAILED;
+      return false;
+    }
+    params.security = security;
+  }
 
   // A connect while connected or still connecting is refused, or drops the old AP in the driver's own way
   wifi_iface_status iface_status{};
@@ -639,6 +729,13 @@ bool WiFiComponent::wifi_sta_connect_(const WiFiAP &ap) {
 
   apply_power_save_before_connect(this->power_save_);
 
+#ifdef USE_WIFI_WPA2_EAP
+  if (ap.get_eap().has_value() && !fill_eap(params, *ap.get_eap())) {
+    g_sta_status = WiFiSTAConnectStatus::ERROR_CONNECT_FAILED;
+    return false;
+  }
+#endif
+
   g_sta_status = WiFiSTAConnectStatus::CONNECTING;
   g_wifi_started = true;
 #if USE_NETWORK_IPV4
@@ -652,6 +749,11 @@ bool WiFiComponent::wifi_sta_connect_(const WiFiAP &ap) {
     // The driver blocks until the join has started
     UnavoidableBlockingScope scope;
     ret = net_mgmt(NET_REQUEST_WIFI_CONNECT, sta_iface, &params, sizeof(params));
+    // Not every driver takes the automatic mode
+    if (ret != 0 && params.security == WIFI_SECURITY_TYPE_WPA_AUTO_PERSONAL) {
+      params.security = WIFI_SECURITY_TYPE_PSK;
+      ret = net_mgmt(NET_REQUEST_WIFI_CONNECT, sta_iface, &params, sizeof(params));
+    }
   }
   if (ret != 0) {
     ESP_LOGW(TAG, "NET_REQUEST_WIFI_CONNECT failed: %d", ret);
@@ -771,7 +873,7 @@ void WiFiComponent::wifi_scan_finished_(bool success) {
         bssid_t bssid{};
         std::copy(std::begin(record.bssid), std::end(record.bssid), bssid.begin());
         this->scan_result_.emplace_back(bssid, record.ssid, record.ssid_length, record.channel, record.rssi,
-                                        record.with_auth, record.ssid_length == 0);
+                                        record.security != WIFI_SECURITY_TYPE_NONE, record.ssid_length == 0);
       }
     } else if (wanted > 0) {
       for (size_t i = 0; i < scan_candidate_count; i++) {
@@ -784,7 +886,7 @@ void WiFiComponent::wifi_scan_finished_(bool success) {
         bssid_t bssid{};
         std::copy(std::begin(candidate.bssid), std::end(candidate.bssid), bssid.begin());
         this->scan_result_.emplace_back(bssid, sta.ssid_.c_str(), sta.ssid_.size(), candidate.channel, candidate.rssi,
-                                        candidate.with_auth, false);
+                                        candidate.security != WIFI_SECURITY_TYPE_NONE, false);
       }
     }
   }

@@ -55,6 +55,10 @@ VARIANT = ZephyrVariant(
     blobs=("hal_espressif", ".*", ".blobs_hal_espressif_ready"),
     transports=frozenset({"wifi", "ble"}),
     transport_drivers={"wifi": ("WIFI_ESP32", "wifi")},
+    wifi_features={
+        "wpa3": ("ESP32_WIFI_ENABLE_WPA3_SAE",),
+        "eap": ("ESP32_WIFI_ENTERPRISE",),
+    },
     soc="esp32s3",
     # Dual-core Xtensa LX7 like the original ESP32; WIFI_ESP32 requires `!SMP`, so
     # only the procpu image is built.

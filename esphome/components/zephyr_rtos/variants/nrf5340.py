@@ -68,6 +68,7 @@ VARIANT = ZephyrVariant(
     transports=frozenset({"wifi"}),
     # wlan0 is the nordic,wlan interface node, not the nRF7002 QSPI device.
     transport_drivers={"wifi": ("WIFI_NRF70", "wlan0")},
+    wifi_features={"wpa": (), "wpa3": ()},
     # Firmware patch for the driver's normal (STA/AP) mode.
     transport_blobs={
         "wifi": ("nrf_wifi", ".*default/nrf70\\.bin", ".blobs_nrf_wifi_ready")

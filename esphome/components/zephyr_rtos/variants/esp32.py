@@ -82,6 +82,10 @@ VARIANT = ZephyrVariant(
     blobs=("hal_espressif", ".*", ".blobs_hal_espressif_ready"),
     transports=frozenset({"wifi", "ble"}),
     transport_drivers={"wifi": ("WIFI_ESP32", "wifi")},
+    wifi_features={
+        "wpa3": ("ESP32_WIFI_ENABLE_WPA3_SAE",),
+        "eap": ("ESP32_WIFI_ENTERPRISE",),
+    },
     soc="esp32",
     # Original ESP32 is dual-core Xtensa (PRO_CPU/APP_CPU), not a HP/LP asymmetric pair
     # like esp32_c6 -- Zephyr's WIFI_ESP32 driver requires `!SMP` (single scheduled core),

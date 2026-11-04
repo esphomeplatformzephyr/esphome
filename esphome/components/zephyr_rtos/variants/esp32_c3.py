@@ -47,6 +47,10 @@ VARIANT = ZephyrVariant(
     # No 802.15.4 radio on this chip -- WiFi + BLE only, unlike esp32_c6/esp32_h2/esp32_c5.
     transports=frozenset({"wifi", "ble"}),
     transport_drivers={"wifi": ("WIFI_ESP32", "wifi")},
+    wifi_features={
+        "wpa3": ("ESP32_WIFI_ENABLE_WPA3_SAE",),
+        "eap": ("ESP32_WIFI_ENTERPRISE",),
+    },
     soc="esp32c3",
     swap_methods=frozenset({"scratch", "move", "offset"}),
     min_version_override=cv.Version(4, 5, 0),

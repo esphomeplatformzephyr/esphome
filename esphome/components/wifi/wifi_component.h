@@ -200,6 +200,8 @@ struct EAPAuth {
 // used for EAP-TTLS
 #ifdef USE_ESP32
   esp_eap_ttls_phase2_types ttls_phase_2;
+#elif defined(USE_ZEPHYR)
+  bool use_ttls;
 #endif
 };
 #endif  // USE_WIFI_WPA2_EAP

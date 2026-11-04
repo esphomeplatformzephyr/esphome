@@ -93,6 +93,7 @@ VARIANT = ZephyrVariant(
     # required: wifi/__init__.py raises if a "wifi"-transport variant has no
     # transport_drivers entry for it.
     transport_drivers={"wifi": ("WIFI_SILABS_SIWX91X", "wifi0")},
+    wifi_features={"wpa": (), "wpa3": ()},
     # Same hal_silabs blob-check reasoning as efr32mg24's own comment about this
     # exact chip's firmware blob (that comment was written anticipating this
     # variant): Zephyr's hal_silabs blob check verifies the HAL's entire manifest
