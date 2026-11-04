@@ -13,6 +13,7 @@
 #include <zephyr/net/net_mgmt.h>
 #include <zephyr/net/wifi_mgmt.h>
 #include <zephyr/sys/atomic.h>
+#include <zephyr/version.h>
 
 #include <algorithm>
 #include <array>
@@ -41,8 +42,9 @@ struct ZephyrWiFiEvent {
     AP_STA_DISCONNECTED,
 #endif
     IPV4_ADDR_ADD,
+    IPV4_ADDR_DEL,
 #if USE_NETWORK_IPV6
-    IPV6_ADDR_ADD,
+    IPV6_ADDRS_CHANGED,
 #endif
   };
   Type type;
@@ -69,10 +71,11 @@ bool g_ap_enabled = false;                                       // NOLINT
 // connect/scan/AP-enable, not interface registration) -- deferred until after.
 bool g_wifi_started = false;   // NOLINT
 bool g_sta_manual_ip = false;  // NOLINT
-// Set when wifi_sta_connect_() disconnects the current AP itself, so wifi_loop_() does not let
-// that AP's DISCONNECT_RESULT end the attempt started after it. Main loop only.
+in_addr g_sta_static_ip{};     // NOLINT
+// Set when wifi_sta_connect_() ends the current connection or attempt itself, so wifi_loop_() does
+// not let the event for it end the attempt started after it. Main loop only.
 bool g_expect_disconnect = false;  // NOLINT
-// Given on every DISCONNECT_RESULT; the ESP32 driver refuses a connect until it has sent one.
+// Given when a connection or attempt ends; the ESP32 driver refuses a connect until then.
 // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 K_SEM_DEFINE(disconnect_sem, 0, 1);
 constexpr int32_t DISCONNECT_WAIT_MS = 1000;
@@ -240,7 +243,12 @@ void wifi_event_handler(net_mgmt_event_callback *cb, uint64_t mgmt_event, net_if
   switch (mgmt_event) {
     case NET_EVENT_WIFI_CONNECT_RESULT: {
       const auto *status = static_cast<const wifi_status *>(cb->info);
-      push_event(ZephyrWiFiEvent::Type::CONNECT_RESULT, status != nullptr ? status->status : -1);
+      const int result = status != nullptr ? status->status : -1;
+      push_event(ZephyrWiFiEvent::Type::CONNECT_RESULT, result);
+      // An attempt that is left before it joins ends with a failed result, not a disconnect
+      if (result != 0) {
+        k_sem_give(&disconnect_sem);
+      }
       break;
     }
     case NET_EVENT_WIFI_DISCONNECT_RESULT: {
@@ -283,15 +291,20 @@ void wifi_event_handler(net_mgmt_event_callback *cb, uint64_t mgmt_event, net_if
 }
 
 void ipv4_event_handler(net_mgmt_event_callback *cb, uint64_t mgmt_event, net_if *iface) {
-  if (mgmt_event == NET_EVENT_IPV4_ADDR_ADD && iface == sta_iface) {
+  if (iface != sta_iface) {
+    return;
+  }
+  if (mgmt_event == NET_EVENT_IPV4_ADDR_ADD) {
     push_event(ZephyrWiFiEvent::Type::IPV4_ADDR_ADD);
+  } else if (mgmt_event == NET_EVENT_IPV4_ADDR_DEL) {
+    push_event(ZephyrWiFiEvent::Type::IPV4_ADDR_DEL);
   }
 }
 
 #if USE_NETWORK_IPV6
 void ipv6_event_handler(net_mgmt_event_callback *cb, uint64_t mgmt_event, net_if *iface) {
-  if (mgmt_event == NET_EVENT_IPV6_ADDR_ADD && iface == sta_iface) {
-    push_event(ZephyrWiFiEvent::Type::IPV6_ADDR_ADD);
+  if (iface == sta_iface) {
+    push_event(ZephyrWiFiEvent::Type::IPV6_ADDRS_CHANGED);
   }
 }
 #endif
@@ -314,18 +327,34 @@ bool parse_ipv4(const char *str, in_addr &out) {
   return true;
 }
 
-struct Ipv4Collector {
+struct IpCollector {
   network::IPAddresses *addresses;
   uint8_t index;
 };
 
 // net_if_ipv4_addr_foreach() callbacks; Zephyr calls them for each used address.
 void collect_ipv4(net_if *iface, net_if_addr *addr, void *user_data) {
-  auto *collector = static_cast<Ipv4Collector *>(user_data);
+  auto *collector = static_cast<IpCollector *>(user_data);
   if (collector->index < collector->addresses->size()) {
     (*collector->addresses)[collector->index++] = ipv4_to_ip_address(addr->address.in_addr);
   }
 }
+
+#if USE_NETWORK_IPV6
+// An address still being checked for duplicates is not usable yet.
+void collect_ipv6(net_if *iface, net_if_addr *addr, void *user_data) {
+  auto *collector = static_cast<IpCollector *>(user_data);
+  if (addr->addr_state == NET_ADDR_PREFERRED && collector->index < collector->addresses->size()) {
+    (*collector->addresses)[collector->index++] = network::IPAddress(&addr->address.in6_addr);
+  }
+}
+
+void count_ipv6(net_if *iface, net_if_addr *addr, void *user_data) {
+  if (addr->addr_state == NET_ADDR_PREFERRED) {
+    (*static_cast<uint8_t *>(user_data))++;
+  }
+}
+#endif
 
 struct FirstIpv4 {
   in_addr addr{};
@@ -369,10 +398,11 @@ void WiFiComponent::wifi_pre_setup_() {
 #endif
   net_mgmt_init_event_callback(&wifi_event_cb, wifi_event_handler, wifi_events);
   net_mgmt_add_event_callback(&wifi_event_cb);
-  net_mgmt_init_event_callback(&ipv4_event_cb, ipv4_event_handler, NET_EVENT_IPV4_ADDR_ADD);
+  net_mgmt_init_event_callback(&ipv4_event_cb, ipv4_event_handler, NET_EVENT_IPV4_ADDR_ADD | NET_EVENT_IPV4_ADDR_DEL);
   net_mgmt_add_event_callback(&ipv4_event_cb);
 #if USE_NETWORK_IPV6
-  net_mgmt_init_event_callback(&ipv6_event_cb, ipv6_event_handler, NET_EVENT_IPV6_ADDR_ADD);
+  net_mgmt_init_event_callback(&ipv6_event_cb, ipv6_event_handler,
+                               NET_EVENT_IPV6_ADDR_ADD | NET_EVENT_IPV6_ADDR_DEL | NET_EVENT_IPV6_DAD_SUCCEED);
   net_mgmt_add_event_callback(&ipv6_event_cb);
 #endif
 }
@@ -415,6 +445,41 @@ bool WiFiComponent::wifi_sta_pre_setup_() { return true; }
 // Zephyr's net_mgmt WiFi API has no TX power control request at all.
 bool WiFiComponent::wifi_apply_output_power_(float output_power) { return true; }
 
+namespace {
+
+// The API takes one setting per request. Every field is still filled in, since a driver may read
+// more than the one the request names.
+wifi_ps_params make_ps_params(WiFiPowerSaveMode mode, wifi_ps_param_type type) {
+  wifi_ps_params params{};
+  params.type = type;
+  params.enabled = mode == WIFI_POWER_SAVE_NONE ? WIFI_PS_DISABLED : WIFI_PS_ENABLED;
+  params.wakeup_mode = mode == WIFI_POWER_SAVE_HIGH ? WIFI_PS_WAKEUP_MODE_LISTEN_INTERVAL : WIFI_PS_WAKEUP_MODE_DTIM;
+  params.listen_interval = mode == WIFI_POWER_SAVE_HIGH ? 10 : 1;
+  return params;
+}
+
+// The listen interval is refused once associated, so these go in before connecting. A driver
+// without them returns an error, and the state request after connecting still applies.
+void apply_power_save_before_connect(WiFiPowerSaveMode mode) {
+  if (mode == WIFI_POWER_SAVE_NONE) {
+    return;
+  }
+  wifi_ps_params params = make_ps_params(mode, WIFI_PS_PARAM_WAKEUP_MODE);
+  int ret = net_mgmt(NET_REQUEST_WIFI_PS, sta_iface, &params, sizeof(params));
+  if (ret != 0) {
+    ESP_LOGD(TAG, "Power save wakeup mode not set: %d", ret);
+  }
+  if (mode == WIFI_POWER_SAVE_HIGH) {
+    params = make_ps_params(mode, WIFI_PS_PARAM_LISTEN_INTERVAL);
+    ret = net_mgmt(NET_REQUEST_WIFI_PS, sta_iface, &params, sizeof(params));
+    if (ret != 0) {
+      ESP_LOGD(TAG, "Power save listen interval not set: %d", ret);
+    }
+  }
+}
+
+}  // namespace
+
 bool WiFiComponent::wifi_apply_power_save_() {
   if (sta_iface == nullptr) {
     return false;
@@ -424,25 +489,7 @@ bool WiFiComponent::wifi_apply_power_save_() {
     // (see wifi_loop_()); report success so callers don't log a spurious failure.
     return true;
   }
-  wifi_ps_params params{};
-  params.type = WIFI_PS_PARAM_STATE;
-  switch (this->power_save_) {
-    case WIFI_POWER_SAVE_NONE:
-      params.enabled = WIFI_PS_DISABLED;
-      break;
-    case WIFI_POWER_SAVE_LIGHT:
-      // No exact equivalent to ESP-IDF's three levels -- Zephyr only has a listen
-      // interval, so "light" uses a short one and "high" a longer, more aggressive one.
-      params.enabled = WIFI_PS_ENABLED;
-      params.mode = WIFI_PS_MODE_WMM;
-      params.listen_interval = 1;
-      break;
-    case WIFI_POWER_SAVE_HIGH:
-      params.enabled = WIFI_PS_ENABLED;
-      params.mode = WIFI_PS_MODE_WMM;
-      params.listen_interval = 10;
-      break;
-  }
+  wifi_ps_params params = make_ps_params(this->power_save_, WIFI_PS_PARAM_STATE);
   int ret = net_mgmt(NET_REQUEST_WIFI_PS, sta_iface, &params, sizeof(params));
   bool success = ret == 0;
 #ifdef USE_WIFI_POWER_SAVE_LISTENERS
@@ -458,6 +505,13 @@ bool WiFiComponent::wifi_apply_power_save_() {
 bool WiFiComponent::wifi_sta_ip_config_(const optional<ManualIP> &manual_ip) {
   if (sta_iface == nullptr) {
     return false;
+  }
+  // A previous network's static address would otherwise stay, and could be reported as the first one.
+  if (g_sta_manual_ip) {
+    g_sta_manual_ip = false;
+    net_if_ipv4_addr_rm(sta_iface, &g_sta_static_ip);
+    const in_addr no_gateway{};
+    net_if_ipv4_set_gw(sta_iface, &no_gateway);
   }
   if (!manual_ip.has_value()) {
     // DHCPv4 is started on CONNECT_RESULT (see wifi_loop_()).
@@ -478,6 +532,7 @@ bool WiFiComponent::wifi_sta_ip_config_(const optional<ManualIP> &manual_ip) {
     ESP_LOGE(TAG, "Failed to set static IP");
     return false;
   }
+  g_sta_static_ip = addr;
   net_if_ipv4_set_gw(sta_iface, &gw);
   net_if_ipv4_set_netmask_by_addr(sta_iface, &addr, &mask);
   // Without DHCP nothing else supplies DNS servers for getaddrinfo().
@@ -536,6 +591,13 @@ void fill_ssid_and_security(wifi_connect_req_params &params, const CompactString
   }
 }
 
+bool get_iface_status(net_if *iface, wifi_iface_status *status) {
+  if (iface == nullptr) {
+    return false;
+  }
+  return net_mgmt(NET_REQUEST_WIFI_IFACE_STATUS, iface, status, sizeof(*status)) == 0;
+}
+
 }  // namespace
 
 bool WiFiComponent::wifi_sta_connect_(const WiFiAP &ap) {
@@ -557,19 +619,25 @@ bool WiFiComponent::wifi_sta_connect_(const WiFiAP &ap) {
   params.channel = ap.has_channel() ? ap.get_channel() : WIFI_CHANNEL_ANY;
   params.timeout = SYS_FOREVER_MS;
 
-  // Roaming connects while still connected; the drivers refuse that or drop the old AP themselves
-  const bool was_connected = g_sta_status == WiFiSTAConnectStatus::CONNECTED;
+  // A connect while connected or still connecting is refused, or drops the old AP in the driver's own way
+  wifi_iface_status iface_status{};
+  const bool was_active = get_iface_status(sta_iface, &iface_status) && iface_status.state >= WIFI_STATE_SCANNING &&
+                          iface_status.state <= WIFI_STATE_COMPLETED;
   g_expect_disconnect = false;
-  if (was_connected) {
+  if (was_active) {
     k_sem_reset(&disconnect_sem);
     UnavoidableBlockingScope scope;
     if (net_mgmt(NET_REQUEST_WIFI_DISCONNECT, sta_iface, nullptr, 0) == 0) {
       g_expect_disconnect = true;
       if (k_sem_take(&disconnect_sem, K_MSEC(DISCONNECT_WAIT_MS)) != 0) {
         ESP_LOGW(TAG, "No disconnect event from the previous AP");
+        // So the next real disconnect is not taken for this one
+        g_expect_disconnect = false;
       }
     }
   }
+
+  apply_power_save_before_connect(this->power_save_);
 
   g_sta_status = WiFiSTAConnectStatus::CONNECTING;
   g_wifi_started = true;
@@ -816,17 +884,14 @@ bool WiFiComponent::wifi_disconnect_() {
   }
   g_expect_disconnect = false;
   int ret = net_mgmt(NET_REQUEST_WIFI_DISCONNECT, sta_iface, nullptr, 0);
-  return ret == 0;
-}
-
-namespace {
-bool get_iface_status(net_if *iface, wifi_iface_status *status) {
-  if (iface == nullptr) {
+  if (ret != 0) {
     return false;
   }
-  return net_mgmt(NET_REQUEST_WIFI_IFACE_STATUS, iface, status, sizeof(*status)) == 0;
+  if (g_sta_status == WiFiSTAConnectStatus::CONNECTING) {
+    g_sta_status = WiFiSTAConnectStatus::IDLE;
+  }
+  return true;
 }
-}  // namespace
 
 bssid_t WiFiComponent::wifi_bssid() {
   bssid_t bssid{};
@@ -867,8 +932,13 @@ network::IPAddresses WiFiComponent::wifi_sta_ip_addresses() {
   if (sta_iface == nullptr) {
     return addresses;
   }
-  Ipv4Collector collector{&addresses, 0};
+  IpCollector collector{&addresses, 0};
   net_if_ipv4_addr_foreach(sta_iface, collect_ipv4, &collector);
+#if USE_NETWORK_IPV6
+  // Slot 0 holds the IPv4 address, as on ESP-IDF
+  collector.index = std::max<uint8_t>(collector.index, 1);
+  net_if_ipv6_addr_foreach(sta_iface, collect_ipv6, &collector);
+#endif
   return addresses;
 }
 
@@ -919,7 +989,22 @@ network::IPAddress WiFiComponent::wifi_gateway_ip_() {
 }
 
 network::IPAddress WiFiComponent::wifi_dns_ip_(int num) {
-  // Not implemented -- ESPHome's DNS lookups go through getaddrinfo() regardless.
+  const dns_resolve_context *ctx = dns_resolve_get_default();
+  for (const auto &server : ctx->servers) {
+    const net_sockaddr *addr = &server.dns_server;
+    if (addr->sa_family == AF_INET && !net_ipv4_is_addr_mcast(&net_sin(addr)->sin_addr)) {
+      if (num-- == 0) {
+        return ipv4_to_ip_address(net_sin(addr)->sin_addr);
+      }
+    }
+#if USE_NETWORK_IPV6
+    if (addr->sa_family == AF_INET6 && !net_ipv6_is_addr_mcast(&net_sin6(addr)->sin6_addr)) {
+      if (num-- == 0) {
+        return network::IPAddress(&net_sin6(addr)->sin6_addr);
+      }
+    }
+#endif
+  }
   return {};
 }
 
@@ -934,7 +1019,7 @@ bool WiFiComponent::wifi_loop_() {
           g_expect_disconnect = false;
           g_sta_status = WiFiSTAConnectStatus::CONNECTED;
           if (g_sta_manual_ip) {
-            // A static address re-added on reconnect raises no IPV4_ADDR_ADD event.
+            // Its IPV4_ADDR_ADD event came before the link did.
 #if USE_NETWORK_IPV4
             this->got_ipv4_address_ = true;
             this->update_connected_state_();
@@ -955,6 +1040,11 @@ bool WiFiComponent::wifi_loop_() {
 #endif
             net_dhcpv4_start(sta_iface);
           }
+#if USE_NETWORK_IPV6
+          // Addresses kept from before this link raise no event
+          this->num_ipv6_addresses_ = 0;
+          net_if_ipv6_addr_foreach(sta_iface, count_ipv6, &this->num_ipv6_addresses_);
+#endif
           // Deferred from setup() -- the driver wasn't started yet at that point (see
           // wifi_apply_power_save_()'s g_wifi_started guard), so apply it now that it is.
           if (!this->wifi_apply_power_save_()) {
@@ -963,26 +1053,48 @@ bool WiFiComponent::wifi_loop_() {
 #ifdef USE_WIFI_CONNECT_STATE_LISTENERS
           this->pending_.connect_state = true;
 #endif
+        } else if (g_expect_disconnect) {
+          // The earlier attempt that wifi_sta_connect_() ended
+          ESP_LOGD(TAG, "Expected end of previous attempt");
+          g_expect_disconnect = false;
         } else {
-          g_sta_status = WiFiSTAConnectStatus::ERROR_CONNECT_FAILED;
+          const auto reason = static_cast<wifi_conn_status>(event.status);
+          char ssid[SSID_BUFFER_SIZE];
+          ESP_LOGW(TAG, "Connect failed ssid='%s' reason='%s'", this->wifi_ssid_to(ssid), wifi_conn_status_txt(reason));
+          g_sta_status = reason == WIFI_STATUS_CONN_AP_NOT_FOUND ? WiFiSTAConnectStatus::ERROR_NETWORK_NOT_FOUND
+                                                                 : WiFiSTAConnectStatus::ERROR_CONNECT_FAILED;
         }
         break;
-      case ZephyrWiFiEvent::Type::DISCONNECT_RESULT:
-        if (g_expect_disconnect) {
-          // The previous AP's leave; the attempt started after it keeps CONNECTING
+      case ZephyrWiFiEvent::Type::DISCONNECT_RESULT: {
+        const auto reason = static_cast<wifi_disconn_reason>(event.status);
+        // While connecting, a requested leave can only be the previous AP's, even after the wait for it ended
+        if (g_expect_disconnect ||
+            (g_sta_status == WiFiSTAConnectStatus::CONNECTING && reason == WIFI_REASON_DISCONN_USER_REQUEST)) {
+          // The attempt started after it keeps CONNECTING
           ESP_LOGD(TAG, "Expected disconnect from previous AP");
           g_expect_disconnect = false;
         } else {
+          char ssid[SSID_BUFFER_SIZE];
+#if KERNEL_VERSION_NUMBER >= 0x040500
+          ESP_LOGW(TAG, "Disconnected ssid='%s' reason='%s'", this->wifi_ssid_to(ssid),
+                   wifi_disconn_reason_txt(reason));
+#else
+          ESP_LOGW(TAG, "Disconnected ssid='%s' reason=%d", this->wifi_ssid_to(ssid), event.status);
+#endif
           g_sta_status = WiFiSTAConnectStatus::IDLE;
         }
 #if USE_NETWORK_IPV4
         this->got_ipv4_address_ = false;
+#endif
+#if USE_NETWORK_IPV6
+        this->num_ipv6_addresses_ = 0;
 #endif
         this->update_connected_state_();
 #ifdef USE_WIFI_CONNECT_STATE_LISTENERS
         this->notify_disconnect_state_listeners_();
 #endif
         break;
+      }
       case ZephyrWiFiEvent::Type::AP_ENABLE_RESULT:
         if (event.status == 0) {
           ESP_LOGD(TAG, "AP enabled");
@@ -1023,9 +1135,22 @@ bool WiFiComponent::wifi_loop_() {
         this->notify_ip_state_listeners_();
 #endif
         break;
+      case ZephyrWiFiEvent::Type::IPV4_ADDR_DEL: {
+#if USE_NETWORK_IPV4
+        FirstIpv4 first;
+        net_if_ipv4_addr_foreach(sta_iface, first_ipv4, &first);
+        this->got_ipv4_address_ = first.found;
+        if (!first.found) {
+          ESP_LOGV(TAG, "Lost IP");
+        }
+        this->update_connected_state_();
+#endif
+        break;
+      }
 #if USE_NETWORK_IPV6
-      case ZephyrWiFiEvent::Type::IPV6_ADDR_ADD:
-        this->num_ipv6_addresses_++;
+      case ZephyrWiFiEvent::Type::IPV6_ADDRS_CHANGED:
+        this->num_ipv6_addresses_ = 0;
+        net_if_ipv6_addr_foreach(sta_iface, count_ipv6, &this->num_ipv6_addresses_);
         this->update_connected_state_();
 #ifdef USE_WIFI_IP_STATE_LISTENERS
         this->notify_ip_state_listeners_();
