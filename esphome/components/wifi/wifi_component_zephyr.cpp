@@ -46,6 +46,9 @@ struct ZephyrWiFiEvent {
 #endif
   };
   Type type;
+#ifdef USE_WIFI_AP
+  uint8_t mac[WIFI_MAC_ADDR_LEN];
+#endif
   int status;
 };
 
@@ -81,12 +84,58 @@ K_MSGQ_DEFINE(event_queue, sizeof(ZephyrWiFiEvent), EVENT_QUEUE_SIZE, alignof(Ze
 // Events lost to a full queue, reported by wifi_loop_().
 atomic_t dropped_events = ATOMIC_INIT(0);  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 
-void push_event(ZephyrWiFiEvent::Type type, int status = 0) {
-  const ZephyrWiFiEvent event{type, status};
+void queue_event(const ZephyrWiFiEvent &event) {
   if (k_msgq_put(&event_queue, &event, K_NO_WAIT) != 0) {
     atomic_inc(&dropped_events);
   }
 }
+
+void push_event(ZephyrWiFiEvent::Type type, int status = 0) {
+  ZephyrWiFiEvent event{};
+  event.type = type;
+  event.status = status;
+  queue_event(event);
+}
+
+#ifdef USE_WIFI_AP
+void push_ap_station_event(ZephyrWiFiEvent::Type type, const wifi_ap_sta_info &info) {
+  ZephyrWiFiEvent event{};
+  event.type = type;
+  memcpy(event.mac, info.mac, sizeof(event.mac));
+  queue_event(event);
+}
+
+// Stations on the AP, by MAC so a repeat join does not count twice. The API has no way to read this
+// list back, so an event lost to a full queue stays lost. Main loop only.
+constexpr uint8_t AP_STATION_BOUND = 8;
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
+std::array<std::array<uint8_t, WIFI_MAC_ADDR_LEN>, AP_STATION_BOUND> ap_stations;
+uint8_t ap_station_count = 0;
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
+
+// Returns ap_station_count when the station is not in the table.
+uint8_t find_ap_station(const uint8_t *mac) {
+  for (uint8_t i = 0; i < ap_station_count; i++) {
+    if (memcmp(ap_stations[i].data(), mac, WIFI_MAC_ADDR_LEN) == 0) {
+      return i;
+    }
+  }
+  return ap_station_count;
+}
+
+void add_ap_station(const uint8_t *mac) {
+  if (find_ap_station(mac) == ap_station_count && ap_station_count < AP_STATION_BOUND) {
+    memcpy(ap_stations[ap_station_count++].data(), mac, WIFI_MAC_ADDR_LEN);
+  }
+}
+
+void remove_ap_station(const uint8_t *mac) {
+  const uint8_t index = find_ap_station(mac);
+  if (index < ap_station_count) {
+    ap_stations[index] = ap_stations[--ap_station_count];
+  }
+}
+#endif  // USE_WIFI_AP
 
 // Scan records stay out of the event queue, since a scan can report every AP in range at once.
 // The main loop prepares this storage and reads it only after the handler reports the scan done.
@@ -212,10 +261,11 @@ void wifi_event_handler(net_mgmt_event_callback *cb, uint64_t mgmt_event, net_if
     }
 #ifdef USE_WIFI_AP
     case NET_EVENT_WIFI_AP_STA_CONNECTED:
-      push_event(ZephyrWiFiEvent::Type::AP_STA_CONNECTED);
+      push_ap_station_event(ZephyrWiFiEvent::Type::AP_STA_CONNECTED, *static_cast<const wifi_ap_sta_info *>(cb->info));
       break;
     case NET_EVENT_WIFI_AP_STA_DISCONNECTED:
-      push_event(ZephyrWiFiEvent::Type::AP_STA_DISCONNECTED);
+      push_ap_station_event(ZephyrWiFiEvent::Type::AP_STA_DISCONNECTED,
+                            *static_cast<const wifi_ap_sta_info *>(cb->info));
       break;
 #endif
     case NET_EVENT_WIFI_SCAN_RESULT:
@@ -290,6 +340,21 @@ void first_ipv4(net_if *iface, net_if_addr *addr, void *user_data) {
   }
 }
 
+#ifdef USE_WIFI_AP
+// Releases what wifi_ap_ip_config_() took, and forgets the stations that went down with the AP.
+void stop_ap_network() {
+#ifdef CONFIG_NET_DHCPV4_SERVER
+  net_dhcpv4_server_stop(ap_iface);  // -ENOENT when it is not running
+#endif
+  FirstIpv4 first;
+  net_if_ipv4_addr_foreach(ap_iface, first_ipv4, &first);
+  if (first.found) {
+    net_if_ipv4_addr_rm(ap_iface, &first.addr);
+  }
+  ap_station_count = 0;
+}
+#endif
+
 }  // namespace
 
 void WiFiComponent::wifi_pre_setup_() {
@@ -338,6 +403,9 @@ bool WiFiComponent::wifi_mode_(optional<bool> sta, optional<bool> ap) {
       return false;
     }
     g_ap_enabled = false;
+#ifdef USE_WIFI_AP
+    stop_ap_network();
+#endif
   }
   return true;
 }
@@ -664,18 +732,23 @@ bool WiFiComponent::wifi_ap_ip_config_(const optional<ManualIP> &manual_ip) {
   if (ap_iface == nullptr) {
     return false;
   }
+  // An AP that failed to start, or was refused late, is still holding these.
+  stop_ap_network();
   char buf[network::IP_ADDRESS_BUFFER_SIZE];
   in_addr addr{};
+  in_addr gateway{};
   in_addr mask{};
   if (manual_ip.has_value()) {
-    if (!parse_ipv4(manual_ip->static_ip.str_to(buf), addr) || !parse_ipv4(manual_ip->subnet.str_to(buf), mask)) {
+    if (!parse_ipv4(manual_ip->static_ip.str_to(buf), addr) || !parse_ipv4(manual_ip->gateway.str_to(buf), gateway) ||
+        !parse_ipv4(manual_ip->subnet.str_to(buf), mask)) {
       return false;
     }
   } else {
     net_addr_pton(AF_INET, "192.168.4.1", &addr);
+    gateway = addr;
     net_addr_pton(AF_INET, "255.255.255.0", &mask);
   }
-  net_if_ipv4_set_gw(ap_iface, &addr);
+  net_if_ipv4_set_gw(ap_iface, &gateway);
   net_if_addr *ifaddr = net_if_ipv4_addr_add(ap_iface, &addr, NET_ADDR_MANUAL, 0);
   if (ifaddr == nullptr) {
     ESP_LOGE(TAG, "Failed to set AP IP address");
@@ -688,7 +761,7 @@ bool WiFiComponent::wifi_ap_ip_config_(const optional<ManualIP> &manual_ip) {
   // subnet: .255 is the broadcast address, and starting any later than
   // 254 - (ADDR_COUNT - 1) would let the range overflow past .255 into the next subnet.
   constexpr int max_pool_start = 254 - (CONFIG_NET_DHCPV4_SERVER_ADDR_COUNT - 1);
-  pool_start.s4_addr[3] = std::min(pool_start.s4_addr[3] + 10, max_pool_start);
+  pool_start.s4_addr[3] = std::min(pool_start.s4_addr[3] + 99, max_pool_start);
   if (net_dhcpv4_server_start(ap_iface, &pool_start) != 0) {
     ESP_LOGW(TAG, "Failed to start DHCPv4 server on AP interface");
   }
@@ -928,12 +1001,13 @@ bool WiFiComponent::wifi_loop_() {
         break;
 #ifdef USE_WIFI_AP
       case ZephyrWiFiEvent::Type::AP_STA_CONNECTED:
-        this->ap_clients_++;
+        add_ap_station(event.mac);
+        this->ap_clients_ = ap_station_count;
         ESP_LOGV(TAG, "AP client connected");
         break;
       case ZephyrWiFiEvent::Type::AP_STA_DISCONNECTED:
-        if (this->ap_clients_ > 0)
-          this->ap_clients_--;
+        remove_ap_station(event.mac);
+        this->ap_clients_ = ap_station_count;
         ESP_LOGV(TAG, "AP client disconnected");
         break;
 #endif

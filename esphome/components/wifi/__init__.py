@@ -1096,9 +1096,14 @@ async def to_code(config):
         if has_manual_ip:
             # No DHCP supplies DNS servers with a static IP; room for dns1 and dns2.
             zephyr_add_prj_conf("DNS_RESOLVER_MAX_SERVERS", 2)
-        if CONF_AP in config:
+        if (ap_conf := config.get(CONF_AP)) is not None:
             # AP-mode code (wifi_component_zephyr.cpp) needs this for DHCP to work.
+            # The pool, lease and DNS address match the ESP-IDF DHCP server.
             zephyr_add_prj_conf("NET_DHCPV4_SERVER", True)
+            zephyr_add_prj_conf("NET_DHCPV4_SERVER_ADDR_COUNT", 11)
+            zephyr_add_prj_conf("NET_DHCPV4_SERVER_ADDR_LEASE_TIME", 7200)
+            ap_ip = ap_conf.get(CONF_MANUAL_IP, {}).get(CONF_STATIC_IP, "192.168.4.1")
+            zephyr_add_prj_conf("NET_DHCPV4_SERVER_OPTION_DNS_ADDRESS", str(ap_ip))
         # Room for the scan to name each network's channel; the Kconfig default is 3
         channels = {network.get(CONF_CHANNEL) for network in networks}
         if None not in channels and len(channels) > 3:
