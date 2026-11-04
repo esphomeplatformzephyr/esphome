@@ -44,6 +44,10 @@ VARIANT = ZephyrVariant(
     blobs=("hal_espressif", ".*", ".blobs_hal_espressif_ready"),
     transports=frozenset({"wifi", "ble", "openthread"}),
     transport_drivers={"wifi": ("WIFI_ESP32", "wifi")},
+    wifi_features={
+        "wpa3": ("ESP32_WIFI_ENABLE_WPA3_SAE",),
+        "eap": ("ESP32_WIFI_ENTERPRISE",),
+    },
     soc="esp32c5",
     qualifier="hpcore",
     swap_methods=frozenset({"scratch", "move", "offset"}),

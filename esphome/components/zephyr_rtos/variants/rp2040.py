@@ -69,6 +69,7 @@ VARIANT = ZephyrVariant(
     valid_toolchains=(Toolchain.SDK_ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     transports=frozenset({"wifi"}),
+    wifi_features={"wpa": (), "wpa3": ()},
     transport_drivers={
         "wifi": ("CYW43439", "{/soc/pio@50200000/pio0_spi0/airoc-wifi@0}")
     },

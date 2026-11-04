@@ -29,6 +29,8 @@ void ImprovSerialComponent::setup() {
   this->uart_selection_ = logger::global_logger->get_uart();
 #elif defined(USE_ARDUINO)
   this->hw_serial_ = logger::global_logger->get_hw_serial();
+#elif defined(USE_ZEPHYR)
+  this->uart_dev_ = logger::global_logger->get_uart_dev();
 #endif
 
   // The Improv state machine tracks Wi-Fi provisioning only. General device
@@ -148,6 +150,20 @@ void ImprovSerialComponent::write_data_(const uint8_t *data, const size_t size) 
   if (there_is_data) {
     this->hw_serial_->write(data, size);
     this->hw_serial_->write(&this->tx_header_[TX_CHECKSUM_IDX], 2);  // Footer: checksum and newline
+  }
+#elif defined(USE_ZEPHYR)
+  if (this->uart_dev_ == nullptr) {
+    return;
+  }
+  const auto write = [this](const uint8_t *bytes, size_t length) {
+    for (size_t i = 0; i < length; i++) {
+      uart_poll_out(this->uart_dev_, bytes[i]);
+    }
+  };
+  write(this->tx_header_, header_tx_len);
+  if (there_is_data) {
+    write(data, size);
+    write(&this->tx_header_[TX_CHECKSUM_IDX], 2);  // Footer: checksum and newline
   }
 #endif
 }

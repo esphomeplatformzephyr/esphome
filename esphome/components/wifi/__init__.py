@@ -48,7 +48,6 @@ from esphome.const import (
     CONF_IDENTITY,
     CONF_KEY,
     CONF_MANUAL_IP,
-    CONF_MIN_RSSI,
     CONF_NETWORKS,
     CONF_ON_CONNECT,
     CONF_ON_DISCONNECT,
@@ -313,8 +312,18 @@ TTLS_PHASE_2 = {
     "eap": cg.global_ns.ESP_EAP_TTLS_PHASE2_EAP,
 }
 
+
+def _validate_ttls_phase_2(value: str) -> str:
+    if not CORE.using_zephyr_rtos:
+        return cv.only_on_esp32(value)
+    # The Zephyr Wi-Fi API has one TTLS type
+    if value != "mschapv2":
+        raise cv.Invalid("Only mschapv2 is supported on Zephyr")
+    return value
+
+
 EAP_AUTH_SCHEMA = cv.All(
-    cv.only_on([Platform.ESP32, Platform.ESP8266]),
+    cv.only_on_or_zephyr_rtos([Platform.ESP32, Platform.ESP8266]),
     cv.Schema(
         {
             cv.Optional(CONF_IDENTITY): cv.string_strict,
@@ -322,7 +331,7 @@ EAP_AUTH_SCHEMA = cv.All(
             cv.Optional(CONF_PASSWORD): cv.sensitive(cv.string_strict),
             cv.Optional(CONF_CERTIFICATE_AUTHORITY): wpa2_eap.validate_certificate,
             cv.SplitDefault(CONF_TTLS_PHASE_2, esp32="mschapv2"): cv.All(
-                cv.enum(TTLS_PHASE_2), cv.only_on_esp32
+                cv.enum(TTLS_PHASE_2), _validate_ttls_phase_2
             ),
             cv.Inclusive(
                 CONF_CERTIFICATE, "certificate_and_key"
@@ -453,6 +462,23 @@ def validate_variant(_):
         if has_ap and driver is not None and driver[0] == "WIFI_NRF70":
             raise cv.Invalid(
                 "'ap:' is not supported yet on the nRF70 Wi-Fi driver", [CONF_AP]
+            )
+        min_auth_mode = fv.full_config.get()[DOMAIN].get(CONF_MIN_AUTH_MODE)
+        if min_auth_mode in ("WPA", "WPA3") and (
+            min_auth_mode.lower() not in variant.wifi_features
+        ):
+            raise cv.Invalid(
+                f"min_auth_mode: {min_auth_mode} is not supported on Zephyr variant "
+                f"'{variant_name}'",
+                [CONF_MIN_AUTH_MODE],
+            )
+        if "eap" not in variant.wifi_features and any(
+            CONF_EAP in network
+            for network in fv.full_config.get()[DOMAIN].get(CONF_NETWORKS, [])
+        ):
+            raise cv.Invalid(
+                f"eap is not supported on Zephyr variant '{variant_name}'",
+                [CONF_NETWORKS],
             )
         board = zephyr_data()[KEY_BOARD]
         # "w" is a qualifier segment, not necessarily the last one -- e.g.
@@ -779,7 +805,7 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_USE_ADDRESS): cv.string_strict,
             cv.Optional(CONF_MIN_AUTH_MODE): cv.All(
                 VALIDATE_WIFI_MIN_AUTH_MODE,
-                cv.only_on([Platform.ESP32, Platform.ESP8266]),
+                cv.only_on_or_zephyr_rtos([Platform.ESP32, Platform.ESP8266]),
                 _validate_min_auth_mode,
             ),
             cv.SplitDefault(CONF_OUTPUT_POWER, esp8266=20.0): cv.All(
@@ -811,11 +837,6 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_USE_PSRAM): cv.All(
                 cv.only_on_esp32, cv.requires_component("psram"), cv.boolean
             ),
-            cv.Optional(CONF_MIN_RSSI): cv.All(
-                cv.decibel,
-                cv.int_range(min=-100, max=-20),
-                cv.only_on_zephyr_rtos,
-            ),
         }
     ),
     cv.key_requires(CONF_ON_DPP_URI, CONF_DPP),
@@ -844,6 +865,12 @@ def eap_auth(config):
     key = ""
     if CONF_KEY in config:
         key = wpa2_eap.read_relative_config_path(config[CONF_KEY])
+    # On Zephyr the method is chosen up front; ESP-IDF negotiates it with the server
+    ttls = (
+        ("use_ttls", CONF_TTLS_PHASE_2 in config)
+        if CORE.using_zephyr_rtos
+        else ("ttls_phase_2", config.get(CONF_TTLS_PHASE_2))
+    )
     return cg.StructInitializer(
         EAPAuth,
         ("identity", config.get(CONF_IDENTITY, "")),
@@ -852,7 +879,7 @@ def eap_auth(config):
         ("ca_cert", ca_cert),
         ("client_cert", client_cert),
         ("client_key", key),
-        ("ttls_phase_2", config.get(CONF_TTLS_PHASE_2)),
+        ttls,
     )
 
 
@@ -1090,6 +1117,13 @@ async def to_code(config):
             )
         kconfig, dt_label = transport_driver
         zephyr_add_prj_conf(kconfig, True)
+        # A network's security is only known once it is found, so it is always compiled in,
+        # as on ESP-IDF.
+        for symbol in variant.wifi_features.get("wpa3", ()):
+            zephyr_add_prj_conf(symbol, True)
+        if has_eap:
+            for symbol in variant.wifi_features["eap"]:
+                zephyr_add_prj_conf(symbol, True)
         zephyr_add_overlay(f'&{dt_label} {{ status = "okay"; }};')
         if blob_spec := variant.transport_blobs.get("wifi"):
             zephyr_add_blobs(*blob_spec)
@@ -1102,10 +1136,18 @@ async def to_code(config):
         if has_manual_ip:
             # No DHCP supplies DNS servers with a static IP; room for dns1 and dns2.
             zephyr_add_prj_conf("DNS_RESOLVER_MAX_SERVERS", 2)
-        if CONF_AP in config:
+        if (ap_conf := config.get(CONF_AP)) is not None:
             # AP-mode code (wifi_component_zephyr.cpp) needs this for DHCP to work.
+            # The pool, lease and DNS address match the ESP-IDF DHCP server.
             zephyr_add_prj_conf("NET_DHCPV4_SERVER", True)
-        cg.add_optional(var.set_min_scan_rssi, config.get(CONF_MIN_RSSI))
+            zephyr_add_prj_conf("NET_DHCPV4_SERVER_ADDR_COUNT", 11)
+            zephyr_add_prj_conf("NET_DHCPV4_SERVER_ADDR_LEASE_TIME", 7200)
+            ap_ip = ap_conf.get(CONF_MANUAL_IP, {}).get(CONF_STATIC_IP, "192.168.4.1")
+            zephyr_add_prj_conf("NET_DHCPV4_SERVER_OPTION_DNS_ADDRESS", str(ap_ip))
+        # Room for the scan to name each network's channel; the Kconfig default is 3
+        channels = {network.get(CONF_CHANNEL) for network in networks}
+        if None not in channels and len(channels) > 3:
+            zephyr_add_prj_conf("WIFI_MGMT_SCAN_CHAN_MAX_MANUAL", len(channels))
 
     if CORE.is_esp32:
         if config[CONF_ENABLE_BTM] or config[CONF_ENABLE_RRM]:

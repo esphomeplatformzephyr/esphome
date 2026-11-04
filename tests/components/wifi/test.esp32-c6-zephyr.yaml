@@ -2,7 +2,13 @@ packages:
   wifi: !include common.yaml
 
 wifi:
-  min_rssi: -40
+  min_auth_mode: WPA3
+  networks:
+    - ssid: MySSIDEAP
+      eap:
+        username: username
+        password: password
+        identity: identity
   manual_ip:
     static_ip: 192.168.1.100
     gateway: 192.168.1.1
@@ -14,3 +20,5 @@ wifi:
       static_ip: 192.168.4.1
       gateway: 192.168.4.1
       subnet: 255.255.255.0
+
+improv_serial:

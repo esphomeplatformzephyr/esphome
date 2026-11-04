@@ -225,6 +225,10 @@ class ZephyrVariant:
     # variant). Use this when the blobs are for hardware not every board of the variant
     # has (e.g. rp2040's CYW43439 wifi chip, only present on `/w`-qualified boards).
     transport_blobs: dict[str, tuple[str, str, str]] = field(default_factory=dict)
+    # Wi-Fi security modes this variant's driver can connect with, beyond open and WPA2,
+    # mapped to the Kconfig symbols each needs. Known values: "wpa", "wpa3", "eap". A mode with no
+    # entry is rejected at validation.
+    wifi_features: dict[str, tuple[str, ...]] = field(default_factory=dict)
     # Per-variant override of the SDK's default version window (see ZephyrSDK); None uses
     # the SDK's value unchanged.
     default_version_override: str | None = None
