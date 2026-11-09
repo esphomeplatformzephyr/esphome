@@ -642,7 +642,9 @@ async def to_code(configs: list[ConfigType]) -> None:
         await cg.add_pin(var.set_mosi, spi.get(CONF_MOSI_PIN))
         if data_pins := spi.get(CONF_DATA_PINS):
             cg.add(var.set_data_pins(data_pins))
-        if (index := spi.get(CONF_INTERFACE_INDEX)) is not None:
+        if (index := spi.get(CONF_INTERFACE_INDEX)) is None:
+            cg.add_define("USE_SPI_SOFTWARE")
+        else:
             if CORE.using_toolchain_zephyr:
                 interface, bus_label = _zephyr_setup_spi(spi, resolved_zephyr_buses)
                 cg.add(var.set_interface(cg.RawExpression(interface)))

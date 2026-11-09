@@ -15,6 +15,9 @@ struct ZephyrGPIOInterrupt {
 };
 
 class ZephyrGPIOPin final : public GPIOPin {
+  // Its arg_ points at this pin, so the ISR-safe calls read the fields below directly.
+  friend class esphome::ISRInternalGPIOPin;
+
  public:
   // pin_name_prefix: secondary display label for chips with real GPIO port banks
   // (e.g. Nordic's "P0."/"P1."). Null/empty = flat numbering only.

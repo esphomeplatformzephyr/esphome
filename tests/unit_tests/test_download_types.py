@@ -21,6 +21,7 @@ PLATFORMS = [
     "rp2",
     "libretiny",
     "nrf52",
+    "host",
     "nrf",
     "nxp",
     "renesas",
