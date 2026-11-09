@@ -120,7 +120,7 @@ def _uses_zephyr(config: ConfigType) -> bool:
 
 
 def AUTO_LOAD() -> list[str]:
-    return ["zephyr_rtos"] if CORE.using_zephyr_rtos else ["preferences"]
+    return ["zephyr_rtos"] if CORE.using_toolchain_zephyr else ["preferences"]
 
 
 CONF_ASSERTION_LEVEL = "assertion_level"
@@ -1763,7 +1763,7 @@ def _validate_signed_ota_keys(config: ConfigType) -> ConfigType:
 
 
 def final_validate(config) -> None:
-    if CORE.using_zephyr_rtos:
+    if CORE.using_toolchain_zephyr:
         return
     # Imported locally to avoid circular import issues
     from esphome.components.psram import DOMAIN as PSRAM_DOMAIN
@@ -3045,7 +3045,7 @@ async def _finalize_arduino_aware_flags():
 
 
 async def to_code(config):
-    if CORE.using_zephyr_rtos:
+    if CORE.using_toolchain_zephyr:
         # zephyr_rtos builds it
         return
     framework_ver: cv.Version = CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]
@@ -4055,7 +4055,7 @@ def _write_idf_component_yml():
 
 # Called by writer.py
 def copy_files():
-    if CORE.using_zephyr_rtos:
+    if CORE.using_toolchain_zephyr:
         from esphome.components import zephyr_rtos
 
         zephyr_rtos.copy_files()
@@ -4184,7 +4184,7 @@ STACKTRACE_ESP32_CRASH_BT_RE = re.compile(r"BT\d+:\s*0x([0-9a-fA-F]{8})")
 
 
 def run_compile(args, config: ConfigType) -> bool:
-    if not CORE.using_zephyr_rtos:
+    if not CORE.using_toolchain_zephyr:
         return False
     from esphome.components import zephyr_rtos
 
@@ -4192,7 +4192,7 @@ def run_compile(args, config: ConfigType) -> bool:
 
 
 def upload_program(config: ConfigType, args, host: str) -> bool:
-    if not CORE.using_zephyr_rtos:
+    if not CORE.using_toolchain_zephyr:
         return False
     from esphome.components import zephyr_rtos
 
@@ -4200,7 +4200,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
 
 
 def has_network_ota(config: ConfigType) -> bool:
-    if not CORE.using_zephyr_rtos:
+    if not CORE.using_toolchain_zephyr:
         return False
     from esphome.components import zephyr_rtos
 
@@ -4208,7 +4208,7 @@ def has_network_ota(config: ConfigType) -> bool:
 
 
 def process_stacktrace(config, line, backtrace_state):
-    if CORE.using_zephyr_rtos:
+    if CORE.using_toolchain_zephyr:
         from esphome.components import zephyr_rtos
 
         return zephyr_rtos.process_stacktrace(config, line, backtrace_state)

@@ -72,7 +72,7 @@ def _uses_zephyr(config: ConfigType) -> bool:
 
 
 def AUTO_LOAD() -> list[str]:
-    return ["zephyr_rtos"] if CORE.using_zephyr_rtos else ["preferences"]
+    return ["zephyr_rtos"] if CORE.using_toolchain_zephyr else ["preferences"]
 
 
 # Legacy top-level YAML keys that route here. The framework
@@ -371,7 +371,7 @@ def CONFIG_SCHEMA(config: ConfigType) -> ConfigType:
 
 @coroutine_with_priority(CoroPriority.PLATFORM)
 async def to_code(config: ConfigType) -> None:
-    if CORE.using_zephyr_rtos:
+    if CORE.using_toolchain_zephyr:
         # zephyr_rtos builds it
         return
     cg.add(rp2_ns.setup_preferences())
@@ -688,7 +688,7 @@ def generate_pio_files() -> bool:
 
 # Called by writer.py
 def copy_files() -> None:
-    if CORE.using_zephyr_rtos:
+    if CORE.using_toolchain_zephyr:
         from esphome.components import zephyr_rtos
 
         zephyr_rtos.copy_files()
@@ -713,7 +713,7 @@ def copy_files() -> None:
 
 
 def run_compile(args, config: ConfigType) -> bool:
-    if not CORE.using_zephyr_rtos:
+    if not CORE.using_toolchain_zephyr:
         return False
     from esphome.components import zephyr_rtos
 
@@ -721,7 +721,7 @@ def run_compile(args, config: ConfigType) -> bool:
 
 
 def upload_program(config: ConfigType, args, host: str) -> bool:
-    if not CORE.using_zephyr_rtos:
+    if not CORE.using_toolchain_zephyr:
         return False
     from esphome.components import zephyr_rtos
 
@@ -729,7 +729,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
 
 
 def has_network_ota(config: ConfigType) -> bool:
-    if not CORE.using_zephyr_rtos:
+    if not CORE.using_toolchain_zephyr:
         return False
     from esphome.components import zephyr_rtos
 
@@ -737,7 +737,7 @@ def has_network_ota(config: ConfigType) -> bool:
 
 
 def process_stacktrace(config: ConfigType, line: str, backtrace_state: bool) -> bool:
-    if CORE.using_zephyr_rtos:
+    if CORE.using_toolchain_zephyr:
         from esphome.components import zephyr_rtos
 
         return zephyr_rtos.process_stacktrace(config, line, backtrace_state)

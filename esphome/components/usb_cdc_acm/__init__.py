@@ -24,7 +24,7 @@ from esphome.const import (
     CONF_ID,
     CONF_RX_BUFFER_SIZE,
     CONF_TX_BUFFER_SIZE,
-    PLATFORM_NRF52,
+    Framework,
 )
 from esphome.core import CORE
 from esphome.cpp_generator import MockObj
@@ -55,7 +55,7 @@ INTERFACE_SCHEMA = cv.Schema(
         cv.GenerateID(): cv.All(cv.declare_id(USBCDCACMInstance), uart.mark_unclocked),
         cv.Optional(CONF_DEBUG): maybe_empty_debug,
         cv.Optional(CONF_DISABLED): cv.All(
-            cv.boolean, cv.only_on_or_zephyr_rtos([PLATFORM_NRF52])
+            cv.boolean, cv.only_with_framework(Framework.ZEPHYR)
         ),
     }
 )
@@ -72,7 +72,10 @@ ZEPHYR_USB_FAMILIES = {"nordic", "rpi_pico", "renesas", "stm32", "nxp"}
 
 
 def _only_on_zephyr_usb(config: ConfigType) -> ConfigType:
-    if not CORE.using_zephyr_rtos or zephyr_variant_family() not in ZEPHYR_USB_FAMILIES:
+    if (
+        not CORE.using_toolchain_zephyr
+        or zephyr_variant_family() not in ZEPHYR_USB_FAMILIES
+    ):
         raise cv.Invalid(
             "This feature is only available when using the zephyr framework "
             "on a supported platform with USB"
@@ -145,7 +148,7 @@ async def to_code(config: ConfigType) -> None:
             args = (
                 MockObj(f"DEVICE_DT_GET_OR_NULL(DT_NODELABEL(cdc_acm_uart{index}))"),
             )
-        elif CORE.using_zephyr_rtos:
+        elif CORE.using_toolchain_zephyr:
             label = zephyr_cdc_acm_label(index)
             args = (
                 MockObj(f"DEVICE_DT_GET_OR_NULL(DT_NODELABEL({label}))"),
@@ -162,7 +165,7 @@ async def to_code(config: ConfigType) -> None:
             await debug_to_code(debug, interface)
     if CORE.using_zephyr:
         zephyr_add_prj_conf("UART_LINE_CTRL", True)
-        if CORE.using_zephyr_rtos:
+        if CORE.using_toolchain_zephyr:
             # Zephyr 4.5 keeps the ring_buf claim/finish API only with this option
             zephyr_add_prj_conf("RING_BUFFER", True)
         if CORE.is_nrf52:

@@ -94,6 +94,7 @@ from esphome.const import (
     PLATFORM_STM32,
     TYPE_GIT,
     TYPE_LOCAL,
+    Toolchain,
 )
 from esphome.core import CORE, ID, EsphomeError
 from tests.unit_tests.components.zephyr_rtos.zephyr_state import (
@@ -2403,6 +2404,7 @@ def _set_zephyr_ota(variant: str, ota: list[dict]) -> None:
         KEY_TARGET_PLATFORM: zephyr_platform_framework(variant).value[0].value,
         KEY_TARGET_FRAMEWORK: "zephyr",
     }
+    CORE.toolchain = Toolchain.ZEPHYR
     CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant=variant)
     CORE.config = {"ota": ota}
 
@@ -2445,6 +2447,7 @@ def test_reject_swap_method_off_zephyr_allows_zephyr() -> None:
         KEY_TARGET_PLATFORM: PLATFORM_NRF,
         KEY_TARGET_FRAMEWORK: "zephyr",
     }
+    CORE.toolchain = Toolchain.ZEPHYR
     conf = {"swap_method": "move"}
     assert reject_swap_method_off_zephyr(conf) == conf
 
@@ -2547,6 +2550,7 @@ def test_usb_cdc_acm_only_on_zephyr_usb(variant: str, ok: bool) -> None:
         KEY_TARGET_PLATFORM: zephyr_platform_framework(variant).value[0].value,
         KEY_TARGET_FRAMEWORK: "zephyr",
     }
+    CORE.toolchain = Toolchain.ZEPHYR
     CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant=variant)
     if ok:
         assert _only_on_zephyr_usb({}) == {}
@@ -2575,6 +2579,7 @@ def test_usb_cdc_acm_zephyr_interface_uses_port_label(
     }
     patch_board = _zephyr_cdc_core(board_label)
     CORE.data[KEY_CORE][KEY_TARGET_FRAMEWORK] = "zephyr"
+    CORE.toolchain = Toolchain.ZEPHYR
     with (
         patch_board,
         patch("esphome.codegen.new_Pvariable") as new_var,

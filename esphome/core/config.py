@@ -236,7 +236,7 @@ def validate_loop_interval(config: ConfigType) -> ConfigType:
             )
         elif CORE.is_bk72xx:
             max_loop = 4000  # 10000ms / 5 * 2 default value
-        elif CORE.using_zephyr_rtos:
+        elif CORE.using_toolchain_zephyr:
             # No watchdog (watchdog_timeout: 0): the loop sleep is not capped
             wdt = fv.full_config.get()[CORE.target_platform].get(CONF_WATCHDOG_TIMEOUT)
             if wdt is None or wdt.total_milliseconds == 0:
@@ -253,7 +253,7 @@ def validate_loop_interval(config: ConfigType) -> ConfigType:
                 " Raise esp32.watchdog_timeout to sleep longer."
                 if CORE.is_esp32
                 else f" Raise {CORE.target_platform}.watchdog_timeout to sleep longer."
-                if CORE.using_zephyr_rtos
+                if CORE.using_toolchain_zephyr
                 else "",
             )
     return config
@@ -391,7 +391,7 @@ def _validate_suspend_loop(value: bool) -> bool:
     if (
         value
         and CORE.target_platform in [PLATFORM_HOST, PLATFORM_RP2]
-        and not CORE.using_zephyr_rtos
+        and not CORE.using_toolchain_zephyr
     ):
         raise cv.Invalid(
             f"Suspend loop is not available on {CORE.target_platform} platform"

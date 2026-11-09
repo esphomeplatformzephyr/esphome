@@ -83,6 +83,7 @@ def test_has_network_ota_needs_zephyr_rtos(
         KEY_TARGET_PLATFORM: platform,
         KEY_TARGET_FRAMEWORK: framework,
     }
+    CORE.toolchain = Toolchain.ZEPHYR if framework == "zephyr" else None
     assert module.has_network_ota(_mcumgr_config({"udp": True})) is expected
 
 

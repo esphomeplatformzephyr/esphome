@@ -327,7 +327,7 @@ def _consume_ota_sockets(config: ConfigType) -> ConfigType:
     # OTA needs 1 listening socket. The active transfer connection during an update
     # uses a TCP PCB from the general pool, covered by MIN_TCP_SOCKETS headroom.
     socket.consume_sockets(1, "ota", socket.SocketType.TCP_LISTEN)(config)
-    if CORE.using_zephyr_rtos:
+    if CORE.using_toolchain_zephyr:
         # The UDP data phase opens a datagram socket for the session
         socket.consume_sockets(1, "ota", socket.SocketType.UDP)(config)
     return config
@@ -337,7 +337,7 @@ def _validate_swap_method(config: ConfigType) -> ConfigType:
     # Deferred import: esphome.components.zephyr is a heavy module (git, subprocess,
     # west/sysbuild handling) that every non-Zephyr platform using platform: esphome
     # would otherwise import just to build this schema.
-    if not CORE.using_zephyr_rtos:
+    if not CORE.using_toolchain_zephyr:
         return reject_swap_method_off_zephyr(config)
     from esphome.components.zephyr import validate_swap_method
 
@@ -439,7 +439,7 @@ async def to_code(config: ConfigType) -> None:
     # Build flag so lwip_fast_select.c (a .c file that can't include defines.h) sees it.
     cg.add_build_flag("-DUSE_OTA_PLATFORM_ESPHOME")
 
-    if CORE.using_zephyr_rtos:
+    if CORE.using_toolchain_zephyr:
         from esphome.components.zephyr import apply_swap_method
 
         apply_swap_method(config)

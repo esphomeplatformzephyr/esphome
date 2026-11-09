@@ -722,7 +722,7 @@ def run_miniterm(config: ConfigType, port: str, args) -> int:
     # Decoder resolution, crash isolation, and disable-after-failure
     # all live in LogLineProcessor, shared with the API log path.
     processor = LogLineProcessor(config, CORE.target_platform)
-    if args.reset and CORE.using_zephyr_rtos:
+    if args.reset and CORE.using_toolchain_zephyr:
         from esphome.components.zephyr import reset_over_usb  # noqa: PLC0415
 
         reset_over_usb(config, port)
@@ -855,7 +855,7 @@ def write_cpp_file() -> int:
 def _skip_bootloader_supported() -> bool:
     if CORE.is_esp32 and CORE.using_toolchain_esp_idf:
         return True
-    if CORE.using_zephyr_rtos:
+    if CORE.using_toolchain_zephyr:
         from esphome.components.zephyr import zephyr_skip_bootloader_supported  # noqa: PLC0415
 
         return zephyr_skip_bootloader_supported()
@@ -1139,7 +1139,7 @@ def _find_picotool() -> Path | None:
 def _is_zephyr_rpi_pico() -> bool:
     from esphome.components.zephyr import zephyr_variant_family
 
-    return CORE.using_zephyr_rtos and zephyr_variant_family() == "rpi_pico"
+    return CORE.using_toolchain_zephyr and zephyr_variant_family() == "rpi_pico"
 
 
 def _find_picotool_zephyr() -> Path | None:

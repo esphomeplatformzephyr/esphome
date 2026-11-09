@@ -105,7 +105,7 @@ def _extract_tz_string(tzfile: bytes) -> str:
 
 
 def detect_tz() -> str | None:
-    if CORE.using_zephyr_rtos or CORE.target_platform not in {
+    if CORE.using_toolchain_zephyr or CORE.target_platform not in {
         PLATFORM_ESP8266,
         PLATFORM_ESP32,
         PLATFORM_RP2040,
@@ -476,7 +476,7 @@ async def to_code(config):
         if CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION] >= cv.Version(2, 8, 0):
             zephyr_add_prj_conf("POSIX_SINGLE_PROCESS", True)
             zephyr_add_prj_conf("XSI_SINGLE_PROCESS", True)
-    elif CORE.using_zephyr_rtos:
+    elif CORE.using_toolchain_zephyr:
         # platform:zephyr variants (>= 4.4.0) are above the
         # Zephyr 4.x threshold where POSIX_CLOCK was removed; POSIX_API covers
         # clock_gettime() instead, and implies XSI_SINGLE_PROCESS for gettimeofday().
