@@ -922,7 +922,7 @@ class EsphomeCore:
             return self.relative_build_path("build", f"{self.name}.bin")
         if self.is_libretiny:
             return self.relative_pioenvs_path(self.name, "firmware.uf2")
-        if self.using_toolchain_sdk_zephyr:
+        if self.using_toolchain_zephyr:
             # OTA writes this file's bytes straight into MCUboot's secondary
             # slot, so it must be the MCUboot-signed app image, not the merged flash image
             # used for initial serial flashing.
@@ -1068,8 +1068,8 @@ class EsphomeCore:
         return self.toolchain == Toolchain.SDK_NRF
 
     @property
-    def using_toolchain_sdk_zephyr(self):
-        return self.toolchain == Toolchain.SDK_ZEPHYR
+    def using_toolchain_zephyr(self):
+        return self.toolchain == Toolchain.ZEPHYR
 
     @property
     def using_toolchain_arduino(self):
@@ -1220,7 +1220,7 @@ class EsphomeCore:
         if (
             self.using_toolchain_esp_idf
             or self.using_toolchain_sdk_nrf
-            or self.using_toolchain_sdk_zephyr
+            or self.using_toolchain_zephyr
         ):
             # The native ESP-IDF, nRF52 and Zephyr build generators do not
             # consume build_unflags

@@ -1000,6 +1000,13 @@ class TestEsphomeCore:
     def test_using_zephyr_rtos__no_target_set(self, target) -> None:
         assert target.using_zephyr_rtos is False
 
+    def test_using_toolchain_zephyr(self, target):
+        """using_toolchain_zephyr is True only for the ZEPHYR toolchain."""
+        target.toolchain = const.Toolchain.ZEPHYR
+        assert target.using_toolchain_zephyr is True
+        target.toolchain = const.Toolchain.SDK_NRF
+        assert target.using_toolchain_zephyr is False
+
     def test_using_toolchain_arduino(self, target):
         """A toolchain choice, distinct from the arduino target framework."""
         target.toolchain = const.Toolchain.ARDUINO
