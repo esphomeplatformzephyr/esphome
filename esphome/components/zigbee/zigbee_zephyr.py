@@ -93,8 +93,8 @@ def requires_zigbee_zephyr_supported(value):
     """Raise a clear error if ZBOSS zigbee isn't usable here -- see zigbee_zephyr_supported()."""
     if not zigbee_zephyr_supported():
         raise cv.Invalid(
-            "This option requires platform: nrf52, or a Zephyr RTOS build with a "
-            "zigbee-capable variant"
+            "This option is only available on platform: nrf52, or when using the "
+            "zephyr framework with a zigbee-capable variant"
         )
     return value
 

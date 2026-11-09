@@ -158,9 +158,9 @@ def _validate_platform(conf: ConfigType) -> ConfigType:
         or (CORE.using_zephyr_rtos and zephyr_variant() in ZEPHYR_VARIANTS)
     ):
         raise cv.Invalid(
-            "This feature is only available on nrf52 (platform: nrf52, or "
-            "a Zephyr RTOS build with variant: esp32, esp32c3, esp32c5, esp32c6, esp32h2, "
-            "esp32s3, nrf52, nrf54l15, nrf54lm20a, efr32mg24, efr32bg27, rp2040, or rp2350)."
+            "This feature is only available on platform: nrf52, or when using the zephyr "
+            "framework with variant: esp32, esp32c3, esp32c5, esp32c6, esp32h2, "
+            "esp32s3, nrf52, nrf54l15, nrf54lm20a, efr32mg24, efr32bg27, rp2040, or rp2350."
         )
     hw_uart = conf[CONF_TRANSPORT].get(CONF_HARDWARE_UART)
     if hw_uart in CDC_IDS and not (

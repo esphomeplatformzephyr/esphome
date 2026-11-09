@@ -356,7 +356,8 @@ def _validate_platform(config: ConfigType) -> ConfigType:
         # openthread_zephyr.cpp has no border router support yet
         if CORE.using_zephyr_rtos and CONF_BORDER_ROUTER in config:
             raise cv.Invalid(
-                "OpenThread Border Router is not supported on Zephyr RTOS builds yet",
+                "OpenThread Border Router is not available yet when using the zephyr "
+                "framework on this platform",
                 [CONF_BORDER_ROUTER],
             )
         return config

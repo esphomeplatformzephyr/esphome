@@ -39,7 +39,8 @@ def _validate_rtt_console(config: ConfigType) -> ConfigType:
         return config
     if not CORE.using_zephyr_rtos:
         raise cv.Invalid(
-            f"{CONF_ENABLE_RTT_CONSOLE} is only available on Zephyr RTOS builds",
+            f"{CONF_ENABLE_RTT_CONSOLE} is only available when using the zephyr "
+            "framework on a supported platform",
             path=[CONF_ENABLE_RTT_CONSOLE],
         )
     if SEGGER_RTT_UART not in zephyr_family_uart_drivers():

@@ -30,7 +30,10 @@ def _zephyr_rtos() -> ModuleType | None:
 
 def _require_zephyr_rtos(name: str) -> ModuleType:
     if (rtos := _zephyr_rtos()) is None:
-        raise EsphomeError(f"{name}() needs a Zephyr RTOS platform")
+        raise EsphomeError(
+            f"{name}() is only available when using the zephyr framework "
+            "on a supported platform"
+        )
     return rtos
 
 

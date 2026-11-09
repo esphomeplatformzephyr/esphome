@@ -77,7 +77,8 @@ def reject_swap_method_off_zephyr(config: ConfigType) -> ConfigType:
     """swap_method: is only applied on Zephyr RTOS builds; reject it elsewhere."""
     if not CORE.using_zephyr_rtos and CONF_SWAP_METHOD in config:
         raise cv.Invalid(
-            f"'{CONF_SWAP_METHOD}' is only supported on Zephyr RTOS builds",
+            f"'{CONF_SWAP_METHOD}' is only available when using the zephyr framework "
+            "on a supported platform",
             path=[CONF_SWAP_METHOD],
         )
     return config
