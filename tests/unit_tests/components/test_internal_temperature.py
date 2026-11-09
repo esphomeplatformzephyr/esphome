@@ -7,7 +7,7 @@ import pytest
 
 from esphome.components.internal_temperature import sensor as internal_temperature
 from esphome.components.zephyr_rtos.const import KEY_ZEPHYR_RTOS
-from esphome.const import KEY_CORE, KEY_TARGET_FRAMEWORK, KEY_TARGET_PLATFORM
+from esphome.const import KEY_CORE, KEY_TARGET_FRAMEWORK, KEY_TARGET_PLATFORM, Toolchain
 from esphome.core import CORE
 from tests.unit_tests.components.zephyr_rtos.zephyr_state import (
     empty_zephyr_data,
@@ -21,6 +21,7 @@ def _set_variant(variant: str) -> None:
         KEY_TARGET_PLATFORM: platform,
         KEY_TARGET_FRAMEWORK: "zephyr",
     }
+    CORE.toolchain = Toolchain.ZEPHYR
     CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant=variant)
 
 

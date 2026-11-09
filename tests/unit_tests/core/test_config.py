@@ -169,6 +169,7 @@ def test_loop_interval_zephyr_watchdog(
         KEY_TARGET_PLATFORM: PLATFORM_NRF,
         KEY_TARGET_FRAMEWORK: "zephyr",
     }
+    CORE.toolchain = Toolchain.ZEPHYR
     token = fv.full_config.set(
         {PLATFORM_NRF: {CONF_WATCHDOG_TIMEOUT: watchdog_timeout}}
     )
