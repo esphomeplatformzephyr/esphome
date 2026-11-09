@@ -2429,7 +2429,9 @@ def test_zephyr_skip_bootloader_unsupported_on_other_platform() -> None:
 
 def test_reject_swap_method_off_zephyr_raises() -> None:
     CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: PLATFORM_ESP32}
-    with pytest.raises(cv.Invalid, match="only supported on Zephyr RTOS builds"):
+    with pytest.raises(
+        cv.Invalid, match="only available when using the zephyr framework"
+    ):
         reject_swap_method_off_zephyr({"swap_method": "move"})
 
 
@@ -2549,7 +2551,7 @@ def test_usb_cdc_acm_only_on_zephyr_usb(variant: str, ok: bool) -> None:
     if ok:
         assert _only_on_zephyr_usb({}) == {}
     else:
-        with pytest.raises(cv.Invalid, match="variants with USB"):
+        with pytest.raises(cv.Invalid, match="supported platform with USB"):
             _only_on_zephyr_usb({})
 
 

@@ -74,7 +74,8 @@ ZEPHYR_USB_FAMILIES = {"nordic", "rpi_pico", "renesas", "stm32", "nxp"}
 def _only_on_zephyr_usb(config: ConfigType) -> ConfigType:
     if not CORE.using_zephyr_rtos or zephyr_variant_family() not in ZEPHYR_USB_FAMILIES:
         raise cv.Invalid(
-            "This feature is only available on Zephyr RTOS variants with USB"
+            "This feature is only available when using the zephyr framework "
+            "on a supported platform with USB"
         )
     return config
 

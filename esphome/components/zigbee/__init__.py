@@ -103,8 +103,9 @@ def _require_zigbee_supported(config: ConfigType) -> ConfigType:
     requires_zigbee_zephyr_supported."""
     if not (zigbee_esp32_supported() or zigbee_zephyr_supported()):
         raise cv.Invalid(
-            "This option requires a zigbee-capable ESP32 variant, platform: nrf52, "
-            "or a Zephyr RTOS build with a zigbee-capable variant"
+            "This option is only available on a zigbee-capable ESP32 variant, on "
+            "platform: nrf52, or when using the zephyr framework with a "
+            "zigbee-capable variant"
         )
     return config
 
