@@ -303,12 +303,13 @@ async def to_code(config: ConfigType) -> None:
         if reg0_config[CONF_UICR_ERASE]:
             cg.add_define("USE_NRF52_UICR_ERASE")
             zephyr_add_prj_conf("NRFX_NVMC", True)
-    # Read by uicr.cpp and the debug component's bootloader report, as platform: nrf52's
+    # Read by uicr.cpp, the debug component's bootloader report and the logger's
+    # bootloader version warning, as platform: nrf52's
     bootloader = config[CONF_FRAMEWORK][CONF_ADVANCED][CONF_BOOTLOADER]
     if bootloader == BOOTLOADER_MCUBOOT:
         cg.add_define("USE_BOOTLOADER_MCUBOOT")
     elif (softdevice := _SOFTDEVICE_VERSION.get(bootloader)) is not None:
-        cg.add_define("USE_ZEPHYR_NRF52_ADAFRUIT_BOOTLOADER")
+        cg.add_define("USE_BOOTLOADER_ADAFRUIT")
         cg.add_define("USE_SOFTDEVICE_ID", 140)
         cg.add_define("USE_SOFTDEVICE_VERSION", softdevice)
 

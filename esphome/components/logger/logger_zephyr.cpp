@@ -24,7 +24,11 @@
 #include <esphome/components/zephyr/reset_reason.h>
 #endif
 #ifdef USE_BOOTLOADER_ADAFRUIT
+#ifdef USE_NRF52
 #include <nrf.h>
+#else
+#include <hal/nrf_timer.h>
+#endif
 #endif
 
 // platform: nrf52 claims CDC ACM port 0 with zephyr_claim_cdc_acm(), always named cdc_acm_uart0

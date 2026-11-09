@@ -929,7 +929,7 @@
 // Emitted by zephyr/variants/nrf52.py when advanced: dfu: is set.
 #define USE_ZEPHYR_NRF52_DFU
 // Emitted by zephyr_rtos/variants/nrf52.py for an Adafruit bootloader.
-#define USE_ZEPHYR_NRF52_ADAFRUIT_BOOTLOADER
+#define USE_BOOTLOADER_ADAFRUIT
 // Emitted by zephyr_add_usb_baud_rate() -- reports baud rates the USB host sets on the serial port.
 #define USE_ZEPHYR_USB_BAUD_RATE
 // Emitted by zephyr_can/canbus.py when any CAN bus has a non-zero tx_buffer_size.
