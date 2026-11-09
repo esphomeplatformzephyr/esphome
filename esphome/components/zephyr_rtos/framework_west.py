@@ -532,7 +532,15 @@ def _check_and_install(
         else:
             _LOGGER.info("Initializing Zephyr SDK %s (%s) ...", ver_tag, label)
             rmdir(framework, msg=f"Clean up {ver_tag} framework")
-            cmd = [str(python_bin), "-m", "west", "init", "-m", manifest_url]
+            cmd = [
+                str(python_bin),
+                "-m",
+                "west",
+                "init",
+                "-o=--depth=1",
+                "-m",
+                manifest_url,
+            ]
             # A pinned SHA can't be a --mr value; init at the source's ref, then pin.
             init_rev = source.get(CONF_REF) if pinned else manifest_rev
             if init_rev:
