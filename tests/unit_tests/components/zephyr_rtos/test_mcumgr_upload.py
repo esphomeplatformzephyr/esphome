@@ -43,7 +43,7 @@ def _state(tmp_path: Path) -> None:
     CORE.config_path = tmp_path / "test.yaml"
     CORE.build_path = tmp_path / "build"
     CORE.name = "test"
-    CORE.toolchain = Toolchain.SDK_ZEPHYR
+    CORE.toolchain = Toolchain.ZEPHYR
 
 
 def _upload(

@@ -74,7 +74,7 @@ VARIANT = ZephyrVariant(
     sdk=MAINLINE,
     sdk_name="zephyr",
     family="esp32",
-    valid_toolchains=(Toolchain.SDK_ZEPHYR,),
+    valid_toolchains=(Toolchain.ZEPHYR,),
     # Original ESP32 is Xtensa (dual-core PRO_CPU/APP_CPU), unlike H2/C6's RISC-V --
     # a completely separate Zephyr SDK toolchain.
     toolchain="xtensa-espressif_esp32_zephyr-elf",

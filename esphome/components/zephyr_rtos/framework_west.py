@@ -12,7 +12,7 @@ import tempfile
 
 import yaml
 
-from esphome.build_helpers.tools_cache import SDK_ZEPHYR_TOOLS_CACHE, tools_cache_path
+from esphome.build_helpers.tools_cache import ZEPHYR_TOOLS_CACHE, tools_cache_path
 from esphome.const import CONF_PATH, CONF_REF, CONF_TYPE, CONF_URL, TYPE_LOCAL
 from esphome.core import EsphomeError
 from esphome.framework_helpers import (
@@ -33,7 +33,7 @@ def _tools_path() -> Path:
     # Machine-global (OS user cache dir) so all Zephyr-based projects share one
     # SDK/toolchain/west install; see build_helpers.tools_cache.tools_cache_path
     # for the env-override and normalization rules.
-    return tools_cache_path(*SDK_ZEPHYR_TOOLS_CACHE)
+    return tools_cache_path(*ZEPHYR_TOOLS_CACHE)
 
 
 def _python_env_path(version: str) -> Path:

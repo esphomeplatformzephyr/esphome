@@ -40,7 +40,7 @@ VARIANT = ZephyrVariant(
     # six301 SoC support first shipped in 4.5.0.
     min_version_override=cv.Version(4, 5, 0),
     family="silabs",
-    valid_toolchains=(Toolchain.SDK_ZEPHYR,),
+    valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     # The SoC has an ieee802154 node too, but it's untested on this chip.
     transports=frozenset({"ble"}),

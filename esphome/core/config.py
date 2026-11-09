@@ -936,7 +936,7 @@ async def to_code(config: ConfigType) -> None:
     if not (
         CORE.using_toolchain_esp_idf
         or CORE.using_toolchain_sdk_nrf
-        or CORE.using_toolchain_sdk_zephyr
+        or CORE.using_toolchain_zephyr
     ):
         cg.add_build_flag("-fno-exceptions")
 

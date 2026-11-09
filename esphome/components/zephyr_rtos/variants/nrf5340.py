@@ -63,7 +63,7 @@ VARIANT = ZephyrVariant(
     sdk_name="ncs",
     alt_sdks={"zephyr": MAINLINE},
     family="nordic",
-    valid_toolchains=(Toolchain.SDK_ZEPHYR,),
+    valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     transports=frozenset({"wifi"}),
     # wlan0 is the nordic,wlan interface node, not the nRF7002 QSPI device.

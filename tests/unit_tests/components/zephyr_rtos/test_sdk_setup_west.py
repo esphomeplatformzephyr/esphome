@@ -24,8 +24,8 @@ from esphome.components.zephyr_rtos.sdk_setup_west import (
 def test_sdk_install_dir_env_override(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    override = tmp_path / "custom" / "sdk-zephyr"
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(override))
+    override = tmp_path / "custom" / "zephyr"
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(override))
     assert (
         _sdk_install_dir("0.17.4")
         == override.resolve() / "toolchains" / "zephyr-sdk-0.17.4"
@@ -35,10 +35,10 @@ def test_sdk_install_dir_env_override(
 def test_sdk_install_dir_default_is_global_cache(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.delenv("ESPHOME_SDK_ZEPHYR_PREFIX", raising=False)
+    monkeypatch.delenv("ESPHOME_ZEPHYR_PREFIX", raising=False)
     expected = (
         Path(platformdirs.user_cache_dir("esphome", appauthor=False))
-        / "sdk-zephyr"
+        / "zephyr"
         / "toolchains"
         / "zephyr-sdk-0.17.4"
     ).resolve()
@@ -103,7 +103,7 @@ def test_check_and_install_downloads_when_sdk_path_missing(
     monkeypatch: pytest.MonkeyPatch,
     mock_sdk_download_ops: tuple[MagicMock, MagicMock],
 ) -> None:
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
     mock_download, mock_extract = mock_sdk_download_ops
     framework = _make_framework(tmp_path)
     sdk_path = _sdk_install_dir("0.17.4")
@@ -124,7 +124,7 @@ def test_check_and_install_skips_download_when_sentinel_exists(
     monkeypatch: pytest.MonkeyPatch,
     mock_sdk_download_ops: tuple[MagicMock, MagicMock],
 ) -> None:
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
     mock_download, mock_extract = mock_sdk_download_ops
     framework = _make_framework(tmp_path)
     sdk_path = _sdk_install_dir("0.17.4")
@@ -142,7 +142,7 @@ def test_check_and_install_reuses_sdk_path_for_a_second_toolchain(
     monkeypatch: pytest.MonkeyPatch,
     mock_sdk_download_ops: tuple[MagicMock, MagicMock],
 ) -> None:
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
     mock_download, mock_extract = mock_sdk_download_ops
     framework = _make_framework(tmp_path)
     sdk_path = _sdk_install_dir("0.17.4")
@@ -163,7 +163,7 @@ def test_check_and_install_reextracts_partial_sdk_path(
     monkeypatch: pytest.MonkeyPatch,
     mock_sdk_download_ops: tuple[MagicMock, MagicMock],
 ) -> None:
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
     mock_download, mock_extract = mock_sdk_download_ops
     framework = _make_framework(tmp_path)
     sdk_path = _sdk_install_dir("0.17.4")
@@ -186,7 +186,7 @@ def test_check_and_install_raises_without_setup_script(
     monkeypatch: pytest.MonkeyPatch,
     mock_sdk_download_ops: tuple[MagicMock, MagicMock],
 ) -> None:
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
     framework = _make_framework(tmp_path)
     sdk_path = _sdk_install_dir("0.17.4")
     _make_complete_base(sdk_path)
@@ -203,7 +203,7 @@ def test_check_and_install_no_base_marker_on_extract_failure(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
     framework = _make_framework(tmp_path)
     sdk_path = _sdk_install_dir("0.17.4")
 
@@ -228,7 +228,7 @@ def test_check_and_install_runs_setup_script_with_the_right_arguments(
     monkeypatch: pytest.MonkeyPatch,
     mock_sdk_download_ops: tuple[MagicMock, MagicMock],
 ) -> None:
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
     framework = _make_framework(tmp_path)
     sdk_path = _sdk_install_dir("0.17.4")
     _make_complete_base(sdk_path)
@@ -252,7 +252,7 @@ def test_check_and_install_raises_when_setup_script_fails(
     monkeypatch: pytest.MonkeyPatch,
     mock_sdk_download_ops: tuple[MagicMock, MagicMock],
 ) -> None:
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
     framework = _make_framework(tmp_path)
     sdk_path = _sdk_install_dir("0.17.4")
     _make_complete_base(sdk_path)
@@ -270,7 +270,7 @@ def test_check_and_install_rejects_unsupported_cpu(
     monkeypatch: pytest.MonkeyPatch,
     mock_sdk_download_ops: tuple[MagicMock, MagicMock],
 ) -> None:
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
     framework = _make_framework(tmp_path)
     mock_download, _mock_extract = mock_sdk_download_ops
 
@@ -288,7 +288,7 @@ def test_check_and_install_rejects_unsupported_os(
     monkeypatch: pytest.MonkeyPatch,
     mock_sdk_download_ops: tuple[MagicMock, MagicMock],
 ) -> None:
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
     monkeypatch.setattr(sys, "platform", "freebsd14")
     framework = _make_framework(tmp_path)
 
@@ -301,7 +301,7 @@ def test_check_and_install_picks_the_macos_arm_archive(
     monkeypatch: pytest.MonkeyPatch,
     mock_sdk_download_ops: tuple[MagicMock, MagicMock],
 ) -> None:
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
     monkeypatch.setattr(sys, "platform", "darwin")
     framework = _make_framework(tmp_path)
     mock_download, _mock_extract = mock_sdk_download_ops
@@ -326,7 +326,7 @@ def test_check_and_install_picks_the_windows_7z_archive(
     monkeypatch: pytest.MonkeyPatch,
     mock_sdk_download_ops: tuple[MagicMock, MagicMock],
 ) -> None:
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
     monkeypatch.setattr(sys, "platform", "win32")
     framework = _make_framework(tmp_path)
     mock_download, _mock_extract = mock_sdk_download_ops
@@ -356,7 +356,7 @@ def test_check_and_install_windows_arm_uses_the_x64_archive(
     monkeypatch: pytest.MonkeyPatch,
     mock_sdk_download_ops: tuple[MagicMock, MagicMock],
 ) -> None:
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
     monkeypatch.setattr(sys, "platform", "win32")
     framework = _make_framework(tmp_path)
     mock_download, _mock_extract = mock_sdk_download_ops
@@ -380,7 +380,7 @@ def test_check_and_install_runs_setup_cmd_with_slash_options_on_windows(
     monkeypatch: pytest.MonkeyPatch,
     mock_sdk_download_ops: tuple[MagicMock, MagicMock],
 ) -> None:
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
     monkeypatch.setattr(sys, "platform", "win32")
     framework = _make_framework(tmp_path)
     sdk_path = _sdk_install_dir("0.17.4")
@@ -405,7 +405,7 @@ def test_check_and_install_raises_without_setup_cmd_on_windows(
     monkeypatch: pytest.MonkeyPatch,
     mock_sdk_download_ops: tuple[MagicMock, MagicMock],
 ) -> None:
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
     monkeypatch.setattr(sys, "platform", "win32")
     framework = _make_framework(tmp_path)
     sdk_path = _sdk_install_dir("0.17.4")

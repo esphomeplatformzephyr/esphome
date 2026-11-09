@@ -257,8 +257,8 @@ def test_native_dts_path_matches_the_machine_global_cache_key(
 ) -> None:
     # Must land at the same directory framework_west._source_cache_key() would
     # produce for the plain official-source (no sdk_source:, no modules) case --
-    # sdk.tools_subdir-prefixed, nested under the shared sdk-zephyr cache root.
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path))
+    # sdk.tools_subdir-prefixed, nested under the shared zephyr cache root.
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path))
     _set_framework_version(4, 4, 1)
     expected = tmp_path / "frameworks" / f"{sdk.tools_subdir}-v4.4.1" / "zephyr"
     expected.mkdir(parents=True)
@@ -268,9 +268,9 @@ def test_native_dts_path_matches_the_machine_global_cache_key(
 def test_native_dts_path_keeps_release_candidate_suffix(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path))
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path))
     _set_framework_version(4, 5, 0, "rc1")
-    expected = tmp_path / "frameworks" / "sdk-zephyr-v4.5.0-rc1" / "zephyr"
+    expected = tmp_path / "frameworks" / "zephyr-v4.5.0-rc1" / "zephyr"
     expected.mkdir(parents=True)
     assert _native_dts_path(MAINLINE) == expected
 
@@ -278,7 +278,7 @@ def test_native_dts_path_keeps_release_candidate_suffix(
 def test_native_dts_path_none_when_not_on_disk(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path))
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path))
     _set_framework_version(4, 4, 1)
     assert _native_dts_path(MAINLINE) is None
 
@@ -287,9 +287,9 @@ def test_native_dts_path_none_without_the_family_hal(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A workspace with the HAL filter may not have fetched this family's HAL yet."""
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path))
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path))
     _set_framework_version(4, 4, 1)
-    framework = tmp_path / "frameworks" / "sdk-zephyr-v4.4.1"
+    framework = tmp_path / "frameworks" / "zephyr-v4.4.1"
     (framework / "zephyr").mkdir(parents=True)
     assert _native_dts_path(MAINLINE, "stm32") is None
 
@@ -299,33 +299,33 @@ def test_native_dts_path_none_without_the_family_hal(
 
 # ---------------------------------------------------------------------------
 # _dts_cache_root / _sdk_source_version_cache_root / _manifest_revision_cache_root
-# -- must nest under the machine-global sdk-zephyr root (ESPHOME_SDK_ZEPHYR_PREFIX),
+# -- must nest under the machine-global zephyr root (ESPHOME_ZEPHYR_PREFIX),
 # not a bare ~/.esphome/, so they're covered by the same override and by
 # `esphome clean-all`.
 # ---------------------------------------------------------------------------
 
 
-def test_dts_cache_root_nests_under_sdk_zephyr_prefix(
+def test_dts_cache_root_nests_under_zephyr_prefix(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path))
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path))
     assert _dts_cache_root() == (tmp_path / "dts_cache").resolve()
 
 
-def test_sdk_source_version_cache_root_nests_under_sdk_zephyr_prefix(
+def test_sdk_source_version_cache_root_nests_under_zephyr_prefix(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path))
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path))
     assert (
         _sdk_source_version_cache_root()
         == (tmp_path / "sdk_source_version_cache").resolve()
     )
 
 
-def test_manifest_revision_cache_root_nests_under_sdk_zephyr_prefix(
+def test_manifest_revision_cache_root_nests_under_zephyr_prefix(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(tmp_path))
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path))
     assert (
         _manifest_revision_cache_root()
         == (tmp_path / "manifest_revision_cache").resolve()

@@ -66,7 +66,7 @@ VARIANT = ZephyrVariant(
     sdk_name="zephyr",
     alt_sdks={"silabs": SILABS},
     family="silabs",
-    valid_toolchains=(Toolchain.SDK_ZEPHYR,),
+    valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     # BLE only -- EFR32BG27 is a Blue Gecko part, its radio node (efr32xg27.dtsi) only
     # declares ble-2mbps/ble-coded-phy/ble-cte-tx properties and has no ieee802154 node

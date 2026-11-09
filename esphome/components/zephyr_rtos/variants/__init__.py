@@ -522,7 +522,7 @@ def set_core_data(
     )
 
     advanced = config.get(CONF_FRAMEWORK, {}).get(CONF_ADVANCED, {})
-    CORE.toolchain = Toolchain.SDK_ZEPHYR
+    CORE.toolchain = Toolchain.ZEPHYR
     CORE.data[KEY_CORE][KEY_TARGET_FRAMEWORK] = KEY_ZEPHYR
     CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION] = framework_ver
 
@@ -570,7 +570,7 @@ def set_core_data(
 
 MAINLINE: ZephyrSDK = ZephyrSDK(
     manifest_url="https://github.com/zephyrproject-rtos/zephyr",
-    tools_subdir="sdk-zephyr",
+    tools_subdir="zephyr",
 )
 
 # Nordic's ZBOSS Zigbee stack, split out of sdk-nrf into this separate add-on repo as of
@@ -614,7 +614,7 @@ NCS: ZephyrSDK = ZephyrSDK(
 SILABS: ZephyrSDK = ZephyrSDK(
     manifest_url="https://github.com/SiliconLabsSoftware/zephyr-silabs",
     boards_repo_url="https://github.com/SiliconLabsSoftware/zephyr",
-    tools_subdir="sdk-silabs",
+    tools_subdir="zephyr-silabs",
     default_version="2026.6.0",
     min_version=cv.Version(2026, 6, 0),
     resolve_boards_ref_via_manifest=True,

@@ -359,12 +359,12 @@ def _ccache_env(env: dict, source_dir: Path) -> dict[str, str]:
     see USE_CCACHE=0, so a disabled ccache must be turned off explicitly.
     """
     from esphome.build_helpers.ccache import ccache_env, resolve_ccache_path
-    from esphome.build_helpers.tools_cache import SDK_ZEPHYR_TOOLS_CACHE
+    from esphome.build_helpers.tools_cache import ZEPHYR_TOOLS_CACHE
 
     ccache = resolve_ccache_path()
     if ccache is None:
         return {} if "CCACHE_DISABLE" in env else {"CCACHE_DISABLE": "1"}
-    settings = ccache_env(ccache, SDK_ZEPHYR_TOOLS_CACHE)
+    settings = ccache_env(ccache, ZEPHYR_TOOLS_CACHE)
     # The per-device source map is the only per-device flag; a spaced path
     # cannot survive ccache's space-split list, so it stays hashed.
     source = source_dir.as_posix()

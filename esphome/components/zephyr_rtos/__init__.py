@@ -1778,7 +1778,7 @@ def run_compile(args, config: ConfigType) -> bool:
     variant = zephyr_rtos_data()["variant"]
     extra_modules = generate_zephyr_modules(list(CORE.platformio_libraries.values()))
 
-    if not CORE.using_toolchain_sdk_zephyr:
+    if not CORE.using_toolchain_zephyr:
         return False
 
     from .build_zephyr import generate_cmake_lists, run_west_blobs_fetch, run_west_build
