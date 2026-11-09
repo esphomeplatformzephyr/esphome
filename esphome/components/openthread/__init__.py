@@ -37,7 +37,6 @@ from esphome.components.zephyr import (
     zephyr_add_prj_conf,
     zephyr_add_prj_conf_min,
     zephyr_framework_type,
-    zephyr_raise_prj_conf_min,
 )
 from esphome.config_helpers import filter_source_files_from_platform
 import esphome.config_validation as cv
@@ -654,9 +653,7 @@ async def to_code(config: ConfigType) -> None:
             # Without SLAAC the device never forms an OMR (Off-Mesh-Routable) address, so
             # SRP's auto-registered host resolves by name but every address lookup times out.
             zephyr_add_prj_conf("OPENTHREAD_SLAAC", True)
-            zephyr_raise_prj_conf_min("MAIN_STACK_SIZE", 4096)
-        else:
-            zephyr_add_prj_conf_min("MAIN_STACK_SIZE", 4096)
+        zephyr_add_prj_conf_min("MAIN_STACK_SIZE", 4096)
 
         if not CORE.is_nrf52:
             # Mirror `framework: log_level:` into OpenThread's own log verbosity -- a

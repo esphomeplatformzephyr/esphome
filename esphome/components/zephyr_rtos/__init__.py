@@ -243,16 +243,6 @@ def zephyr_only_on_variant(*variant_names: str):
     return validator
 
 
-def zephyr_raise_prj_conf_min(name: str, minimum: int, image: str = "") -> None:
-    """Raise an integer prj conf value to at least `minimum`; never lowers it."""
-    if not name.startswith("CONFIG_"):
-        name = "CONFIG_" + name
-    prj_conf = zephyr_rtos_data()[KEY_PRJ_CONF].setdefault(image, {})
-    value, required = prj_conf.get(name, (0, True))
-    if value < minimum:
-        prj_conf[name] = (minimum, required)
-
-
 def zephyr_set_prj_conf_override(
     name: str, value: PrjConfValueType, image: str = ""
 ) -> None:

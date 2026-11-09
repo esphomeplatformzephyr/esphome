@@ -61,12 +61,6 @@ def zephyr_cdc_acm_label(id: int) -> str:
     return f"cdc_acm_uart{id}"
 
 
-def zephyr_raise_prj_conf_min(name: str, minimum: int, image: str = "") -> None:
-    _require_zephyr_rtos("zephyr_raise_prj_conf_min").zephyr_raise_prj_conf_min(
-        name, minimum, image
-    )
-
-
 def zephyr_add_sysbuild_conf(
     name: str, value: "PrjConfValueType", required: bool = True
 ) -> None:

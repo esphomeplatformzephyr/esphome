@@ -37,7 +37,6 @@ from esphome.components.zephyr_rtos import (
     zephyr_cdc_acm_label,
     zephyr_claim_cdc_acm,
     zephyr_only_on_variant,
-    zephyr_raise_prj_conf_min,
     zephyr_rtos_config_schema,
     zephyr_set_module_override,
     zephyr_setup_i2c_pinctrl,
@@ -1733,28 +1732,6 @@ def test_variant_config_schema_rejects_main_stack_size_below_4096() -> None:
         _validate(
             {"variant": "ESP32C3", "framework": {"advanced": {"main_stack_size": 2048}}}
         )
-
-
-def test_zephyr_raise_prj_conf_min_sets_missing_value() -> None:
-    CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data()
-    zephyr_raise_prj_conf_min("MAIN_STACK_SIZE", 4096)
-    assert _stack() == (4096, True)
-
-
-def test_zephyr_raise_prj_conf_min_raises_low_value() -> None:
-    # platform: nrf52 with OpenThread: 2048 -> 4096
-    CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data()
-    zephyr_add_prj_conf("MAIN_STACK_SIZE", 2048, required=False)
-    zephyr_raise_prj_conf_min("MAIN_STACK_SIZE", 4096)
-    assert _stack() == (4096, False)
-
-
-def test_zephyr_raise_prj_conf_min_never_lowers() -> None:
-    # ESP32-H2 with OpenThread keeps 8192
-    CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant="ESP32H2")
-    _main_stack_to_code({"framework": {"advanced": {}}})
-    zephyr_raise_prj_conf_min("MAIN_STACK_SIZE", 4096)
-    assert _stack() == (8192, False)
 
 
 def _nrf52_advanced(**advanced: object) -> dict:
