@@ -8,8 +8,6 @@
 
 namespace esphome::zephyr_rtos {
 
-ESPHOME_LOG_TAG(TAG, "usb_baud_rate");
-
 // Zephyr's USB event hook has no user data argument, so the callback finds the instance here.
 static UsbBaudRate *instance{nullptr};   // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
 static bool callback_registered{false};  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
@@ -20,15 +18,11 @@ UsbBaudRate::UsbBaudRate(const device *port) : port_(port) {
 }
 
 void UsbBaudRate::setup() {
-  if (instance != this) {
-    ESP_LOGW(TAG, "Only one instance is supported");
-    this->mark_failed();
-  } else if (!callback_registered) {
-    ESP_LOGW(TAG, "No USB device found");
-    this->mark_failed();
-  } else if (this->queue_tail_ == this->queue_head_) {
+  if (!this->setup_check(instance == this, LOG_STR("Only one instance is supported")) ||
+      !this->setup_check(callback_registered, LOG_STR("No USB device found")))
+    return;
+  if (this->queue_tail_ == this->queue_head_)
     this->disable_loop();  // woken by the USB thread when a rate arrives
-  }
 }
 
 // Runs on the USB thread: queue the rate and wake the main loop, which runs the callbacks.
