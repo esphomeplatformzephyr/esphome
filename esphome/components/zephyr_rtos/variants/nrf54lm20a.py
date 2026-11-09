@@ -92,7 +92,7 @@ VARIANT = ZephyrVariant(
     sdk_name="ncs",
     alt_sdks={"zephyr": MAINLINE},
     family="nordic",
-    valid_toolchains=(Toolchain.SDK_ZEPHYR,),
+    valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     # Untested on hardware as of 2026-08-04.
     transports=frozenset({"ble", "openthread", "zigbee"}),

@@ -893,8 +893,8 @@ def only_on(platforms):
         if CORE.target_platform not in platforms:
             raise Invalid(f"This feature is only available on {platforms}")
         # esp32 and rp2 entries mean ESP-IDF or Arduino; Zephyr support is
-        # declared with only_on_or_zephyr_rtos.
-        if CORE.using_zephyr_rtos and CORE.target_platform in (
+        # declared with only_with_toolchain(Toolchain.ZEPHYR).
+        if CORE.using_toolchain_zephyr and CORE.target_platform in (
             PLATFORM_ESP32,
             PLATFORM_RP2,
         ):
@@ -903,30 +903,6 @@ def only_on(platforms):
                 "with framework: type: zephyr"
             )
         return obj
-
-    return validator_
-
-
-def only_on_zephyr_rtos(obj: typing.Any) -> typing.Any:
-    """Allow this option only on Zephyr builds other than nrf52."""
-    if not CORE.using_zephyr_rtos:
-        raise Invalid(
-            "This feature is only available when using the zephyr framework "
-            "on a supported platform"
-        )
-    return obj
-
-
-def only_on_or_zephyr_rtos(
-    platforms: str | list[str],
-) -> Callable[[typing.Any], typing.Any]:
-    """Allow this option on the given platforms and on Zephyr builds other than nrf52."""
-    on_platforms = only_on(platforms)
-
-    def validator_(obj: typing.Any) -> typing.Any:
-        if CORE.using_zephyr_rtos:
-            return obj
-        return on_platforms(obj)
 
     return validator_
 
@@ -952,6 +928,24 @@ def only_with_framework(
                 if docs_path:
                     err_str += f": {docs_url(path=f'components/{docs_path}')}"
             raise Invalid(err_str)
+        return obj
+
+    return validator_
+
+
+def only_with_toolchain(
+    toolchains: Toolchain | list[Toolchain],
+) -> Callable[[typing.Any], typing.Any]:
+    """Validate that this option can only be specified with the given toolchains."""
+    if not isinstance(toolchains, list):
+        toolchains = [toolchains]
+
+    def validator_(obj: typing.Any) -> typing.Any:
+        if CORE.toolchain not in toolchains:
+            raise Invalid(
+                "This feature is only available with toolchain(s) "
+                f"{', '.join(toolchain.value for toolchain in toolchains)}"
+            )
         return obj
 
     return validator_
@@ -2394,7 +2388,7 @@ class SplitDefault(Optional):
     @property
     def default(self):
         keys = []
-        if CORE.using_zephyr_rtos:
+        if CORE.using_toolchain_zephyr:
             keys += _zephyr_rtos_default_keys()
         elif CORE.is_esp32:
             from esphome.components.esp32 import VARIANT_ESP32, get_esp32_variant
@@ -2421,7 +2415,7 @@ class SplitDefault(Optional):
                 keys += _get_default_key(variant, framework)
                 keys += _get_default_key(variant)
             keys += _get_default_key(framework)
-        if not CORE.using_zephyr_rtos:
+        if not CORE.using_toolchain_zephyr:
             keys += _get_default_key()
         for key in keys:
             if self._defaults.get(key) is not None:

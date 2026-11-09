@@ -56,7 +56,7 @@ VARIANT = ZephyrVariant(
     sdk=MAINLINE,
     sdk_name="zephyr",
     family="stm32",
-    valid_toolchains=(Toolchain.SDK_ZEPHYR,),
+    valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     transports=frozenset(),
     # nucleo_f401re's stock layout ships its own scratch_partition, so "scratch" is

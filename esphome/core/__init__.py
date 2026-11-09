@@ -922,7 +922,7 @@ class EsphomeCore:
             return self.relative_build_path("build", f"{self.name}.bin")
         if self.is_libretiny:
             return self.relative_pioenvs_path(self.name, "firmware.uf2")
-        if self.using_toolchain_sdk_zephyr:
+        if self.using_toolchain_zephyr:
             # OTA writes this file's bytes straight into MCUboot's secondary
             # slot, so it must be the MCUboot-signed app image, not the merged flash image
             # used for initial serial flashing.
@@ -967,7 +967,9 @@ class EsphomeCore:
     @property
     def is_esp32(self):
         """ESP32 on ESP-IDF or Arduino; false for framework: type: zephyr."""
-        return self.target_platform == PLATFORM_ESP32 and not self.using_zephyr_rtos
+        return (
+            self.target_platform == PLATFORM_ESP32 and not self.using_toolchain_zephyr
+        )
 
     @property
     def is_rp2(self):
@@ -980,7 +982,7 @@ class EsphomeCore:
         the rp2 component — variant detection doesn't belong on ``CORE``.
         False for framework: type: zephyr.
         """
-        return self.target_platform == PLATFORM_RP2 and not self.using_zephyr_rtos
+        return self.target_platform == PLATFORM_RP2 and not self.using_toolchain_zephyr
 
     @property
     def is_rp2040(self):
@@ -1068,8 +1070,8 @@ class EsphomeCore:
         return self.toolchain == Toolchain.SDK_NRF
 
     @property
-    def using_toolchain_sdk_zephyr(self):
-        return self.toolchain == Toolchain.SDK_ZEPHYR
+    def using_toolchain_zephyr(self):
+        return self.toolchain == Toolchain.ZEPHYR
 
     @property
     def using_toolchain_arduino(self):
@@ -1093,14 +1095,6 @@ class EsphomeCore:
     @property
     def using_zephyr(self):
         return self.target_framework == "zephyr"
-
-    @property
-    def using_zephyr_rtos(self) -> bool:
-        """True when building with Zephyr on any platform other than nrf52."""
-        return (
-            self.data.get(KEY_CORE, {}).get(KEY_TARGET_FRAMEWORK) == "zephyr"
-            and not self.is_nrf52
-        )
 
     def add_job(self, func, *args, **kwargs) -> None:
         self.event_loop.add_job(func, *args, **kwargs)
@@ -1220,7 +1214,7 @@ class EsphomeCore:
         if (
             self.using_toolchain_esp_idf
             or self.using_toolchain_sdk_nrf
-            or self.using_toolchain_sdk_zephyr
+            or self.using_toolchain_zephyr
         ):
             # The native ESP-IDF, nRF52 and Zephyr build generators do not
             # consume build_unflags

@@ -12,7 +12,7 @@ import tempfile
 
 import yaml
 
-from esphome.build_helpers.tools_cache import SDK_ZEPHYR_TOOLS_CACHE, tools_cache_path
+from esphome.build_helpers.tools_cache import ZEPHYR_TOOLS_CACHE, tools_cache_path
 from esphome.const import CONF_PATH, CONF_REF, CONF_TYPE, CONF_URL, TYPE_LOCAL
 from esphome.core import EsphomeError
 from esphome.framework_helpers import (
@@ -33,7 +33,7 @@ def _tools_path() -> Path:
     # Machine-global (OS user cache dir) so all Zephyr-based projects share one
     # SDK/toolchain/west install; see build_helpers.tools_cache.tools_cache_path
     # for the env-override and normalization rules.
-    return tools_cache_path(*SDK_ZEPHYR_TOOLS_CACHE)
+    return tools_cache_path(*ZEPHYR_TOOLS_CACHE)
 
 
 def _python_env_path(version: str) -> Path:
@@ -532,7 +532,15 @@ def _check_and_install(
         else:
             _LOGGER.info("Initializing Zephyr SDK %s (%s) ...", ver_tag, label)
             rmdir(framework, msg=f"Clean up {ver_tag} framework")
-            cmd = [str(python_bin), "-m", "west", "init", "-m", manifest_url]
+            cmd = [
+                str(python_bin),
+                "-m",
+                "west",
+                "init",
+                "-o=--depth=1",
+                "-m",
+                manifest_url,
+            ]
             # A pinned SHA can't be a --mr value; init at the source's ref, then pin.
             init_rev = source.get(CONF_REF) if pinned else manifest_rev
             if init_rev:

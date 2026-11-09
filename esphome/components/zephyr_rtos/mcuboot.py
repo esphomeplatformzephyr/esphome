@@ -42,7 +42,7 @@ _BOOT_STATUS_STATE_COUNT = {"scratch": 3, "move": 3, "offset": 2}
 
 def validate_swap_method(config: ConfigType) -> ConfigType:
     """Reject a swap_method the current variant's port doesn't support."""
-    if not CORE.using_zephyr_rtos:
+    if not CORE.using_toolchain_zephyr:
         return reject_swap_method_off_zephyr(config)
     from . import zephyr_variant
     from .variants import VARIANTS
@@ -62,7 +62,7 @@ def validate_swap_method(config: ConfigType) -> ConfigType:
 
 def apply_swap_method(config: ConfigType) -> None:
     """Push the configured MCUboot swap method to sysbuild.conf."""
-    if not CORE.using_zephyr_rtos:
+    if not CORE.using_toolchain_zephyr:
         return
     from . import zephyr_add_sysbuild_conf
 
@@ -75,7 +75,7 @@ def apply_swap_method(config: ConfigType) -> None:
 
 def zephyr_skip_bootloader_supported() -> bool:
     """True when MCUboot is in the build: only with ota:, and OTA never sends it."""
-    return CORE.using_zephyr_rtos and bool((CORE.config or {}).get(CONF_OTA))
+    return CORE.using_toolchain_zephyr and bool((CORE.config or {}).get(CONF_OTA))
 
 
 def apply_single_slot() -> None:

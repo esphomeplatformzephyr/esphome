@@ -23,6 +23,7 @@ from esphome.const import (
     STATE_CLASS_MEASUREMENT,
     UNIT_CELSIUS,
     PlatformFramework,
+    Toolchain,
 )
 from esphome.core import CORE
 from esphome.types import ConfigType
@@ -43,14 +44,17 @@ CONFIG_SCHEMA = cv.All(
         state_class=STATE_CLASS_MEASUREMENT,
         entity_category=ENTITY_CATEGORY_DIAGNOSTIC,
     ).extend(cv.polling_component_schema("60s")),
-    cv.only_on_or_zephyr_rtos(
-        [
-            PLATFORM_ESP32,
-            PLATFORM_RP2,
-            PLATFORM_BK72XX,
-            PLATFORM_NRF52,
-            PLATFORM_LN882X,
-        ]
+    cv.Any(
+        cv.only_on(
+            [
+                PLATFORM_ESP32,
+                PLATFORM_RP2,
+                PLATFORM_BK72XX,
+                PLATFORM_NRF52,
+                PLATFORM_LN882X,
+            ]
+        ),
+        cv.only_with_toolchain(Toolchain.ZEPHYR),
     ),
 )
 
@@ -66,7 +70,7 @@ async def to_code(config: ConfigType) -> None:
     if CORE.using_zephyr and CORE.is_nrf52:
         zephyr_add_prj_conf("SENSOR", True)
         zephyr_add_prj_conf("TEMP_NRF5", True)
-    elif CORE.using_zephyr_rtos:
+    elif CORE.using_toolchain_zephyr:
         # Every Zephyr sensor driver needs it; the driver itself follows its node's status
         zephyr_add_prj_conf("SENSOR", True)
         if nodes := VARIANTS[zephyr_variant()].die_temp_nodes:

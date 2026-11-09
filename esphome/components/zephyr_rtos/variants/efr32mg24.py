@@ -62,7 +62,7 @@ VARIANT = ZephyrVariant(
     sdk_name="zephyr",
     alt_sdks={"silabs": SILABS},
     family="silabs",
-    valid_toolchains=(Toolchain.SDK_ZEPHYR,),
+    valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     # BLE always available (bt_hci_silabs HCI node enabled upstream). OpenThread also
     # possible via the ieee802154 driver added upstream 2026-02-12 (commit bd89985e6,

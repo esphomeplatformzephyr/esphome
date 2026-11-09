@@ -8,7 +8,7 @@ import time
 
 import yaml
 
-from esphome.build_helpers.tools_cache import SDK_ZEPHYR_TOOLS_CACHE, tools_cache_path
+from esphome.build_helpers.tools_cache import ZEPHYR_TOOLS_CACHE, tools_cache_path
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_PATH,
@@ -24,6 +24,7 @@ from esphome.core import CORE, TimePeriodSeconds
 from esphome.types import ConfigType
 
 from .const import COMMIT_SHA_RE, KEY_SDK_SOURCE_RESOLVED_REF, KEY_ZEPHYR_RTOS
+from .framework_west import _install_lock
 from .variants import ZephyrSDK
 
 _LOGGER = logging.getLogger(__name__)
@@ -35,18 +36,18 @@ _SPARSE_CHECKOUT_SCHEMA = "2"
 
 
 def _dts_cache_root() -> Path:
-    # Nested under the same machine-global sdk-zephyr cache root as the SDK/west
+    # Nested under the same machine-global zephyr cache root as the SDK/west
     # workspace itself (not a bare ~/.esphome/) so it's covered by the same
-    # ESPHOME_SDK_ZEPHYR_PREFIX override and by `esphome clean-all`.
-    return tools_cache_path(*SDK_ZEPHYR_TOOLS_CACHE) / "dts_cache"
+    # ESPHOME_ZEPHYR_PREFIX override and by `esphome clean-all`.
+    return tools_cache_path(*ZEPHYR_TOOLS_CACHE) / "dts_cache"
 
 
 def _sdk_source_version_cache_root() -> Path:
-    return tools_cache_path(*SDK_ZEPHYR_TOOLS_CACHE) / "sdk_source_version_cache"
+    return tools_cache_path(*ZEPHYR_TOOLS_CACHE) / "sdk_source_version_cache"
 
 
 def _manifest_revision_cache_root() -> Path:
-    return tools_cache_path(*SDK_ZEPHYR_TOOLS_CACHE) / "manifest_revision_cache"
+    return tools_cache_path(*ZEPHYR_TOOLS_CACHE) / "manifest_revision_cache"
 
 
 _DTS_SPARSE_PATHS = (
@@ -292,7 +293,7 @@ def _native_dts_path(sdk: ZephyrSDK, family: str | None = None) -> Path | None:
     if sdk.tools_subdir is None:
         return None
     candidate = (
-        tools_cache_path(*SDK_ZEPHYR_TOOLS_CACHE)
+        tools_cache_path(*ZEPHYR_TOOLS_CACHE)
         / "frameworks"
         / f"{sdk.tools_subdir}-v{_framework_base_version()}"
         / "zephyr"
@@ -315,7 +316,7 @@ def _resolve_boards_ref(sdk: ZephyrSDK, ver: str) -> str | None:
     manifest_url's own west.yml at tag f"v{ver}" and read the boards_repo_url project's
     own `revision:` field -- the only correct way to know it; see
     ZephyrSDK.resolve_boards_ref_via_manifest for why a guessed format string can't work.
-    Cached under the machine-global sdk-zephyr cache root's manifest_revision_cache/
+    Cached under the machine-global zephyr cache root's manifest_revision_cache/
     (small -- just the resolved string), immutable per (manifest_url, ver) since ver
     always maps to the same immutable upstream tag.
     """
@@ -468,72 +469,74 @@ def _sparse_clone_hal_modules(zephyr_dir: Path, family: str | None) -> None:
 
 
 def _sparse_clone_dts(
-    variant: str, sdk_name: str, sdk: ZephyrSDK, family: str | None = None
+    sdk_name: str, sdk: ZephyrSDK, family: str | None = None
 ) -> Path | None:
     """Sparse-clone boards/, dts/, and include/zephyr/dt-bindings/ from the sdk's board
     repo.
 
-    The clone is cached under the machine-global sdk-zephyr cache root's
-    dts_cache/<variant>/<sdk_name>/<sdk_ver>/ and reused on subsequent compiles. The
-    cache is keyed on the resolved boards revision (stored in a small marker file),
-    not just directory presence, so a stale checkout from before a ref-resolution fix
-    landed is detected and re-fetched automatically instead of silently reused
-    forever.
+    The clone is cached under the machine-global zephyr cache root's
+    dts_cache/<sdk_name>/<sdk_ver>/zephyr/, shared by every variant, with each family's
+    HAL dts/ added as needed in <sdk_ver>/modules/. The cache is keyed on the resolved boards revision (stored
+    in a small marker file), not just directory presence, so a stale checkout from
+    before a ref-resolution fix landed is detected and re-fetched automatically
+    instead of silently reused forever.
     Returns None if git is unavailable, the tag/ref can't be resolved, or the clone
     fails.
     """
     repo = sdk.boards_repo_url or sdk.manifest_url
     ver = _framework_base_version()
-    dest = _dts_cache_root() / variant / sdk_name / ver
+    # A level down, so the HAL modules beside it stay within this version
+    dest = _dts_cache_root() / sdk_name / ver / "zephyr"
 
     tag = _resolve_boards_ref(sdk, ver)
     if tag is None:
         _LOGGER.warning(
-            "[zephyr] Could not determine boards revision for %s %s %s; skipping sparse clone",
-            variant,
+            "[zephyr] Could not determine boards revision for %s %s; skipping sparse clone",
             sdk_name,
             ver,
         )
         return None
 
-    ref_marker = dest / ".resolved_ref"
-    marker_content = f"{tag}#{_SPARSE_CHECKOUT_SCHEMA}"
-    zephyr_dir = dest / "zephyr" if (dest / "zephyr").is_dir() else dest
-    if (
-        (zephyr_dir / "boards").is_dir()
-        and ref_marker.is_file()
-        and ref_marker.read_text().strip() == marker_content
-    ):
-        # HAL modules have their own marker -- may not have run yet on an older cache.
-        _sparse_clone_hal_modules(zephyr_dir, family)
-        return zephyr_dir
-
-    if dest.is_dir():
-        shutil.rmtree(dest, ignore_errors=True)  # stale cache -- force a re-fetch
-
-    _LOGGER.info(
-        "[zephyr] Fetching board DTS files for %s %s (revision %s) — one-time download, cached afterward",
-        variant,
-        ver,
-        tag,
-    )
-    dest.mkdir(parents=True, exist_ok=True)
-    try:
-        _git_sparse_fetch(repo, tag, dest)
-        # sdk-zephyr repos nest the Zephyr tree one level down
+    # Shared by every variant, so builds running at once must not clone it together
+    with _install_lock(f"dts-{sdk_name}-{ver}"):
+        ref_marker = dest / ".resolved_ref"
+        marker_content = f"{tag}#{_SPARSE_CHECKOUT_SCHEMA}"
         zephyr_dir = dest / "zephyr" if (dest / "zephyr").is_dir() else dest
-        if (zephyr_dir / "boards").is_dir():
-            ref_marker.write_text(marker_content)
+        if (
+            (zephyr_dir / "boards").is_dir()
+            and ref_marker.is_file()
+            and ref_marker.read_text().strip() == marker_content
+        ):
+            # HAL modules have their own marker -- may not have run yet on an older cache.
             _sparse_clone_hal_modules(zephyr_dir, family)
             return zephyr_dir
-        return None
-    except subprocess.CalledProcessError as exc:
-        _LOGGER.warning("[zephyr] DTS fetch failed: %s", exc.stderr.strip())
-    except FileNotFoundError:
-        _LOGGER.warning("[zephyr] DTS fetch requires git; install git and retry")
 
-    shutil.rmtree(dest, ignore_errors=True)
-    return None
+        if dest.is_dir():
+            shutil.rmtree(dest, ignore_errors=True)  # stale cache -- force a re-fetch
+
+        _LOGGER.info(
+            "[zephyr] Fetching board DTS files for %s %s (revision %s) — one-time download, cached afterward",
+            sdk_name,
+            ver,
+            tag,
+        )
+        dest.mkdir(parents=True, exist_ok=True)
+        try:
+            _git_sparse_fetch(repo, tag, dest)
+            # sdk-zephyr repos nest the Zephyr tree one level down
+            zephyr_dir = dest / "zephyr" if (dest / "zephyr").is_dir() else dest
+            if (zephyr_dir / "boards").is_dir():
+                ref_marker.write_text(marker_content)
+                _sparse_clone_hal_modules(zephyr_dir, family)
+                return zephyr_dir
+            return None
+        except subprocess.CalledProcessError as exc:
+            _LOGGER.warning("[zephyr] DTS fetch failed: %s", exc.stderr.strip())
+        except FileNotFoundError:
+            _LOGGER.warning("[zephyr] DTS fetch requires git; install git and retry")
+
+        shutil.rmtree(dest, ignore_errors=True)
+        return None
 
 
 def _sparse_clone_dts_from_source(
@@ -544,7 +547,7 @@ def _sparse_clone_dts_from_source(
     Mirrors _sparse_clone_dts() but clones the user's fork/ref directly instead of an
     upstream tag -- a fork's VERSION file (e.g. a custom bump like "4.4.99") has no
     matching tag on the plain upstream repo, so DTS lookups must come from the same
-    fork/ref the rest of the build uses. Cached under the machine-global sdk-zephyr
+    fork/ref the rest of the build uses. Cached under the machine-global zephyr
     cache root's dts_cache/<url-ref-hash>/, keyed the same way as
     resolve_sdk_source_version()'s cache. Freshness is decided once, up front, by
     resolve_sdk_source_version() -- which resolves the moving ref (a fork/branch, or an
@@ -651,7 +654,7 @@ async def fetch_board_dts(
         return
 
     zephyr_dir = _native_dts_path(sdk, family) or _sparse_clone_dts(
-        variant, sdk_name, sdk, family
+        sdk_name, sdk, family
     )
     if zephyr_dir is not None:
         zd["dts_base_path"] = str(zephyr_dir)

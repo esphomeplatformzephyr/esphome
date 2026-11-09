@@ -29,6 +29,7 @@ from esphome.const import (
     PLATFORM_RP2,
     PLATFORM_RTL87XX,
     PlatformFramework,
+    Toolchain,
 )
 from esphome.core import CORE, ID, CoroPriority, Lambda, coroutine_with_priority
 from esphome.cpp_generator import MockObj, TemplateArgsType
@@ -231,7 +232,7 @@ def uart_selection(value: Any) -> str:
         raise cv.Invalid("Uart selection not valid for host platform")
     if CORE.is_nrf52:
         return cv.one_of(*UART_SELECTION_NRF52, upper=True)(value)
-    if CORE.using_zephyr_rtos:
+    if CORE.using_toolchain_zephyr:
         from esphome.components.esp32.const import (
             VARIANT_ESP32C3,
             VARIANT_ESP32C5,
@@ -431,14 +432,17 @@ CONFIG_SCHEMA = cv.All(
                 silabs=768,
                 stm32=768,
             ): cv.All(
-                cv.only_on_or_zephyr_rtos(
-                    [
-                        PLATFORM_ESP32,
-                        PLATFORM_BK72XX,
-                        PLATFORM_LN882X,
-                        PLATFORM_RTL87XX,
-                        PLATFORM_NRF52,
-                    ]
+                cv.Any(
+                    cv.only_on(
+                        [
+                            PLATFORM_ESP32,
+                            PLATFORM_BK72XX,
+                            PLATFORM_LN882X,
+                            PLATFORM_RTL87XX,
+                            PLATFORM_NRF52,
+                        ]
+                    ),
+                    cv.only_with_toolchain(Toolchain.ZEPHYR),
                 ),
                 cv.validate_bytes,
                 cv.Any(
@@ -484,16 +488,19 @@ CONFIG_SCHEMA = cv.All(
                 silabs=UART0,
                 stm32=UART0,
             ): cv.All(
-                cv.only_on_or_zephyr_rtos(
-                    [
-                        PLATFORM_ESP8266,
-                        PLATFORM_ESP32,
-                        PLATFORM_RP2,
-                        PLATFORM_BK72XX,
-                        PLATFORM_LN882X,
-                        PLATFORM_RTL87XX,
-                        PLATFORM_NRF52,
-                    ]
+                cv.Any(
+                    cv.only_on(
+                        [
+                            PLATFORM_ESP8266,
+                            PLATFORM_ESP32,
+                            PLATFORM_RP2,
+                            PLATFORM_BK72XX,
+                            PLATFORM_LN882X,
+                            PLATFORM_RTL87XX,
+                            PLATFORM_NRF52,
+                        ]
+                    ),
+                    cv.only_with_toolchain(Toolchain.ZEPHYR),
                 ),
                 uart_selection,
             ),
@@ -624,7 +631,7 @@ async def to_code(config: ConfigType) -> None:
     if hardware_uart is not None and (
         hardware_uart.startswith("&")
         or (
-            CORE.using_zephyr_rtos
+            CORE.using_toolchain_zephyr
             and hardware_uart not in (UART1, USB_CDC, USB_SERIAL_JTAG)
         )
     ):
@@ -791,7 +798,7 @@ async def _late_logger_init(config: ConfigType) -> None:
             if config[CONF_HARDWARE_UART] == USB_CDC:
                 cg.add_define("USE_LOGGER_UART_SELECTION_USB_CDC")
                 zephyr_add_prj_conf("UART_LINE_CTRL", True)
-    if CORE.using_zephyr_rtos and has_serial_logging:
+    if CORE.using_toolchain_zephyr and has_serial_logging:
         from esphome.components.zephyr import (
             VARIANTS,
             claim_rtt_channel,

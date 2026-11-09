@@ -47,7 +47,7 @@ def test_platform_generates_zephyr_build(
 
     assert CORE.data[KEY_CORE][KEY_TARGET_PLATFORM] == platform
     assert CORE.data[KEY_CORE][KEY_TARGET_FRAMEWORK] == "zephyr"
-    assert CORE.using_zephyr_rtos
+    assert CORE.using_toolchain_zephyr
     assert "logger::Logger" in main_cpp
     assert zephyr_data()[KEY_PRJ_CONF][""]["CONFIG_TEST_OPTION"] == (True, True)
     assert "logger_zephyr.cpp" not in logger.FILTER_SOURCE_FILES()

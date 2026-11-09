@@ -41,7 +41,7 @@ VARIANT = ZephyrVariant(
     sdk=MAINLINE,
     sdk_name="zephyr",
     family="esp32",
-    valid_toolchains=(Toolchain.SDK_ZEPHYR,),
+    valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="riscv64-zephyr-elf",
     # Zephyr's hal_espressif blob check verifies the HAL's entire manifest once BLE is
     # enabled, not just this chip's -- a chip-specific regex fails the same way, so fetch

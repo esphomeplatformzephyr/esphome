@@ -18,7 +18,7 @@ from esphome.components.zephyr.const import (
     KEY_PM_STATIC,
 )
 import esphome.config_validation as cv
-from esphome.const import CONF_ID, KEY_CORE, KEY_FRAMEWORK_VERSION, PLATFORM_NRF52
+from esphome.const import CONF_ID, KEY_CORE, KEY_FRAMEWORK_VERSION, Framework
 from esphome.core import CORE, CoroPriority, coroutine_with_priority
 from esphome.types import ConfigType
 
@@ -41,7 +41,7 @@ XTENSA_VARIANTS = (VARIANT_ESP32, VARIANT_ESP32S3)
 
 CONFIG_SCHEMA = cv.All(
     cv.Schema({cv.GenerateID(): cv.declare_id(Coredump)}).extend(cv.COMPONENT_SCHEMA),
-    cv.only_on_or_zephyr_rtos([PLATFORM_NRF52]),
+    cv.only_with_framework(Framework.ZEPHYR),
 )
 
 

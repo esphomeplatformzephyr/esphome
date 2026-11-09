@@ -288,7 +288,7 @@ async def to_code(config: ConfigType) -> None:
 
             zephyr_add_prj_conf("NET_SOCKETS", True)
             zephyr_add_prj_conf("POSIX_API", True)
-            if CORE.using_zephyr_rtos:
+            if CORE.using_toolchain_zephyr:
                 # SO_RCVTIMEO/SO_SNDTIMEO are silently ignored without these
                 zephyr_add_prj_conf("NET_CONTEXT_RCVTIMEO", True)
                 zephyr_add_prj_conf("NET_CONTEXT_SNDTIMEO", True)

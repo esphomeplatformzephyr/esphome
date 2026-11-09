@@ -660,7 +660,7 @@ async def to_code(config: ConfigType) -> None:
         zephyr_add_prj_conf("NET_BUF_TX_COUNT", 48)
         zephyr_add_prj_conf("NET_TCP_MAX_RECV_WINDOW_SIZE", 2280)
         zephyr_add_prj_conf("NET_TCP_MAX_SEND_WINDOW_SIZE", 2280)
-    elif CORE.using_zephyr_rtos:
+    elif CORE.using_toolchain_zephyr:
         zephyr_add_prj_conf("NETWORKING", True)
         zephyr_add_prj_conf("NET_IPV4", enable_ipv4)
         zephyr_add_prj_conf("NET_IPV6", enable_ipv6)
@@ -705,7 +705,7 @@ async def to_code(config: ConfigType) -> None:
             cg.add_build_flag("-DPIO_FRAMEWORK_ARDUINO_LWIP2_IPV6_LOW_MEMORY")
         if CORE.is_rp2:
             cg.add_build_flag("-DPIO_FRAMEWORK_ARDUINO_ENABLE_IPV6")
-    if enable_ipv6 and CORE.using_zephyr_rtos:
+    if enable_ipv6 and CORE.using_toolchain_zephyr:
         ipv6_addr_floor = 6 if "openthread" in CORE.config else 2
         zephyr_add_prj_conf(
             "NET_IF_UNICAST_IPV6_ADDR_COUNT",

@@ -48,7 +48,7 @@ VARIANT = ZephyrVariant(
     sdk=MAINLINE,
     sdk_name="zephyr",
     family="esp32",
-    valid_toolchains=(Toolchain.SDK_ZEPHYR,),
+    valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="xtensa-espressif_esp32s3_zephyr-elf",
     # See esp32_h2.py's blobs= comment. Sentinel shared with the other esp32-family
     # variants (same SDK).

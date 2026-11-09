@@ -906,7 +906,7 @@ class MetadataValidationStep(ConfigValidationStep):
                     self.path,
                 )
                 success = False
-            elif CORE.using_zephyr_rtos and component_dep in (
+            elif CORE.using_toolchain_zephyr and component_dep in (
                 PLATFORM_ESP32,
                 PLATFORM_RP2,
             ):

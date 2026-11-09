@@ -169,6 +169,7 @@ def test_loop_interval_zephyr_watchdog(
         KEY_TARGET_PLATFORM: PLATFORM_NRF,
         KEY_TARGET_FRAMEWORK: "zephyr",
     }
+    CORE.toolchain = Toolchain.ZEPHYR
     token = fv.full_config.set(
         {PLATFORM_NRF: {CONF_WATCHDOG_TIMEOUT: watchdog_timeout}}
     )
@@ -241,7 +242,7 @@ async def test_app_is_default_initialized(
         (Toolchain.PLATFORMIO, True),
         (Toolchain.ESP_IDF, False),
         (Toolchain.SDK_NRF, False),
-        (Toolchain.SDK_ZEPHYR, False),
+        (Toolchain.ZEPHYR, False),
     ],
 )
 async def test_no_exceptions_flag_skipped_on_native_cmake_builds(
@@ -1800,12 +1801,12 @@ async def test_add_platformio_options_sdk_nrf(
 
 
 @pytest.mark.asyncio
-async def test_add_platformio_options_sdk_zephyr(
+async def test_add_platformio_options_zephyr(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """sdk-zephyr is a native toolchain too: the same options are honored,
+    """Zephyr is a native toolchain too: the same options are honored,
     the rest warn, and build_unflags warn as the build ignores them."""
-    CORE.toolchain = Toolchain.SDK_ZEPHYR
+    CORE.toolchain = Toolchain.ZEPHYR
     CORE.data[KEY_CORE] = {
         KEY_TARGET_PLATFORM: "zephyr",
         KEY_TARGET_FRAMEWORK: "zephyr",
@@ -1826,11 +1827,11 @@ async def test_add_platformio_options_sdk_zephyr(
     assert CORE.platformio_options == {"lib_ignore": ["libsodium"]}
     assert (
         "esphome->platformio_options->board_build.f_flash is ignored when "
-        "building with the native 'sdk-zephyr' toolchain" in caplog.text
+        "building with the native 'zephyr' toolchain" in caplog.text
     )
     assert (
         "Build unflag -Wall is ignored when building with the native "
-        "'sdk-zephyr' toolchain" in caplog.text
+        "'zephyr' toolchain" in caplog.text
     )
 
 

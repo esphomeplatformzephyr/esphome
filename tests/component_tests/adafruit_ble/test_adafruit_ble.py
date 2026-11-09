@@ -83,6 +83,7 @@ def test_zephyr_mcuboot_check_skips_adafruit_ble(
         KEY_TARGET_PLATFORM: PLATFORM_NRF,
         KEY_TARGET_FRAMEWORK: "zephyr",
     }
+    CORE.toolchain = Toolchain.ZEPHYR
     CORE.data[KEY_ZEPHYR] = {
         KEY_BOOTLOADER: "adafruit_nrf52_sd140_v6",
         KEY_SINGLE_SLOT: False,

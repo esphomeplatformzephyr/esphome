@@ -15,7 +15,10 @@ from esphome.const import (
     KEY_CORE,
     KEY_TARGET_FRAMEWORK,
     KEY_TARGET_PLATFORM,
+    Framework,
+    Platform,
     PlatformFramework,
+    Toolchain,
 )
 from esphome.types import ConfigType
 from esphome.util import OrderedDict
@@ -85,6 +88,8 @@ def set_core_config() -> Generator[SetCoreConfigCallable]:
             KEY_TARGET_PLATFORM: platform.value,
             KEY_TARGET_FRAMEWORK: framework.value,
         }
+        if framework == Framework.ZEPHYR and platform != Platform.NRF52:
+            CORE.toolchain = Toolchain.ZEPHYR
 
         # Update with any additional core data
         if core_data:

@@ -56,6 +56,7 @@ from esphome.const import (
     PLATFORM_NRF52,
     PLATFORM_RP2,
     PlatformFramework,
+    Toolchain,
 )
 from esphome.core import CORE, ID, CoroPriority, coroutine_with_priority
 from esphome.cpp_generator import MockObj
@@ -259,19 +260,24 @@ CONFIG_SCHEMA = cv.All(
                 cv.only_on(PLATFORM_HOST), validate_device
             ),
             cv.Optional(CONF_DTS_NODE_OVERRIDE): cv.All(
-                cv.only_on_zephyr_rtos, cv.string_strict, normalize_dts_label
+                cv.only_with_toolchain(Toolchain.ZEPHYR),
+                cv.string_strict,
+                normalize_dts_label,
             ),
         }
     ).extend(cv.COMPONENT_SCHEMA),
-    cv.only_on_or_zephyr_rtos(
-        [
-            PLATFORM_BK72XX,
-            PLATFORM_ESP32,
-            PLATFORM_ESP8266,
-            PLATFORM_RP2,
-            PLATFORM_NRF52,
-            PLATFORM_HOST,
-        ]
+    cv.Any(
+        cv.only_on(
+            [
+                PLATFORM_BK72XX,
+                PLATFORM_ESP32,
+                PLATFORM_ESP8266,
+                PLATFORM_RP2,
+                PLATFORM_NRF52,
+                PLATFORM_HOST,
+            ]
+        ),
+        cv.only_with_toolchain(Toolchain.ZEPHYR),
     ),
     validate_config,
     validate_host_config,

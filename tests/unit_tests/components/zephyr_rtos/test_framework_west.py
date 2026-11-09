@@ -49,12 +49,12 @@ def _make_fake_run_command_ok(
         calls.append(cmd)
         calls.cwds.append(kwargs.get("cwd"))
         if cmd[2:4] == ["west", "init"]:
-            west_dir = tmp_path / "sdk-zephyr" / "frameworks" / _CACHE_KEY / ".west"
+            west_dir = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY / ".west"
             west_dir.mkdir(parents=True, exist_ok=True)
             (west_dir / "config").write_text(f"[manifest]\npath = {manifest_path}\n")
         if cmd[2:5] == list(_FILTER_CMD):
             config_path = (
-                tmp_path / "sdk-zephyr" / "frameworks" / _CACHE_KEY / ".west" / "config"
+                tmp_path / "zephyr" / "frameworks" / _CACHE_KEY / ".west" / "config"
             )
             config = configparser.ConfigParser()
             config.read(config_path)
@@ -90,7 +90,7 @@ def _run_check_and_install(
     with (
         patch(
             "esphome.components.zephyr_rtos.framework_west._tools_path",
-            return_value=tmp_path / "sdk-zephyr",
+            return_value=tmp_path / "zephyr",
         ),
         patch(
             "esphome.components.zephyr_rtos.framework_west._source_cache_key",
@@ -149,7 +149,7 @@ def test_git_source_west_init_uses_ref_then_pins_manifest_repo_to_sha(
         ["git", "fetch", "--depth=1", "--", "origin", resolved_sha],
         ["git", "reset", "--hard", "FETCH_HEAD"],
     ]
-    framework = tmp_path / "sdk-zephyr" / "frameworks" / _CACHE_KEY
+    framework = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
     assert (framework / ".resolved_ref").read_text() == resolved_sha
 
 
@@ -161,7 +161,7 @@ def test_git_source_pins_manifest_repo_where_west_put_it(tmp_path: Path) -> None
         tmp_path, _git_source(resolved_sha), manifest_path="nrf"
     )
 
-    framework = tmp_path / "sdk-zephyr" / "frameworks" / _CACHE_KEY
+    framework = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
     fetch = ["git", "fetch", "--depth=1", "--", "origin", resolved_sha]
     assert calls.cwds[calls.index(fetch)] == str(framework / "nrf")
     reset = ["git", "reset", "--hard", "FETCH_HEAD"]
@@ -186,7 +186,7 @@ def test_git_source_moved_ref_repins_manifest_repo_without_reinit(
         new_sha,
     ]
     assert mock_run.call_args.args[0][2:4] == ["west", "update"]
-    framework = tmp_path / "sdk-zephyr" / "frameworks" / _CACHE_KEY
+    framework = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
     assert (framework / ".resolved_ref").read_text() == new_sha
 
 
@@ -201,7 +201,7 @@ def test_git_source_unchanged_ref_skips_update(tmp_path: Path) -> None:
 def test_missing_ready_sentinel_reruns_update_without_reinit(tmp_path: Path) -> None:
     """A workspace whose last `west update` never finished has .west/ but no .ready."""
     _run_check_and_install(tmp_path, None)
-    framework = tmp_path / "sdk-zephyr" / "frameworks" / _CACHE_KEY
+    framework = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
     (framework / ".ready").unlink()
 
     calls, mock_run = _run_check_and_install(tmp_path, None)
@@ -216,7 +216,7 @@ def test_failed_update_leaves_no_ready_sentinel_and_is_retried(
 ) -> None:
     with pytest.raises(EsphomeError, match="Can't update Zephyr SDK"):
         _run_check_and_install(tmp_path, None, update_returncode=1)
-    framework = tmp_path / "sdk-zephyr" / "frameworks" / _CACHE_KEY
+    framework = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
     assert (framework / ".west").is_dir()
     assert not (framework / ".ready").exists()
 
@@ -230,7 +230,7 @@ def test_failed_update_leaves_no_ready_sentinel_and_is_retried(
 def test_second_failed_update_in_a_row_starts_over(tmp_path: Path) -> None:
     """One failure resumes; a second in a row removes the workspace, so the
     next build initializes it anew."""
-    framework = tmp_path / "sdk-zephyr" / "frameworks" / _CACHE_KEY
+    framework = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
     with pytest.raises(EsphomeError, match="retries it"):
         _run_check_and_install(tmp_path, None, update_returncode=1)
     assert (framework / ".update_failed").is_file()
@@ -245,7 +245,7 @@ def test_second_failed_update_in_a_row_starts_over(tmp_path: Path) -> None:
 
 
 def test_successful_update_clears_the_failure_marker(tmp_path: Path) -> None:
-    framework = tmp_path / "sdk-zephyr" / "frameworks" / _CACHE_KEY
+    framework = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
     with pytest.raises(EsphomeError):
         _run_check_and_install(tmp_path, None, update_returncode=1)
 
@@ -258,10 +258,10 @@ def test_successful_update_clears_the_failure_marker(tmp_path: Path) -> None:
 def test_rebuilt_venv_updates_workspace_without_reclone(tmp_path: Path) -> None:
     """A missing venv (e.g. its interpreter was removed) must not wipe the workspace."""
     _run_check_and_install(tmp_path, None)
-    framework = tmp_path / "sdk-zephyr" / "frameworks" / _CACHE_KEY
+    framework = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
     (framework / "keep").touch()
     python = get_python_env_executable_path(
-        tmp_path / "sdk-zephyr" / "penvs" / "v4.4.1", "python"
+        tmp_path / "zephyr" / "penvs" / "v4.4.1", "python"
     )
     python.unlink()
 
@@ -295,7 +295,7 @@ def _filters(calls: list[list[str]]) -> list[str]:
 
 
 def _framework(tmp_path: Path) -> Path:
-    return tmp_path / "sdk-zephyr" / "frameworks" / _CACHE_KEY
+    return tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
 
 
 def test_fresh_install_fetches_only_the_family_hals(tmp_path: Path) -> None:
@@ -430,7 +430,7 @@ def test_git_source_with_modules_pins_sha_in_generated_manifest(
     init_calls = [c for c in calls if c[2:4] == ["west", "init"]]
     assert init_calls[0][4:] == ["-l", "esphome-manifest"]
     assert ["git", "fetch", "--depth=1", "--", "origin", resolved_sha] not in calls
-    framework = tmp_path / "sdk-zephyr" / "frameworks" / _CACHE_KEY
+    framework = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
     assert _manifest_revision(framework) == resolved_sha
 
 
@@ -445,7 +445,7 @@ def test_git_source_with_modules_moved_ref_regenerates_manifest(
 
     assert not [c for c in calls if c[2:4] == ["west", "init"]]
     assert mock_run.call_args.args[0][2:4] == ["west", "update"]
-    framework = tmp_path / "sdk-zephyr" / "frameworks" / _CACHE_KEY
+    framework = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
     assert _manifest_revision(framework) == new_sha
     assert (framework / ".resolved_ref").read_text() == new_sha
 
@@ -466,7 +466,7 @@ def test_git_source_west_init_falls_back_to_raw_ref_when_unresolved(
     with (
         patch(
             "esphome.components.zephyr_rtos.framework_west._tools_path",
-            return_value=tmp_path / "sdk-zephyr",
+            return_value=tmp_path / "zephyr",
         ),
         patch(
             "esphome.components.zephyr_rtos.framework_west._source_cache_key",
@@ -643,15 +643,15 @@ def test_generate_synthetic_manifest_accepts_yaml_config_strings(
 def test_tools_path_env_override(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    override = tmp_path / "custom" / "sdk-zephyr"
-    monkeypatch.setenv("ESPHOME_SDK_ZEPHYR_PREFIX", str(override))
+    override = tmp_path / "custom" / "zephyr"
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(override))
     assert _tools_path() == override.resolve()
 
 
 def test_tools_path_default_is_global_cache(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv("ESPHOME_SDK_ZEPHYR_PREFIX", raising=False)
+    monkeypatch.delenv("ESPHOME_ZEPHYR_PREFIX", raising=False)
     expected = (
-        Path(platformdirs.user_cache_dir("esphome", appauthor=False)) / "sdk-zephyr"
+        Path(platformdirs.user_cache_dir("esphome", appauthor=False)) / "zephyr"
     ).resolve()
     assert _tools_path() == expected
 
@@ -742,5 +742,5 @@ def test_new_venv_gets_the_windows_rmtree_fix(tmp_path: Path) -> None:
         _run_check_and_install(tmp_path, None)
         _run_check_and_install(tmp_path, None)
     install_sitecustomize.assert_called_once_with(
-        tmp_path / "sdk-zephyr" / "penvs" / "v4.4.1"
+        tmp_path / "zephyr" / "penvs" / "v4.4.1"
     )

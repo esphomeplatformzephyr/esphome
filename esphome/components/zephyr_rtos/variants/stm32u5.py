@@ -54,7 +54,7 @@ VARIANT = ZephyrVariant(
     sdk=MAINLINE,
     sdk_name="zephyr",
     family="stm32",
-    valid_toolchains=(Toolchain.SDK_ZEPHYR,),
+    valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     transports=frozenset(),
     # stm32u5g9j_dk1's stock layout has no scratch_partition (like stm32wb55's

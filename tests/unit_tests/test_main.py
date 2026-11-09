@@ -7680,7 +7680,7 @@ def test_upload_program_ota_bootloader_skip_tree_names_the_flag(
         # toolchain writes the PlatformIO project files.
         (Toolchain.ARDUINO, False),
         (Toolchain.SDK_NRF, False),
-        (Toolchain.SDK_ZEPHYR, False),
+        (Toolchain.ZEPHYR, False),
         (None, True),
     ],
 )

@@ -39,9 +39,9 @@ def test_tools_missing_before_configure(tmp_path: Path) -> None:
     assert not toolchain.get_readelf_path().exists()
 
 
-def test_registered_for_sdk_zephyr() -> None:
+def test_registered_for_zephyr() -> None:
     assert (
-        NATIVE_TOOLCHAIN_MODULES[("zephyr", Toolchain.SDK_ZEPHYR)]
+        NATIVE_TOOLCHAIN_MODULES[("zephyr", Toolchain.ZEPHYR)]
         == "esphome.components.zephyr_rtos.toolchain"
     )
 

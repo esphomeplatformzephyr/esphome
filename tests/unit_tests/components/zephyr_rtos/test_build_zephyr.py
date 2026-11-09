@@ -10,7 +10,7 @@ from unittest.mock import patch
 
 import pytest
 
-from esphome.build_helpers.tools_cache import SDK_ZEPHYR_TOOLS_CACHE, tools_cache_path
+from esphome.build_helpers.tools_cache import ZEPHYR_TOOLS_CACHE, tools_cache_path
 from esphome.components.zephyr_rtos.build_zephyr import (
     _ccache_env,
     _runner_supports_dev_id,
@@ -231,7 +231,7 @@ def test_ccache_env_disabled_turns_zephyr_ccache_off(tmp_path: Path) -> None:
 
 @pytest.mark.usefixtures("clean_ccache_env")
 def test_ccache_env_enabled_uses_managed_settings(tmp_path: Path) -> None:
-    """A resolved ccache gets the shared settings and the sdk-zephyr cache dir."""
+    """A resolved ccache gets the shared settings and the zephyr cache dir."""
     CORE.build_path = tmp_path / "build"
     source_dir = tmp_path / "build" / "zephyr"
     with patch(
@@ -239,9 +239,7 @@ def test_ccache_env_enabled_uses_managed_settings(tmp_path: Path) -> None:
         return_value="/usr/bin/ccache",
     ):
         env = _ccache_env({}, source_dir)
-    assert env["CCACHE_DIR"] == str(
-        tools_cache_path(*SDK_ZEPHYR_TOOLS_CACHE) / "ccache"
-    )
+    assert env["CCACHE_DIR"] == str(tools_cache_path(*ZEPHYR_TOOLS_CACHE) / "ccache")
     assert env["CCACHE_DEPEND"] == "1"
     assert env["CCACHE_BASEDIR"] == str((tmp_path / "build").resolve())
     assert "CCACHE_DISABLE" not in env

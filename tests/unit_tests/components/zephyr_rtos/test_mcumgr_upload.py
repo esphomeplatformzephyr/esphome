@@ -43,7 +43,7 @@ def _state(tmp_path: Path) -> None:
     CORE.config_path = tmp_path / "test.yaml"
     CORE.build_path = tmp_path / "build"
     CORE.name = "test"
-    CORE.toolchain = Toolchain.SDK_ZEPHYR
+    CORE.toolchain = Toolchain.ZEPHYR
 
 
 def _upload(
@@ -83,6 +83,7 @@ def test_has_network_ota_needs_zephyr_rtos(
         KEY_TARGET_PLATFORM: platform,
         KEY_TARGET_FRAMEWORK: framework,
     }
+    CORE.toolchain = Toolchain.ZEPHYR if framework == "zephyr" else None
     assert module.has_network_ota(_mcumgr_config({"udp": True})) is expected
 
 

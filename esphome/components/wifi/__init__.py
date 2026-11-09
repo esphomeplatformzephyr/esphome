@@ -68,6 +68,7 @@ from esphome.const import (
     PLACEHOLDER_WIFI_SSID,
     Platform,
     PlatformFramework,
+    Toolchain,
 )
 from esphome.core import (
     CORE,
@@ -314,7 +315,7 @@ TTLS_PHASE_2 = {
 
 
 def _validate_ttls_phase_2(value: str) -> str:
-    if not CORE.using_zephyr_rtos:
+    if not CORE.using_toolchain_zephyr:
         return cv.only_on_esp32(value)
     # The Zephyr Wi-Fi API has one TTLS type
     if value != "mschapv2":
@@ -323,7 +324,10 @@ def _validate_ttls_phase_2(value: str) -> str:
 
 
 EAP_AUTH_SCHEMA = cv.All(
-    cv.only_on_or_zephyr_rtos([Platform.ESP32, Platform.ESP8266]),
+    cv.Any(
+        cv.only_on([Platform.ESP32, Platform.ESP8266]),
+        cv.only_with_toolchain(Toolchain.ZEPHYR),
+    ),
     cv.Schema(
         {
             cv.Optional(CONF_IDENTITY): cv.string_strict,
@@ -444,7 +448,7 @@ def validate_variant(_):
                 f"Board '{get_board()}' does not have WiFi support (no CYW43 wireless chip). "
                 f"Use a WiFi-capable board like 'rpipicow' or 'rpipico2w'."
             )
-    if CORE.using_zephyr_rtos:
+    if CORE.using_toolchain_zephyr:
         from esphome.components.zephyr import VARIANTS, zephyr_data, zephyr_variant
         from esphome.components.zephyr.const import KEY_BOARD
 
@@ -725,7 +729,7 @@ def _not_on_zephyr(value):
     # Zephyr's net_mgmt WiFi API has no TX power control request at all (checked the full
     # NET_REQUEST_WIFI_CMD_* enum in wifi_mgmt.h) -- reject at config time instead of
     # silently accepting and ignoring the setting.
-    if CORE.using_zephyr_rtos:
+    if CORE.using_toolchain_zephyr:
         raise cv.Invalid("output_power is not supported on Zephyr")
     return value
 
@@ -748,7 +752,7 @@ def _lease_cache_schema(value: Any) -> ConfigType:
     if not isinstance(value, dict):
         value = {CONF_ENABLED: value}
     value = LEASE_CACHE_SCHEMA(value)
-    if value[CONF_ENABLED] and CORE.using_zephyr_rtos:
+    if value[CONF_ENABLED] and CORE.using_toolchain_zephyr:
         # Zephyr has no RTC preferences
         value.setdefault(CONF_STORAGE, preferences.STORAGE_FLASH)
     elif value[CONF_ENABLED]:
@@ -805,7 +809,10 @@ CONFIG_SCHEMA = cv.All(
             cv.Optional(CONF_USE_ADDRESS): cv.string_strict,
             cv.Optional(CONF_MIN_AUTH_MODE): cv.All(
                 VALIDATE_WIFI_MIN_AUTH_MODE,
-                cv.only_on_or_zephyr_rtos([Platform.ESP32, Platform.ESP8266]),
+                cv.Any(
+                    cv.only_on([Platform.ESP32, Platform.ESP8266]),
+                    cv.only_with_toolchain(Toolchain.ZEPHYR),
+                ),
                 _validate_min_auth_mode,
             ),
             cv.SplitDefault(CONF_OUTPUT_POWER, esp8266=20.0): cv.All(
@@ -868,7 +875,7 @@ def eap_auth(config):
     # On Zephyr the method is chosen up front; ESP-IDF negotiates it with the server
     ttls = (
         ("use_ttls", CONF_TTLS_PHASE_2 in config)
-        if CORE.using_zephyr_rtos
+        if CORE.using_toolchain_zephyr
         else ("ttls_phase_2", config.get(CONF_TTLS_PHASE_2))
     )
     return cg.StructInitializer(
@@ -1094,7 +1101,7 @@ async def to_code(config):
             cg.add(var.set_phy_mode(config[CONF_PHY_MODE]))
     elif CORE.is_rp2:
         cg.add_library("WiFi", None)
-    elif CORE.using_zephyr_rtos:
+    elif CORE.using_toolchain_zephyr:
         from esphome.components.zephyr import (
             VARIANTS,
             zephyr_add_blobs,

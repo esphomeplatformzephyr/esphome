@@ -54,6 +54,7 @@ from esphome.const import (
     CONF_UART_ID,
     PLATFORM_HOST,
     PlatformFramework,
+    Toolchain,
 )
 from esphome.core import CORE, ID, CoroPriority, coroutine_with_priority
 import esphome.final_validate as fv
@@ -172,7 +173,7 @@ def validate_host_config(config):
 
 
 def validate_zephyr_config(config):
-    if CORE.using_zephyr_rtos and (CONF_TX_PIN in config or CONF_RX_PIN in config):
+    if CORE.using_toolchain_zephyr and (CONF_TX_PIN in config or CONF_RX_PIN in config):
         from esphome.components.zephyr import rtt_channel  # noqa: PLC0415
 
         if rtt_channel(config.get(CONF_PORT, "")) is not None:
@@ -244,7 +245,7 @@ def _uart_declare_type(value):
         return cv.declare_id(RP2UartComponent)(value)
     if CORE.is_libretiny:
         return cv.declare_id(LibreTinyUARTComponent)(value)
-    if CORE.using_zephyr_rtos:
+    if CORE.using_toolchain_zephyr:
         return cv.declare_id(ZephyrUartComponent)(value)
     if CORE.is_host:
         return cv.declare_id(HostUartComponent)(value)
@@ -310,7 +311,7 @@ def maybe_empty_debug(value):
 
 
 def validate_port(value):
-    if CORE.using_zephyr_rtos:
+    if CORE.using_toolchain_zephyr:
         value = cv.string_strict(value)
         from esphome.components.zephyr import validate_uart_label_override
 
@@ -333,7 +334,7 @@ def validate_port(value):
 
 
 def _fill_zephyr_uart_defaults(config):
-    if CORE.using_zephyr_rtos and CONF_PORT not in config:
+    if CORE.using_toolchain_zephyr and CONF_PORT not in config:
         config = dict(config)
         config[CONF_PORT] = "UART0"
     return config
@@ -379,7 +380,11 @@ CONFIG_SCHEMA = cv.All(
                 cv.only_on_esp32, pins.internal_gpio_output_pin_schema
             ),
             cv.Optional(CONF_PORT): cv.All(
-                validate_port, cv.only_on_or_zephyr_rtos([PLATFORM_HOST])
+                validate_port,
+                cv.Any(
+                    cv.only_on([PLATFORM_HOST]),
+                    cv.only_with_toolchain(Toolchain.ZEPHYR),
+                ),
             ),
             cv.Optional(CONF_RX_BUFFER_SIZE, default=256): cv.validate_bytes,
             cv.Optional(CONF_TX_BUFFER_SIZE): cv.All(
@@ -450,12 +455,12 @@ async def to_code(config):
 
     cg.add(var.set_baud_rate(config[CONF_BAUD_RATE]))
 
-    if not CORE.using_zephyr_rtos:
+    if not CORE.using_toolchain_zephyr:
         await cg.add_pin(var.set_tx_pin, config.get(CONF_TX_PIN))
         await cg.add_pin(var.set_rx_pin, config.get(CONF_RX_PIN))
     await cg.add_pin(var.set_flow_control_pin, config.get(CONF_FLOW_CONTROL_PIN))
     if CONF_PORT in config:
-        if CORE.using_zephyr_rtos:
+        if CORE.using_toolchain_zephyr:
             from esphome.components.zephyr import (
                 VARIANTS,
                 claim_rtt_channel,

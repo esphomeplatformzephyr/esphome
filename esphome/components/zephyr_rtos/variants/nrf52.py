@@ -179,7 +179,7 @@ VARIANT = ZephyrVariant(
     sdk_name="ncs",
     alt_sdks={"zephyr": MAINLINE},
     family="nordic",
-    valid_toolchains=(Toolchain.SDK_ZEPHYR,),
+    valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     # OpenThread included: issue #11's tracked entanglement was specifically about
     # platform: nrf52's NCS-based OpenThread/Zigbee stack coupling -- picking

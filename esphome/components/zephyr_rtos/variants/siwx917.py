@@ -83,7 +83,7 @@ VARIANT = ZephyrVariant(
     # would misdirect adc/sensor.py's family-keyed codegen at EFR32's IADC overlay
     # shape, which doesn't apply to this chip's ADC driver.
     family="silabs_siwx91x",
-    valid_toolchains=(Toolchain.SDK_ZEPHYR,),
+    valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     # Wi-Fi 6 + BLE 5.4 only -- no 802.15.4 radio on this chip.
     transports=frozenset({"wifi", "ble"}),
