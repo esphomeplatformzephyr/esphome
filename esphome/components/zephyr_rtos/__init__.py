@@ -924,8 +924,8 @@ _SNIPPET_SOURCE_SCHEMA = cv.Any(
 )
 
 # A user-authored additive west module -- no username:/password:/refresh: (unlike
-# board_source:/shield_source:/snippet_source:, these are fetched via `west update`
-# as part of the generated manifest, not ESPHome's own git.clone_or_update cache).
+# board_source:/shield_source:/snippet_source:, these are fetched once per revision by
+# framework_west.install_git_modules(), not ESPHome's own git.clone_or_update cache).
 _MODULE_GIT_SCHEMA = cv.Schema(
     {
         cv.Required(CONF_URL): cv.url,
@@ -1671,7 +1671,6 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
             zephyr_rtos_data()["west_version"],
             zephyr_rtos_data()["ninja_version"],
             zephyr_rtos_data()["sdk_source"],
-            modules=resolve_zephyr_modules(),
             hals=zephyr_west_hals(sdk),
         )
         build_dir = CORE.relative_build_path(".west_build")
@@ -1732,7 +1731,6 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
         zephyr_rtos_data()["west_version"],
         zephyr_rtos_data()["ninja_version"],
         zephyr_rtos_data()["sdk_source"],
-        modules=resolve_zephyr_modules(),
         hals=zephyr_west_hals(sdk),
     )
     build_dir = CORE.relative_build_path(".west_build")
@@ -1772,7 +1770,7 @@ def run_compile(args, config: ConfigType) -> bool:
         return False
 
     from .build_zephyr import generate_cmake_lists, run_west_blobs_fetch, run_west_build
-    from .framework_west import check_and_install as west_install
+    from .framework_west import check_and_install as west_install, install_git_modules
     from .sdk_setup_west import check_and_install as sdk_install
 
     variant_data = VARIANTS[variant]
@@ -1781,18 +1779,15 @@ def run_compile(args, config: ConfigType) -> bool:
     )
     version = str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION])
     modules = resolve_zephyr_modules()
-    # A local_path module isn't a west project (west_install() only handles the
-    # git-sourced ones) -- it's an already-on-disk directory, wired in the same way a
-    # converted PlatformIO library is: EXTRA_ZEPHYR_MODULES, no west/manifest
-    # involvement at all.
+    # Modules join the build like a converted PlatformIO library, not the workspace
     extra_modules.extend(m.local_path for m in modules if m.local_path is not None)
+    extra_modules.extend(install_git_modules(modules, sdk.manifest_url))
     python_bin, framework_path, west_env = west_install(
         sdk,
         version,
         zephyr_rtos_data()["west_version"],
         zephyr_rtos_data()["ninja_version"],
         zephyr_rtos_data()["sdk_source"],
-        modules=modules,
         hals=zephyr_west_hals(sdk),
     )
     if sdk_name == "silabs":
@@ -1812,18 +1807,6 @@ def run_compile(args, config: ConfigType) -> bool:
     for module, allow_regex, sentinel_name in blob_specs:
         run_west_blobs_fetch(
             python_bin, framework_path, west_env, module, allow_regex, sentinel_name
-        )
-    for zmodule in modules:
-        if zmodule.blobs is None:
-            continue
-        blob_module, allow_regex, sentinel_name = zmodule.blobs
-        run_west_blobs_fetch(
-            python_bin,
-            framework_path,
-            west_env,
-            blob_module,
-            allow_regex,
-            sentinel_name,
         )
     cmake_lists_changed = generate_cmake_lists()
     board = zephyr_rtos_data()[KEY_BOARD]

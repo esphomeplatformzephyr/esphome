@@ -10,20 +10,18 @@ from unittest.mock import MagicMock, patch
 
 import platformdirs
 import pytest
-import yaml
 
 from esphome.components.zephyr_rtos.const import KEY_SDK_SOURCE_RESOLVED_REF
 from esphome.components.zephyr_rtos.framework_west import (
     _NEUTRAL_HALS,
-    _generate_synthetic_manifest,
     _source_cache_key,
     _tools_path,
     check_and_install,
+    install_git_modules,
 )
 from esphome.components.zephyr_rtos.variants import ZephyrModule, ZephyrSDK
 from esphome.core import EsphomeError
 from esphome.framework_helpers import get_python_env_executable_path
-from esphome.yaml_util import make_data_base
 
 _FAKE_SDK = ZephyrSDK(manifest_url="https://example.invalid/zephyr")
 _CACHE_KEY = "v4.4.1-my-branch-00000000"
@@ -84,7 +82,6 @@ def _fake_create_venv(root: Path, msg: str | None = None) -> None:
 def _run_check_and_install(
     tmp_path: Path,
     source: dict | None,
-    modules: list[ZephyrModule] | None = None,
     manifest_path: str = "zephyr",
     update_returncode: int = 0,
     hals: frozenset[str] | None = None,
@@ -115,9 +112,7 @@ def _run_check_and_install(
         patch("subprocess.run") as mock_subprocess_run,
     ):
         mock_subprocess_run.return_value.returncode = update_returncode
-        check_and_install(
-            sdk=_FAKE_SDK, version="4.4.1", source=source, modules=modules, hals=hals
-        )
+        check_and_install(sdk=_FAKE_SDK, version="4.4.1", source=source, hals=hals)
     return calls, mock_subprocess_run
 
 
@@ -149,11 +144,6 @@ def _git_source(resolved_sha: str) -> dict:
         "ref": "my-branch",
         KEY_SDK_SOURCE_RESOLVED_REF: resolved_sha,
     }
-
-
-def _manifest_revision(framework: Path) -> str:
-    manifest = yaml.safe_load((framework / "esphome-manifest" / "west.yml").read_text())
-    return manifest["manifest"]["projects"][0]["revision"]
 
 
 def _git_calls(calls: list[list[str]]) -> list[list[str]]:
@@ -443,42 +433,6 @@ def test_local_source_is_never_filtered(tmp_path: Path) -> None:
     assert not _filters(calls)
 
 
-_MODULE = ZephyrModule(name="mod", manifest_url="https://example.invalid/mod.git")
-
-
-def test_git_source_with_modules_pins_sha_in_generated_manifest(
-    tmp_path: Path,
-) -> None:
-    """With modules the workspace is rooted at a generated manifest, so the SHA goes
-    there (revision:), not into a git pin of the manifest repository."""
-    resolved_sha = "a" * 40
-    calls, _ = _run_check_and_install(
-        tmp_path, _git_source(resolved_sha), modules=[_MODULE]
-    )
-
-    init_calls = [c for c in calls if c[2:4] == ["west", "init"]]
-    assert init_calls[0][4:] == ["-l", "esphome-manifest"]
-    assert ["git", "fetch", "--depth=1", "--", "origin", resolved_sha] not in calls
-    framework = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
-    assert _manifest_revision(framework) == resolved_sha
-
-
-def test_git_source_with_modules_moved_ref_regenerates_manifest(
-    tmp_path: Path,
-) -> None:
-    _run_check_and_install(tmp_path, _git_source("a" * 40), modules=[_MODULE])
-    new_sha = "b" * 40
-    calls, mock_run = _run_check_and_install(
-        tmp_path, _git_source(new_sha), modules=[_MODULE]
-    )
-
-    assert not [c for c in calls if c[2:4] == ["west", "init"]]
-    assert mock_run.call_args.args[0][2:4] == ["west", "update"]
-    framework = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
-    assert _manifest_revision(framework) == new_sha
-    assert (framework / ".resolved_ref").read_text() == new_sha
-
-
 def test_git_source_west_init_falls_back_to_raw_ref_when_unresolved(
     tmp_path: Path,
 ) -> None:
@@ -522,30 +476,8 @@ def test_git_source_west_init_falls_back_to_raw_ref_when_unresolved(
 
 
 # ---------------------------------------------------------------------------
-# _source_cache_key -- module set identity
+# _source_cache_key
 # ---------------------------------------------------------------------------
-
-
-def test_source_cache_key_differs_when_module_url_changes_but_name_and_rev_match() -> (
-    None
-):
-    # Same name+revision, different manifest_url (e.g. repointed at a fork on the
-    # same branch name) -- must not collide, or a source change would silently
-    # reuse a stale cached workspace.
-    module_a = [ZephyrModule(name="mod", manifest_url="http://a", revision="main")]
-    module_b = [ZephyrModule(name="mod", manifest_url="http://b", revision="main")]
-
-    assert _source_cache_key(_FAKE_SDK, "v1.0.0", None, module_a) != _source_cache_key(
-        _FAKE_SDK, "v1.0.0", None, module_b
-    )
-
-
-def test_source_cache_key_matches_for_identical_module_set() -> None:
-    modules = [ZephyrModule(name="mod", manifest_url="http://a", revision="main")]
-
-    assert _source_cache_key(_FAKE_SDK, "v1.0.0", None, modules) == _source_cache_key(
-        _FAKE_SDK, "v1.0.0", None, modules
-    )
 
 
 def test_source_cache_key_differs_across_sdk_variants() -> None:
@@ -562,106 +494,173 @@ def test_source_cache_key_differs_across_sdk_variants() -> None:
 
 
 # ---------------------------------------------------------------------------
-# _generate_synthetic_manifest -- ref-less root source
+# install_git_modules
 # ---------------------------------------------------------------------------
 
-
-def test_generate_synthetic_manifest_omits_null_revision(tmp_path: Path) -> None:
-    # manifest_rev=None (a ref-less sdk_source: git:) must not become a literal
-    # `revision: null` in the generated west.yml -- omitted means "track the
-    # source's default branch," matching the plain `west init -m` path's own
-    # `if manifest_rev: cmd += ["--mr", manifest_rev]` handling.
-    with patch(
-        "esphome.components.zephyr_rtos.framework_west.run_command_ok",
-        return_value=True,
-    ):
-        manifest_dir = _generate_synthetic_manifest(
-            tmp_path, "https://example.invalid/root.git", None, []
-        )
-
-    manifest = yaml.safe_load((manifest_dir / "west.yml").read_text())
-    root_project = manifest["manifest"]["projects"][0]
-    assert "revision" not in root_project
+_NCS_URL = "https://github.com/nrfconnect/sdk-nrf"
+_MODULE = ZephyrModule(
+    name="mod", manifest_url="https://example.invalid/mod.git", revision="v1.4.0"
+)
 
 
-def test_generate_synthetic_manifest_keeps_revision_when_given(tmp_path: Path) -> None:
-    with patch(
-        "esphome.components.zephyr_rtos.framework_west.run_command_ok",
-        return_value=True,
-    ):
-        manifest_dir = _generate_synthetic_manifest(
-            tmp_path, "https://example.invalid/root.git", "v1.2.3", []
-        )
-
-    manifest = yaml.safe_load((manifest_dir / "west.yml").read_text())
-    assert manifest["manifest"]["projects"][0]["revision"] == "v1.2.3"
-
-
-def test_generate_synthetic_manifest_root_name_defaults_to_url_basename(
+def _run_install_git_modules(
     tmp_path: Path,
-) -> None:
-    with patch(
-        "esphome.components.zephyr_rtos.framework_west.run_command_ok",
-        return_value=True,
+    modules: list[ZephyrModule],
+    fail_fetch: bool = False,
+    module_yml: str | None = None,
+    west_yml: str | None = None,
+) -> tuple[_Calls, list[Path]]:
+    """Return the run_command_ok() calls and the module folders; module_yml and
+    west_yml are the zephyr/module.yml and west.yml the checkout leaves."""
+    calls = _Calls()
+
+    def fake_run_command_ok(cmd: list[str], **kwargs: Any) -> bool:
+        calls.append(cmd)
+        calls.cwds.append(kwargs.get("cwd"))
+        if cmd[:2] == ["git", "init"]:
+            (Path(kwargs["cwd"]) / ".git").mkdir()
+        if cmd[:2] == ["git", "checkout"] and module_yml is not None:
+            (Path(kwargs["cwd"]) / "zephyr").mkdir()
+            (Path(kwargs["cwd"]) / "zephyr" / "module.yml").write_text(module_yml)
+        if cmd[:2] == ["git", "checkout"] and west_yml is not None:
+            (Path(kwargs["cwd"]) / "west.yml").write_text(west_yml)
+        return not (fail_fetch and cmd[:2] == ["git", "fetch"])
+
+    with (
+        patch(
+            "esphome.components.zephyr_rtos.framework_west._tools_path",
+            return_value=tmp_path,
+        ),
+        patch(
+            "esphome.components.zephyr_rtos.framework_west.run_command_ok",
+            side_effect=fake_run_command_ok,
+        ),
     ):
-        manifest_dir = _generate_synthetic_manifest(
-            tmp_path, "https://github.com/nrfconnect/sdk-nrf", "v3.4.0", []
-        )
-
-    manifest = yaml.safe_load((manifest_dir / "west.yml").read_text())
-    assert manifest["manifest"]["projects"][0]["name"] == "sdk-nrf"
+        return calls, install_git_modules(modules, _NCS_URL)
 
 
-def test_generate_synthetic_manifest_root_name_override(tmp_path: Path) -> None:
-    # NCS's own sysbuild/Kconfig scripts hardcode "nrf" as the project name --
-    # regression coverage for the real bug this fixes (a mismatched name leaves
-    # e.g. SYSBUILD_NRF_KCONFIG unset and breaks sysbuild's Kconfig configure step).
-    with patch(
-        "esphome.components.zephyr_rtos.framework_west.run_command_ok",
-        return_value=True,
-    ):
-        manifest_dir = _generate_synthetic_manifest(
-            tmp_path,
-            "https://github.com/nrfconnect/sdk-nrf",
-            "v3.4.0",
-            [],
-            west_project_name="nrf",
-        )
+def test_install_git_modules_fetches_each_module_once(tmp_path: Path) -> None:
+    local = ZephyrModule(name="local", local_path=tmp_path / "mine")
 
-    manifest = yaml.safe_load((manifest_dir / "west.yml").read_text())
-    assert manifest["manifest"]["projects"][0]["name"] == "nrf"
+    calls, paths = _run_install_git_modules(tmp_path, [_MODULE, local])
 
-
-def test_generate_synthetic_manifest_accepts_yaml_config_strings(
-    tmp_path: Path,
-) -> None:
-    # sdk_source:/modules: values come from the YAML config as str subclasses
-    # (make_data_base), which yaml.safe_dump can't represent on its own.
-    url = make_data_base("https://github.com/nrfconnect/sdk-nrf")
-    module = ZephyrModule(
-        name=make_data_base("ant"),
-        manifest_url=make_data_base("https://github.com/ant-nrfconnect/sdk-ant"),
-        revision=make_data_base("v2.1.1"),
-    )
-    with patch(
-        "esphome.components.zephyr_rtos.framework_west.run_command_ok",
-        return_value=True,
-    ):
-        manifest_dir = _generate_synthetic_manifest(
-            tmp_path, url, make_data_base("v3.4.0"), [module]
-        )
-
-    projects = yaml.safe_load((manifest_dir / "west.yml").read_text())["manifest"][
-        "projects"
+    assert len(paths) == 1
+    assert paths[0].parent == tmp_path / "modules"
+    assert paths[0].name.startswith("mod-v1.4.0-")
+    assert calls == [
+        ["git", "init", "-q"],
+        [
+            "git",
+            "fetch",
+            "--depth=1",
+            "--",
+            "https://example.invalid/mod.git",
+            "v1.4.0",
+        ],
+        ["git", "checkout", "-q", "FETCH_HEAD"],
     ]
-    assert projects[0]["url"] == "https://github.com/nrfconnect/sdk-nrf"
-    assert projects[0]["revision"] == "v3.4.0"
-    assert projects[1] == {
-        "name": "ant",
-        "url": "https://github.com/ant-nrfconnect/sdk-ant",
-        "revision": "v2.1.1",
-        "import": True,
-    }
+    assert set(calls.cwds) == {str(paths[0])}
+
+    with patch("filelock.FileLock") as file_lock:
+        calls, again = _run_install_git_modules(tmp_path, [_MODULE])
+    assert again == paths
+    assert not calls
+    file_lock.assert_not_called()
+
+
+def test_install_git_modules_skips_a_fetch_finished_while_waiting(
+    tmp_path: Path,
+) -> None:
+    def _other_build_fetches(lock_file: str, **kwargs: Any) -> MagicMock:
+        sentinel = (
+            tmp_path / "modules" / Path(lock_file).stem / ".git" / "esphome-ready"
+        )
+        sentinel.parent.mkdir(parents=True)
+        sentinel.touch()
+        return MagicMock()
+
+    with patch("filelock.FileLock", side_effect=_other_build_fetches):
+        calls, paths = _run_install_git_modules(tmp_path, [_MODULE])
+
+    assert not calls
+    assert len(paths) == 1
+
+
+def test_install_git_modules_failed_fetch_is_retried(tmp_path: Path) -> None:
+    with pytest.raises(EsphomeError, match="Can't fetch Zephyr module mod v1.4.0"):
+        _run_install_git_modules(tmp_path, [_MODULE], fail_fetch=True)
+
+    calls, _ = _run_install_git_modules(tmp_path, [_MODULE])
+    assert ["git", "checkout", "-q", "FETCH_HEAD"] in calls
+
+
+def test_install_git_modules_folder_follows_the_url(tmp_path: Path) -> None:
+    fork = ZephyrModule(
+        name="mod", manifest_url="https://example.invalid/fork.git", revision="v1.4.0"
+    )
+
+    _, paths = _run_install_git_modules(tmp_path, [_MODULE, fork])
+
+    assert paths[0] != paths[1]
+
+
+def test_install_git_modules_refuses_a_module_with_blobs(tmp_path: Path) -> None:
+    module_yml = "name: mod\nblobs:\n  - path: lib.a\n    sha256: 00\n    url: x\n"
+
+    with pytest.raises(EsphomeError, match="needs binary blobs"):
+        _run_install_git_modules(tmp_path, [_MODULE], module_yml=module_yml)
+
+    # The folder is not marked done, so it is checked again on the next build
+    calls, _ = _run_install_git_modules(tmp_path, [_MODULE])
+    assert calls
+
+
+def test_install_git_modules_accepts_a_module_without_blobs(tmp_path: Path) -> None:
+    _, paths = _run_install_git_modules(
+        tmp_path, [_MODULE], module_yml="name: mod\nbuild:\n  cmake: .\n"
+    )
+
+    assert len(paths) == 1
+
+
+def test_install_git_modules_accepts_a_west_yml_listing_only_the_sdk(
+    tmp_path: Path,
+) -> None:
+    # As ncs-zigbee's own west.yml
+    west_yml = (
+        "manifest:\n"
+        "  remotes:\n"
+        "    - name: ncs\n"
+        "      url-base: https://github.com/nrfconnect\n"
+        "  projects:\n"
+        "    - name: nrf\n"
+        "      remote: ncs\n"
+        "      repo-path: sdk-nrf\n"
+        "      revision: v3.4.0\n"
+        "      import: true\n"
+    )
+
+    _, paths = _run_install_git_modules(tmp_path, [_MODULE], west_yml=west_yml)
+
+    assert len(paths) == 1
+
+
+def test_install_git_modules_refuses_other_projects(tmp_path: Path) -> None:
+    west_yml = (
+        "manifest:\n"
+        "  defaults:\n"
+        "    remote: ncs\n"
+        "  remotes:\n"
+        "    - name: ncs\n"
+        "      url-base: https://github.com/nrfconnect\n"
+        "  projects:\n"
+        "    - name: sdk-nrf\n"
+        "    - name: extra\n"
+        "      url: https://example.invalid/extra.git\n"
+    )
+
+    with pytest.raises(EsphomeError, match=r"needs other projects \(extra\)"):
+        _run_install_git_modules(tmp_path, [_MODULE], west_yml=west_yml)
 
 
 # ---------------------------------------------------------------------------

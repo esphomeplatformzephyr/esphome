@@ -475,12 +475,7 @@ def upload_serial_dfu(host: str) -> bool:
 
     from esphome.__main__ import check_permissions  # noqa: PLC0415
 
-    from .. import (  # noqa: PLC0415
-        resolve_zephyr_modules,
-        zephyr_rtos_data,
-        zephyr_variant,
-        zephyr_west_hals,
-    )
+    from .. import zephyr_rtos_data, zephyr_variant, zephyr_west_hals  # noqa: PLC0415
     from ..const import KEY_FRAMEWORK_TYPE  # noqa: PLC0415
     from ..framework_west import check_and_install as west_install  # noqa: PLC0415
     from . import VARIANTS, resolve_sdk  # noqa: PLC0415
@@ -497,7 +492,6 @@ def upload_serial_dfu(host: str) -> bool:
         zephyr_rtos_data()["west_version"],
         zephyr_rtos_data()["ninja_version"],
         zephyr_rtos_data()["sdk_source"],
-        modules=resolve_zephyr_modules(),
         hals=zephyr_west_hals(sdk),
     )
     if zephyr_rtos_data()[KEY_BOOTLOADER] == BOOTLOADER_NRF:

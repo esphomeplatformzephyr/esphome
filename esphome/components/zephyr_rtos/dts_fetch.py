@@ -285,9 +285,9 @@ def _native_dts_path(sdk: ZephyrSDK, family: str | None = None) -> Path | None:
     Both mainline Zephyr and NCS check out the tree that owns boards/ under a sibling
     directory literally named "zephyr" (the bundled sdk-zephyr fork project -- confirmed
     against a real local NCS install), so this needs no per-sdk branching beyond the cache
-    key. Only matches the plain official-source install (no sdk_source: override, no
-    modules) -- framework_west._source_cache_key()'s other branches aren't reproducible
-    here without the source/git_modules info this function doesn't have; those cases just
+    key. Only matches the plain official-source install (no sdk_source: override) --
+    framework_west._source_cache_key()'s other branches aren't reproducible
+    here without the source info this function doesn't have; those cases just
     fall through to the caller's git-fetch fallback.
     """
     if sdk.tools_subdir is None:
