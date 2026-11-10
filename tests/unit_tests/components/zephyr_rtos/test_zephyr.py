@@ -15,6 +15,7 @@ from esphome.components.zephyr import (
     add_extra_script,
     zephyr_add_kconfig,
     zephyr_add_pm_static,
+    zephyr_data,
 )
 from esphome.components.zephyr_rtos import (
     _MODULE_SCHEMA,
@@ -38,6 +39,7 @@ from esphome.components.zephyr_rtos import (
     zephyr_claim_cdc_acm,
     zephyr_only_on_variant,
     zephyr_rtos_config_schema,
+    zephyr_rtos_data,
     zephyr_set_module_override,
     zephyr_setup_i2c_pinctrl,
     zephyr_setup_spi_pinctrl,
@@ -45,7 +47,12 @@ from esphome.components.zephyr_rtos import (
     zephyr_variant,
     zephyr_variant_family,
 )
-from esphome.components.zephyr_rtos.const import CONF_BOARD_SOURCE, KEY_ZEPHYR_RTOS
+from esphome.components.zephyr_rtos.const import (
+    CONF_BOARD_SOURCE,
+    KEY_PRJ_CONF,
+    KEY_ZEPHYR,
+    KEY_ZEPHYR_RTOS,
+)
 from esphome.components.zephyr_rtos.mcuboot import zephyr_skip_bootloader_supported
 from esphome.components.zephyr_rtos.pinctrl import (
     _build_i2c_pinctrl_states_overlay,
@@ -2615,3 +2622,32 @@ def test_remove_stale_image_files_keeps_only_written_files(tmp_path: Path) -> No
     assert kept.exists()
     assert cmake.exists()
     assert not _remove_stale_image_files({kept})
+
+
+def test_zephyr_data_without_rtos_store() -> None:
+    nrf52_store = {"board": "adafruit_feather_nrf52840"}
+    CORE.data[KEY_ZEPHYR] = nrf52_store
+    assert zephyr_data() is nrf52_store
+
+
+def test_zephyr_data_prefers_rtos_store() -> None:
+    rtos_store = {"board": "nucleo_c5a3zg"}
+    CORE.data[KEY_ZEPHYR] = {"board": "adafruit_feather_nrf52840"}
+    CORE.data[KEY_ZEPHYR_RTOS] = rtos_store
+    assert zephyr_data() is rtos_store
+
+
+def test_zephyr_helpers_write_to_rtos_store() -> None:
+    nrf52_store = {KEY_PRJ_CONF: {}}
+    rtos_store = {KEY_PRJ_CONF: {}}
+    CORE.data[KEY_ZEPHYR] = nrf52_store
+    CORE.data[KEY_ZEPHYR_RTOS] = rtos_store
+    zephyr_add_prj_conf("FOO", True)
+    assert rtos_store[KEY_PRJ_CONF] == {"": {"CONFIG_FOO": (True, True)}}
+    assert nrf52_store[KEY_PRJ_CONF] == {}
+
+
+def test_zephyr_rtos_data() -> None:
+    rtos_store = {"board": "nucleo_c5a3zg"}
+    CORE.data[KEY_ZEPHYR_RTOS] = rtos_store
+    assert zephyr_rtos_data() is rtos_store
