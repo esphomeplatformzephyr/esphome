@@ -153,6 +153,8 @@ _ZEPHYR_LOG_LEVEL_TO_INT = {
 
 
 class ZephyrRtosData(ZephyrData):
+    """CORE.data store of a zephyr_rtos build; nrf52 builds use ZephyrData."""
+
     board_root: Path | None  # resolved framework: board_source: dir, or None if unset
     sdk_source: ConfigType | None  # resolved framework: source:, or None if unset
     variant: str | None
