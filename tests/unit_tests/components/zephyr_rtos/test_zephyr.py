@@ -37,7 +37,6 @@ from esphome.components.zephyr_rtos import (
     zephyr_cdc_acm_label,
     zephyr_claim_cdc_acm,
     zephyr_only_on_variant,
-    zephyr_raise_prj_conf_min,
     zephyr_rtos_config_schema,
     zephyr_set_module_override,
     zephyr_setup_i2c_pinctrl,
@@ -1735,28 +1734,6 @@ def test_variant_config_schema_rejects_main_stack_size_below_4096() -> None:
         )
 
 
-def test_zephyr_raise_prj_conf_min_sets_missing_value() -> None:
-    CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data()
-    zephyr_raise_prj_conf_min("MAIN_STACK_SIZE", 4096)
-    assert _stack() == (4096, True)
-
-
-def test_zephyr_raise_prj_conf_min_raises_low_value() -> None:
-    # platform: nrf52 with OpenThread: 2048 -> 4096
-    CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data()
-    zephyr_add_prj_conf("MAIN_STACK_SIZE", 2048, required=False)
-    zephyr_raise_prj_conf_min("MAIN_STACK_SIZE", 4096)
-    assert _stack() == (4096, False)
-
-
-def test_zephyr_raise_prj_conf_min_never_lowers() -> None:
-    # ESP32-H2 with OpenThread keeps 8192
-    CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant="ESP32H2")
-    _main_stack_to_code({"framework": {"advanced": {}}})
-    zephyr_raise_prj_conf_min("MAIN_STACK_SIZE", 4096)
-    assert _stack() == (8192, False)
-
-
 def _nrf52_advanced(**advanced: object) -> dict:
     _init_variant_schema_core()
     config = _validate({"variant": "NRF52", "framework": {"advanced": advanced}})
@@ -2370,6 +2347,30 @@ def test_module_schema_defaults_git_ref_to_main() -> None:
         }
     )
     assert result[CONF_SOURCE]["ref"] == "main"
+
+
+def test_module_schema_git_refresh_defaults_to_a_day() -> None:
+    result = _MODULE_SCHEMA(
+        {
+            CONF_NAME: "my_module",
+            CONF_SOURCE: {CONF_TYPE: TYPE_GIT, CONF_URL: "https://example.com/mod"},
+        }
+    )
+    assert result[CONF_SOURCE][CONF_REFRESH].total_seconds == 86400
+
+
+def test_module_schema_git_refresh_never() -> None:
+    result = _MODULE_SCHEMA(
+        {
+            CONF_NAME: "my_module",
+            CONF_SOURCE: {
+                CONF_TYPE: TYPE_GIT,
+                CONF_URL: "https://example.com/mod",
+                CONF_REFRESH: "never",
+            },
+        }
+    )
+    assert result[CONF_SOURCE][CONF_REFRESH] == cv.source_refresh("never")
 
 
 def test_module_schema_accepts_name_and_version_only() -> None:

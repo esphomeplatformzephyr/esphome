@@ -303,12 +303,13 @@ async def to_code(config: ConfigType) -> None:
         if reg0_config[CONF_UICR_ERASE]:
             cg.add_define("USE_NRF52_UICR_ERASE")
             zephyr_add_prj_conf("NRFX_NVMC", True)
-    # Read by uicr.cpp and the debug component's bootloader report, as platform: nrf52's
+    # Read by uicr.cpp, the debug component's bootloader report and the logger's
+    # bootloader version warning, as platform: nrf52's
     bootloader = config[CONF_FRAMEWORK][CONF_ADVANCED][CONF_BOOTLOADER]
     if bootloader == BOOTLOADER_MCUBOOT:
         cg.add_define("USE_BOOTLOADER_MCUBOOT")
     elif (softdevice := _SOFTDEVICE_VERSION.get(bootloader)) is not None:
-        cg.add_define("USE_ZEPHYR_NRF52_ADAFRUIT_BOOTLOADER")
+        cg.add_define("USE_BOOTLOADER_ADAFRUIT")
         cg.add_define("USE_SOFTDEVICE_ID", 140)
         cg.add_define("USE_SOFTDEVICE_VERSION", softdevice)
 
@@ -474,12 +475,7 @@ def upload_serial_dfu(host: str) -> bool:
 
     from esphome.__main__ import check_permissions  # noqa: PLC0415
 
-    from .. import (  # noqa: PLC0415
-        resolve_zephyr_modules,
-        zephyr_rtos_data,
-        zephyr_variant,
-        zephyr_west_hals,
-    )
+    from .. import zephyr_rtos_data, zephyr_variant, zephyr_west_hals  # noqa: PLC0415
     from ..const import KEY_FRAMEWORK_TYPE  # noqa: PLC0415
     from ..framework_west import check_and_install as west_install  # noqa: PLC0415
     from . import VARIANTS, resolve_sdk  # noqa: PLC0415
@@ -496,7 +492,6 @@ def upload_serial_dfu(host: str) -> bool:
         zephyr_rtos_data()["west_version"],
         zephyr_rtos_data()["ninja_version"],
         zephyr_rtos_data()["sdk_source"],
-        modules=resolve_zephyr_modules(),
         hals=zephyr_west_hals(sdk),
     )
     if zephyr_rtos_data()[KEY_BOOTLOADER] == BOOTLOADER_NRF:

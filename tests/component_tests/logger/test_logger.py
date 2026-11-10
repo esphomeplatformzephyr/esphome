@@ -295,3 +295,23 @@ def test_rtt3_not_a_logger_keyword(set_core_config: SetCoreConfigCallable) -> No
     CORE.data[KEY_ZEPHYR_RTOS] = {"variant": VARIANT_NRF52, "family": "nordic"}
     with pytest.raises(Invalid):
         uart_selection("RTT3")
+
+
+@pytest.mark.parametrize(
+    ("config", "usb_cdc"),
+    [
+        pytest.param("test_logger_rp2_usb_cdc.yaml", True, id="usb_cdc"),
+        pytest.param("test_logger_rp2_uart0.yaml", False, id="uart0"),
+    ],
+)
+def test_rp2_usb_cdc_selection_define(
+    generate_main: Callable[[str | Path], str],
+    config: str,
+    usb_cdc: bool,
+) -> None:
+    """The USB CDC crash replay only compiles in when the logger uses USB CDC."""
+    generate_main(f"tests/component_tests/logger/{config}")
+
+    assert (
+        "USE_LOGGER_UART_SELECTION_USB_CDC" in {d.name for d in CORE.defines}
+    ) is usb_cdc

@@ -12,7 +12,7 @@ import sys
 
 from esphome.framework_helpers import download_and_extract, str_to_lst_of_str
 
-from .framework_west import _tools_path
+from .framework_west import _install_lock, _tools_path
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -99,44 +99,50 @@ def check_and_install(framework_path: Path, toolchain: str) -> Path:
         _LOGGER.debug("Zephyr SDK v%s already at %s", sdk_version, sdk_path)
         return sdk_path
 
-    # Wipe only an unfinished extraction; an intact base is shared across toolchains.
-    base_marker = sdk_path / ".esphome_base_complete"
-    if not base_marker.exists():
-        shutil.rmtree(sdk_path, ignore_errors=True)
-        os_tag, arch, extension = _sdk_platform_info()
+    with _install_lock(sdk_path.name):
+        if sentinel.exists():  # another build installed it while this one waited
+            return sdk_path
 
-        toolchains_dir = sdk_path.parent
-        substitutions = {
-            "VERSION": sdk_version,
-            "sysname": os_tag,
-            "machine": arch,
-            "extension": extension,
-        }
-        _LOGGER.info("Downloading Zephyr SDK minimal v%s ...", sdk_version)
-        # Not a temp dir, so an interrupted download's .part file resumes next run.
-        download_and_extract(
-            SDK_NG_MINIMAL_MIRRORS,
-            substitutions,
-            toolchains_dir / f"zephyr-sdk-{sdk_version}.minimal.archive",
-            sdk_path,
-            progress_header="Extracting",
+        # Wipe only an unfinished extraction; an intact base is shared across toolchains.
+        base_marker = sdk_path / ".esphome_base_complete"
+        if not base_marker.exists():
+            shutil.rmtree(sdk_path, ignore_errors=True)
+            os_tag, arch, extension = _sdk_platform_info()
+
+            toolchains_dir = sdk_path.parent
+            substitutions = {
+                "VERSION": sdk_version,
+                "sysname": os_tag,
+                "machine": arch,
+                "extension": extension,
+            }
+            _LOGGER.info("Downloading Zephyr SDK minimal v%s ...", sdk_version)
+            # Not a temp dir, so an interrupted download's .part file resumes next run.
+            download_and_extract(
+                SDK_NG_MINIMAL_MIRRORS,
+                substitutions,
+                toolchains_dir / f"zephyr-sdk-{sdk_version}.minimal.archive",
+                sdk_path,
+                progress_header="Extracting",
+            )
+            base_marker.touch()
+
+        setup_cmd = _sdk_setup_command(sdk_path, toolchain)
+        setup_script = Path(setup_cmd[0])
+        if not setup_script.exists():
+            raise RuntimeError(f"Zephyr SDK at {sdk_path} has no {setup_script.name}")
+        _LOGGER.info(
+            "Installing Zephyr SDK %s toolchain v%s ...", toolchain, sdk_version
         )
-        base_marker.touch()
-
-    setup_cmd = _sdk_setup_command(sdk_path, toolchain)
-    setup_script = Path(setup_cmd[0])
-    if not setup_script.exists():
-        raise RuntimeError(f"Zephyr SDK at {sdk_path} has no {setup_script.name}")
-    _LOGGER.info("Installing Zephyr SDK %s toolchain v%s ...", toolchain, sdk_version)
-    result = subprocess.run(
-        setup_cmd,
-        env={**os.environ, "ZEPHYR_SDK_INSTALL_DIR": str(sdk_path)},
-        check=False,
-    )
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"{setup_script.name} failed with exit code {result.returncode}"
+        result = subprocess.run(
+            setup_cmd,
+            env={**os.environ, "ZEPHYR_SDK_INSTALL_DIR": str(sdk_path)},
+            check=False,
         )
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"{setup_script.name} failed with exit code {result.returncode}"
+            )
 
-    sentinel.touch()
+        sentinel.touch()
     return sdk_path

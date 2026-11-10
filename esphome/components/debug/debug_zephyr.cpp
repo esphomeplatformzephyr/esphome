@@ -325,11 +325,7 @@ size_t DebugComponent::get_device_info_(std::span<char, DEVICE_INFO_BUFFER_SIZE>
   // USB power state
   const char *usb_state;
   if (nrf_power_usbregstatus_vbusdet_get(NRF_POWER)) {
-    if (nrf_power_usbregstatus_outrdy_get(NRF_POWER)) {
-      usb_state = "ready";
-    } else {
-      usb_state = "connected (regulator is not ready)";
-    }
+    usb_state = nrf_power_usbregstatus_outrdy_get(NRF_POWER) ? "ready" : "connected (regulator is not ready)";
   } else {
     usb_state = "disconnected";
   }
@@ -497,7 +493,7 @@ size_t DebugComponent::get_device_info_(std::span<char, DEVICE_INFO_BUFFER_SIZE>
   }
 #ifdef USE_BOOTLOADER_MCUBOOT
   ESP_LOGD(TAG, "  Bootloader: mcuboot");
-#elif defined(USE_ZEPHYR_VARIANT_NRF52) && !defined(USE_ZEPHYR_NRF52_ADAFRUIT_BOOTLOADER)
+#elif defined(USE_ZEPHYR_VARIANT_NRF52) && !defined(USE_BOOTLOADER_ADAFRUIT)
   ESP_LOGD(TAG, "  Bootloader: Nordic Open DFU");
 #else
   ESP_LOGD(TAG, "  Bootloader: Adafruit, version %u.%u.%u", (BOOTLOADER_VERSION_REGISTER >> 16) & 0xFF,

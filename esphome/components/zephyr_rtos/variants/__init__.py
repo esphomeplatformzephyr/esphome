@@ -67,22 +67,10 @@ class ZephyrSDK:
     # Set when this SDK has no tagged release usable as a default -- framework: source: is
     # then mandatory; explains why in the raised error.
     requires_source_reason: str | None = None
-    # capability -> module. A module is additive to this SDK (fetched by `west update`
-    # alongside it, no boards/toolchain/version of its own) -- distinct from alt_sdks,
+    # capability -> module. A module is additive to this SDK (fetched into its own folder
+    # and added to the build, no boards/toolchain/version of its own) -- distinct from alt_sdks,
     # which are competing SDK roots. See ZephyrModuleTemplate.
     modules: dict[str, "ZephyrModuleTemplate"] = field(default_factory=dict)
-    # West project name to use for this SDK when it's imported as a sibling project
-    # rather than the manifest root (i.e. whenever modules is non-empty -- see
-    # _generate_synthetic_manifest). None = derive from manifest_url's basename.
-    # NCS needs this pinned to "nrf": its own bundled sysbuild/Kconfig scripts
-    # hardcode that exact west project name (matching Nordic's own official
-    # manifests, confirmed against ncs-zigbee's real west.yml) to generate
-    # `SYSBUILD_NRF_KCONFIG`-style variables -- naming the project anything else
-    # (e.g. "sdk-nrf", the URL's basename) leaves that variable unset and breaks
-    # sysbuild's Kconfig configure step. Found via a real `esphome compile` (variant:
-    # nrf52 + zigbee:), not just by reading Nordic's manifest -- the failure only
-    # surfaces at CMake's Kconfig-configure step, not at `west update`.
-    west_project_name: str | None = None
 
 
 # A fully resolved, ready-to-fetch additive west module -- identical shape whether it
@@ -93,8 +81,7 @@ class ZephyrModule:
     manifest_url: str | None = None  # git remote; None when local_path is set
     local_path: Path | None = None  # user's `type: local` module
     revision: str = "main"  # concrete ref/tag/branch to check out
-    # (west_module, allow_regex, sentinel_name) -- same shape as ZephyrVariant.blobs.
-    blobs: tuple[str, str, str] | None = None
+    refresh: float | None = None  # seconds between checks of revision; None = never
 
 
 # Owned by the ZephyrSDK that can provide a capability; resolves to a concrete
@@ -108,11 +95,10 @@ class ZephyrModuleTemplate:
     # (3.4.x vs 1.4.x) -- no formula, each pairing is a real entry, added as Nordic
     # ships new paired releases.
     default_versions: dict[tuple[int, int], str] = field(default_factory=dict)
-    blobs: tuple[str, str, str] | None = None
     # Lowest version this module is known to work at all -- independent of
     # default_versions' per-root-version pairing, this just rejects an obviously
     # too-old framework: modules: override at config time instead of failing much later
-    # inside `west update`. None = not enforced (e.g. a module with no numbered
+    # while fetching it. None = not enforced (e.g. a module with no numbered
     # releases at all).
     min_version: cv.Version | None = None
 
@@ -149,7 +135,6 @@ class ZephyrModuleTemplate:
             name=self.name,
             manifest_url=self.manifest_url,
             revision=tag,
-            blobs=self.blobs,
         )
 
 
@@ -575,7 +560,7 @@ MAINLINE: ZephyrSDK = ZephyrSDK(
 
 # Nordic's ZBOSS Zigbee stack, split out of sdk-nrf into this separate add-on repo as of
 # NCS 3.4.0; see https://github.com/esphomeplatformzephyr/esphome/issues/31. Additive to
-# NCS (fetched alongside sdk-nrf, no boards/toolchain/version of its own) -- not a
+# NCS (built on top of the sdk-nrf workspace, no boards/toolchain/version of its own) -- not a
 # competing SDK root, so it's a module, not an alt_sdks entry. sdk-nrf and ncs-zigbee are
 # versioned independently by Nordic (3.4.x vs 1.4.x, no formula between the two), hence
 # the explicit per-pairing table rather than a single default_version.
@@ -602,7 +587,6 @@ NCS: ZephyrSDK = ZephyrSDK(
     min_version=cv.Version(3, 4, 0),
     resolve_boards_ref_via_manifest=True,
     modules={"zigbee": NCS_ZIGBEE_TEMPLATE},
-    west_project_name="nrf",
 )
 
 # Silicon Labs' "Simplicity SDK for Zephyr" -- same manifest-of-manifests shape as NCS:

@@ -35,8 +35,8 @@ from esphome.components.network import add_use_address, request_ipv4_off, requir
 from esphome.components.nrf52.framework import include_west_project
 from esphome.components.zephyr import (
     zephyr_add_prj_conf,
+    zephyr_add_prj_conf_min,
     zephyr_framework_type,
-    zephyr_raise_prj_conf_min,
 )
 from esphome.config_helpers import filter_source_files_from_platform
 import esphome.config_validation as cv
@@ -107,7 +107,7 @@ FRAMEWORK_LOG_LEVEL_TO_OT = {
     "VERBOSE": "DEBG",
 }
 
-CONF_DEVICE_TYPES = [
+DEVICE_TYPES = [
     "FTD",
     "MTD",
 ]
@@ -456,7 +456,7 @@ CONFIG_SCHEMA = cv.All(
             cv.GenerateID(CONF_MDNS_ID): cv.use_id(MDNSComponent),
             cv.Optional(CONF_BORDER_ROUTER): _validate_border_router,
             cv.Optional(CONF_DEVICE_TYPE, default="FTD"): cv.one_of(
-                *CONF_DEVICE_TYPES, upper=True
+                *DEVICE_TYPES, upper=True
             ),
             cv.Optional(CONF_FORCE_DATASET): cv.boolean,
             cv.Optional(CONF_TLV): cv.sensitive(
@@ -653,9 +653,7 @@ async def to_code(config: ConfigType) -> None:
             # Without SLAAC the device never forms an OMR (Off-Mesh-Routable) address, so
             # SRP's auto-registered host resolves by name but every address lookup times out.
             zephyr_add_prj_conf("OPENTHREAD_SLAAC", True)
-            zephyr_raise_prj_conf_min("MAIN_STACK_SIZE", 4096)
-        else:
-            zephyr_add_prj_conf("MAIN_STACK_SIZE", 4096)
+        zephyr_add_prj_conf_min("MAIN_STACK_SIZE", 4096)
 
         if not CORE.is_nrf52:
             # Mirror `framework: log_level:` into OpenThread's own log verbosity -- a
