@@ -9,6 +9,7 @@ import re
 import shutil
 import subprocess
 import tempfile
+import time
 
 import yaml
 
@@ -244,9 +245,34 @@ def _extra_projects(path: Path, sdk_url: str) -> list[str]:
     return extra
 
 
+def _git_output(cmd: list[str], cwd: Path | None = None) -> str | None:
+    result = subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=False)
+    return result.stdout if result.returncode == 0 else None
+
+
+def _remote_commit(url: str, rev: str) -> str | None:
+    """The commit a branch or tag names on the remote; None for a commit SHA, or when
+    the remote can't be reached."""
+    if (out := _git_output(["git", "ls-remote", "--", url, rev])) is None:
+        return None
+    commits = dict(reversed(line.split("\t", 1)) for line in out.splitlines())
+    # An annotated tag's commit is on its peeled ^{} line
+    for ref in (f"refs/heads/{rev}", f"refs/tags/{rev}^{{}}", f"refs/tags/{rev}"):
+        if ref in commits:
+            return commits[ref]
+    return None
+
+
+def _module_is_current(sentinel: Path, refresh: float | None) -> bool:
+    return sentinel.exists() and (
+        refresh is None or time.time() - sentinel.stat().st_mtime < refresh
+    )
+
+
 def install_git_modules(modules: list[ZephyrModule], sdk_url: str) -> list[Path]:
-    """Fetch each git module once into its own folder and return the folders, for
-    EXTRA_ZEPHYR_MODULES. sdk_url is the SDK the build uses, the one project a
+    """Fetch each git module into its own folder and return the folders, for
+    EXTRA_ZEPHYR_MODULES. A fetched module's revision is checked again once its
+    refresh time has passed. sdk_url is the SDK the build uses, the one project a
     module's own west.yml may list."""
     paths = []
     for module in modules:
@@ -258,25 +284,40 @@ def install_git_modules(modules: list[ZephyrModule], sdk_url: str) -> list[Path]
         path = _tools_path() / "modules" / key
         paths.append(path)
         sentinel = path / ".git" / "esphome-ready"
-        if sentinel.exists():
+        if _module_is_current(sentinel, module.refresh):
             continue
         with _install_lock(key):
-            if sentinel.exists():  # another build fetched it while this one waited
+            # another build fetched or checked it while this one waited
+            if _module_is_current(sentinel, module.refresh):
                 continue
-            _LOGGER.info(
-                "Fetching Zephyr module %s %s ...", module.name, module.revision
-            )
-            rmdir(path, msg=f"Clean up Zephyr module {key}")
-            path.mkdir(parents=True)
-            # fetch, not clone --branch: the revision can also be a commit SHA
             url, rev = str(module.manifest_url), str(module.revision)
-            for cmd in (
-                ["git", "init", "-q"],
+            if sentinel.exists():
+                commit = _remote_commit(url, rev)
+                head = _git_output(["git", "rev-parse", "HEAD"], cwd=path)
+                # Unchanged, a commit SHA, or offline: keep the folder until next time
+                if commit is None or head is None or commit == head.strip():
+                    sentinel.touch()
+                    continue
+                # In place, so a build using it at this moment can see files change,
+                # as with board_source: (git.clone_or_update)
+                _LOGGER.info("Updating Zephyr module %s %s ...", module.name, rev)
+                cmds = []
+            else:
+                _LOGGER.info("Fetching Zephyr module %s %s ...", module.name, rev)
+                rmdir(path, msg=f"Clean up Zephyr module {key}")
+                path.mkdir(parents=True)
+                cmds = [["git", "init", "-q"]]
+            # fetch, not clone --branch: the revision can also be a commit SHA
+            cmds += [
                 ["git", "fetch", "--depth=1", "--", url, rev],
                 ["git", "checkout", "-q", "FETCH_HEAD"],
-            ):
+            ]
+            for cmd in cmds:
                 if not run_command_ok(cmd, cwd=str(path)):
                     raise EsphomeError(f"Can't fetch Zephyr module {module.name} {rev}")
+                if cmd[1] == "fetch":
+                    # From here a failure leaves a checkout the checks below never saw
+                    sentinel.unlink(missing_ok=True)
             # `west blobs fetch` only reaches modules inside the workspace
             for name in ("module.yml", "module.yaml"):
                 module_yml = path / "zephyr" / name

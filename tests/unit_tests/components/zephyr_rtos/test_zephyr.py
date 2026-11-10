@@ -2349,6 +2349,30 @@ def test_module_schema_defaults_git_ref_to_main() -> None:
     assert result[CONF_SOURCE]["ref"] == "main"
 
 
+def test_module_schema_git_refresh_defaults_to_a_day() -> None:
+    result = _MODULE_SCHEMA(
+        {
+            CONF_NAME: "my_module",
+            CONF_SOURCE: {CONF_TYPE: TYPE_GIT, CONF_URL: "https://example.com/mod"},
+        }
+    )
+    assert result[CONF_SOURCE][CONF_REFRESH].total_seconds == 86400
+
+
+def test_module_schema_git_refresh_never() -> None:
+    result = _MODULE_SCHEMA(
+        {
+            CONF_NAME: "my_module",
+            CONF_SOURCE: {
+                CONF_TYPE: TYPE_GIT,
+                CONF_URL: "https://example.com/mod",
+                CONF_REFRESH: "never",
+            },
+        }
+    )
+    assert result[CONF_SOURCE][CONF_REFRESH] == cv.source_refresh("never")
+
+
 def test_module_schema_accepts_name_and_version_only() -> None:
     result = _MODULE_SCHEMA({CONF_NAME: "ncs-zigbee", CONF_VERSION: "1.4.2"})
     assert result[CONF_VERSION] == "1.4.2"

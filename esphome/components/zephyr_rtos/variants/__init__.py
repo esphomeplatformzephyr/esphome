@@ -81,6 +81,7 @@ class ZephyrModule:
     manifest_url: str | None = None  # git remote; None when local_path is set
     local_path: Path | None = None  # user's `type: local` module
     revision: str = "main"  # concrete ref/tag/branch to check out
+    refresh: float | None = None  # seconds between checks of revision; None = never
 
 
 # Owned by the ZephyrSDK that can provide a capability; resolves to a concrete

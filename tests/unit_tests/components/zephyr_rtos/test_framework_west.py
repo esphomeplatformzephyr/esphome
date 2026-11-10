@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from collections.abc import Callable
 import configparser
+import os
 from pathlib import Path
+import subprocess
+import time
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -14,6 +17,8 @@ import pytest
 from esphome.components.zephyr_rtos.const import KEY_SDK_SOURCE_RESOLVED_REF
 from esphome.components.zephyr_rtos.framework_west import (
     _NEUTRAL_HALS,
+    _git_output,
+    _remote_commit,
     _source_cache_key,
     _tools_path,
     check_and_install,
@@ -584,6 +589,130 @@ def test_install_git_modules_skips_a_fetch_finished_while_waiting(
 
     assert not calls
     assert len(paths) == 1
+
+
+_BRANCH_MODULE = ZephyrModule(
+    name="mod",
+    manifest_url="https://example.invalid/mod.git",
+    revision="main",
+    refresh=3600,
+)
+_HEAD = "a" * 40
+
+
+def _fetched_hour_ago(tmp_path: Path) -> Path:
+    """Fetch _BRANCH_MODULE and make its last check two hours old."""
+    _, paths = _run_install_git_modules(tmp_path, [_BRANCH_MODULE])
+    sentinel = paths[0] / ".git" / "esphome-ready"
+    old = time.time() - 7200
+    os.utime(sentinel, (old, old))
+    return sentinel
+
+
+def _refresh(
+    tmp_path: Path, remote: str | None, fail_fetch: bool = False
+) -> list[list[str]]:
+    """Run a due refresh with the remote branch at `remote` (None = offline)."""
+
+    def fake_git_output(cmd: list[str], cwd: Path | None = None) -> str | None:
+        if cmd[1] == "ls-remote":
+            return None if remote is None else f"{remote}\trefs/heads/main\n"
+        return f"{_HEAD}\n"
+
+    with patch(
+        "esphome.components.zephyr_rtos.framework_west._git_output",
+        side_effect=fake_git_output,
+    ):
+        calls, _ = _run_install_git_modules(
+            tmp_path, [_BRANCH_MODULE], fail_fetch=fail_fetch
+        )
+    return calls
+
+
+def test_install_git_modules_skips_the_check_before_refresh(tmp_path: Path) -> None:
+    _run_install_git_modules(tmp_path, [_BRANCH_MODULE])
+
+    with patch(
+        "esphome.components.zephyr_rtos.framework_west._git_output"
+    ) as git_output:
+        calls, _ = _run_install_git_modules(tmp_path, [_BRANCH_MODULE])
+
+    assert not calls
+    git_output.assert_not_called()
+
+
+def test_install_git_modules_unchanged_branch_fetches_nothing(tmp_path: Path) -> None:
+    sentinel = _fetched_hour_ago(tmp_path)
+
+    assert not _refresh(tmp_path, remote=_HEAD)
+    assert time.time() - sentinel.stat().st_mtime < 60
+
+
+def test_install_git_modules_moved_branch_updates_in_place(tmp_path: Path) -> None:
+    sentinel = _fetched_hour_ago(tmp_path)
+
+    calls = _refresh(tmp_path, remote="b" * 40)
+
+    assert calls == [
+        ["git", "fetch", "--depth=1", "--", "https://example.invalid/mod.git", "main"],
+        ["git", "checkout", "-q", "FETCH_HEAD"],
+    ]
+    assert time.time() - sentinel.stat().st_mtime < 60
+
+
+def test_install_git_modules_offline_keeps_the_module(tmp_path: Path) -> None:
+    sentinel = _fetched_hour_ago(tmp_path)
+
+    assert not _refresh(tmp_path, remote=None)
+    assert sentinel.exists()
+
+
+def test_install_git_modules_failed_update_keeps_the_module(tmp_path: Path) -> None:
+    sentinel = _fetched_hour_ago(tmp_path)
+
+    with pytest.raises(EsphomeError, match="Can't fetch Zephyr module mod main"):
+        _refresh(tmp_path, remote="b" * 40, fail_fetch=True)
+
+    # Still there and still due, so the next build tries the update again
+    assert sentinel.exists()
+    assert time.time() - sentinel.stat().st_mtime > 3600
+
+
+def test_git_output_runs_git(tmp_path: Path) -> None:
+    """Against a local repository, so no network is needed."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    git = ["git", "-c", "user.name=t", "-c", "user.email=t@t"]
+    subprocess.run([*git, "init", "-q", "-b", "main"], cwd=repo, check=True)
+    subprocess.run(
+        [*git, "commit", "-q", "--allow-empty", "-m", "c"], cwd=repo, check=True
+    )
+    head = _git_output(["git", "rev-parse", "HEAD"], cwd=repo).strip()
+
+    assert _remote_commit(str(repo), "main") == head
+    assert _git_output(["git", "rev-parse", "HEAD"], cwd=tmp_path) is None
+
+
+@pytest.mark.parametrize(
+    ("ls_remote", "expected"),
+    [
+        (f"{'b' * 40}\trefs/heads/main\n", "b" * 40),
+        # An annotated tag: its own object, then the commit on the ^{} line
+        (
+            f"{'c' * 40}\trefs/tags/main\n{'d' * 40}\trefs/tags/main^{{}}\n",
+            "d" * 40,
+        ),
+        (f"{'e' * 40}\trefs/tags/main\n", "e" * 40),
+        ("", None),  # a commit SHA, which ls-remote doesn't list
+        (None, None),  # offline
+    ],
+)
+def test_remote_commit(ls_remote: str | None, expected: str | None) -> None:
+    with patch(
+        "esphome.components.zephyr_rtos.framework_west._git_output",
+        return_value=ls_remote,
+    ):
+        assert _remote_commit("https://example.invalid/mod.git", "main") == expected
 
 
 def test_install_git_modules_failed_fetch_is_retried(tmp_path: Path) -> None:

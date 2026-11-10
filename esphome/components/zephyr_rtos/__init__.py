@@ -567,7 +567,10 @@ def _apply_module_overrides(module_confs: list[ConfigType]) -> None:
             zephyr_set_module_override(
                 name,
                 ZephyrModule(
-                    name=name, manifest_url=source[CONF_URL], revision=source[CONF_REF]
+                    name=name,
+                    manifest_url=source[CONF_URL],
+                    revision=source[CONF_REF],
+                    refresh=source[CONF_REFRESH].total_seconds,
                 ),
             )
 
@@ -923,13 +926,14 @@ _SNIPPET_SOURCE_SCHEMA = cv.Any(
     ),
 )
 
-# A user-authored additive west module -- no username:/password:/refresh: (unlike
-# board_source:/shield_source:/snippet_source:, these are fetched once per revision by
+# A user-authored additive west module -- no username:/password: (unlike
+# board_source:/shield_source:/snippet_source:, these are fetched by
 # framework_west.install_git_modules(), not ESPHome's own git.clone_or_update cache).
 _MODULE_GIT_SCHEMA = cv.Schema(
     {
         cv.Required(CONF_URL): cv.url,
         cv.Optional(CONF_REF, default="main"): cv.git_ref,
+        cv.Optional(CONF_REFRESH, default="1d"): cv.All(cv.string, cv.source_refresh),
     }
 )
 _MODULE_SOURCE_SCHEMA = cv.typed_schema(
