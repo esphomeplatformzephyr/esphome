@@ -319,31 +319,33 @@ def check_and_install(
     hals: frozenset[str] | None = None,
 ) -> tuple[Path, Path, dict[str, str]]:
     """Install west and Zephyr SDK, serialized against other builds installing
-    the same version at once (see _install_lock)."""
+    the same workspace at once (see _install_lock)."""
     ver_tag = f"v{version}" if not version.startswith("v") else version
-    with _install_lock(f"sdk-{ver_tag}"):
+    git_modules = [m for m in (modules or []) if m.manifest_url is not None]
+    # Named after the workspace folder, so other workspaces of this version don't wait
+    with _install_lock(_source_cache_key(sdk, ver_tag, source, git_modules)):
         return _check_and_install(
-            sdk, version, west_version, ninja_version, source, modules, hals
+            sdk, version, west_version, ninja_version, source, git_modules, hals
         )
 
 
 def _check_and_install(
     sdk: ZephyrSDK,
     version: str,
-    west_version: str | None = None,
-    ninja_version: str | None = None,
-    source: ConfigType | None = None,
-    modules: list[ZephyrModule] | None = None,
-    hals: frozenset[str] | None = None,
+    west_version: str | None,
+    ninja_version: str | None,
+    source: ConfigType | None,
+    git_modules: list[ZephyrModule],
+    hals: frozenset[str] | None,
 ) -> tuple[Path, Path, dict[str, str]]:
     """Install west and Zephyr SDK.
 
-    modules (resolve_zephyr_modules()'s result): additive west modules to fetch
-    alongside the SDK, each as its own sibling project in a generated manifest --
-    see _generate_synthetic_manifest(). A module with local_path set (framework:
-    modules: type: local) isn't a west project at all -- the caller wires it into the
-    build directly via EXTRA_ZEPHYR_MODULES instead, same as a converted PlatformIO
-    library.
+    git_modules (the git-sourced part of resolve_zephyr_modules()'s result): additive
+    west modules to fetch alongside the SDK, each as its own sibling project in a
+    generated manifest -- see _generate_synthetic_manifest(). A module with local_path
+    set (framework: modules: type: local) isn't a west project at all -- the caller wires
+    it into the build directly via EXTRA_ZEPHYR_MODULES instead, same as a converted
+    PlatformIO library.
 
     west_version/ninja_version override requirements_west.txt's pinned versions
     (CONF_WEST_VERSION/CONF_NINJA_VERSION). source, if given (framework: source:), overrides
@@ -381,8 +383,6 @@ def _check_and_install(
     python_env = _python_env_path(ver_tag)
     python_bin = get_python_env_executable_path(python_env, "python")
 
-    git_modules = [m for m in (modules or []) if m.manifest_url is not None]
-
     is_local = source is not None and source[CONF_TYPE] == TYPE_LOCAL
     if is_local:
         if git_modules:
@@ -414,42 +414,49 @@ def _check_and_install(
         "PATH": f"{python_bin.parent}{os.pathsep}{os.environ.get('PATH', '')}",
     }
 
-    venv_sentinel = python_env / ".ready"
-    overrides = {"west": west_version, "ninja": ninja_version}
-    effective_requirements = _effective_requirements(overrides)
+    # Every workspace of this version shares the venv. It only changes when the west
+    # requirements or overrides do, so builds that use it are not locked against that.
+    with _install_lock(f"penv-{ver_tag}"):
+        venv_sentinel = python_env / ".ready"
+        overrides = {"west": west_version, "ninja": ninja_version}
+        effective_requirements = _effective_requirements(overrides)
 
-    install_venv = not python_bin.exists()
-    # Compares content, not mtime -- an override changes what should be installed without
-    # touching requirements_west.txt itself, so mtime alone would miss it.
-    requirements_changed = (
-        not venv_sentinel.exists()
-        or venv_sentinel.read_text() != effective_requirements
-    )
+        install_venv = not python_bin.exists()
+        # Compares content, not mtime -- an override changes what should be installed without
+        # touching requirements_west.txt itself, so mtime alone would miss it.
+        requirements_changed = (
+            not venv_sentinel.exists()
+            or venv_sentinel.read_text() != effective_requirements
+        )
 
-    if install_venv:
-        rmdir(python_env, msg=f"Clean up {ver_tag} Python environment")
-        create_venv(python_env, msg=ver_tag)
-        # As nrf52: west init's manifest move fails on Windows without it
-        from esphome.components.nrf52.framework import _install_sitecustomize
+        if install_venv:
+            rmdir(python_env, msg=f"Clean up {ver_tag} Python environment")
+            create_venv(python_env, msg=ver_tag)
+            # As nrf52: west init's manifest move fails on Windows without it
+            from esphome.components.nrf52.framework import _install_sitecustomize
 
-        _install_sitecustomize(python_env)
+            _install_sitecustomize(python_env)
 
-    if install_venv or requirements_changed:
-        _LOGGER.info("Installing Python packages: %s", effective_requirements.split())
-        requirements_file = python_env / ".requirements.effective.txt"
-        requirements_file.write_text(effective_requirements)
-        cmd = [
-            str(python_bin),
-            "-m",
-            "pip",
-            "install",
-            "--upgrade",
-            "-r",
-            str(requirements_file),
-        ]
-        if not run_command_ok(cmd):
-            raise EsphomeError(f"Upgrade {ver_tag} Python environment packages failure")
-        venv_sentinel.write_text(effective_requirements)
+        if install_venv or requirements_changed:
+            _LOGGER.info(
+                "Installing Python packages: %s", effective_requirements.split()
+            )
+            requirements_file = python_env / ".requirements.effective.txt"
+            requirements_file.write_text(effective_requirements)
+            cmd = [
+                str(python_bin),
+                "-m",
+                "pip",
+                "install",
+                "--upgrade",
+                "-r",
+                str(requirements_file),
+            ]
+            if not run_command_ok(cmd):
+                raise EsphomeError(
+                    f"Upgrade {ver_tag} Python environment packages failure"
+                )
+            venv_sentinel.write_text(effective_requirements)
 
     manifest_url = (
         source[CONF_URL] if (source is not None and not is_local) else sdk.manifest_url
@@ -646,8 +653,9 @@ def _check_and_install(
                     "-r",
                     str(zephyr_reqs),
                 ]
-                if not run_command_ok(req_cmd):
-                    raise EsphomeError("Can't install Zephyr Python requirements")
+                with _install_lock(f"penv-{ver_tag}"):
+                    if not run_command_ok(req_cmd):
+                        raise EsphomeError("Can't install Zephyr Python requirements")
 
         if pinned:
             resolved_marker.write_text(manifest_rev)

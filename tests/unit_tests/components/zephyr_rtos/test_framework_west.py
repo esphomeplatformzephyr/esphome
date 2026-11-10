@@ -38,7 +38,10 @@ class _Calls(list):
 
 
 def _make_fake_run_command_ok(
-    tmp_path: Path, manifest_path: str = "zephyr", fail_list: bool = False
+    tmp_path: Path,
+    manifest_path: str = "zephyr",
+    fail_list: bool = False,
+    zephyr_reqs: bool = False,
 ) -> tuple[_Calls, Callable[..., bool]]:
     """Record every run_command_ok() call; a `west init` also creates the
     framework and .west/config it would leave on disk (manifest.path is where west put
@@ -52,6 +55,10 @@ def _make_fake_run_command_ok(
             west_dir = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY / ".west"
             west_dir.mkdir(parents=True, exist_ok=True)
             (west_dir / "config").write_text(f"[manifest]\npath = {manifest_path}\n")
+        if zephyr_reqs and cmd[2:4] == ["west", "init"]:
+            reqs = _framework(tmp_path) / "zephyr" / "scripts" / "requirements.txt"
+            reqs.parent.mkdir(parents=True, exist_ok=True)
+            reqs.write_text("pyelftools\n")
         if cmd[2:5] == list(_FILTER_CMD):
             config_path = (
                 tmp_path / "zephyr" / "frameworks" / _CACHE_KEY / ".west" / "config"
@@ -82,10 +89,11 @@ def _run_check_and_install(
     update_returncode: int = 0,
     hals: frozenset[str] | None = None,
     fail_list: bool = False,
+    zephyr_reqs: bool = False,
 ) -> tuple[_Calls, MagicMock]:
     """Return the run_command_ok() calls and the mocked subprocess.run."""
     calls, fake_run_command_ok = _make_fake_run_command_ok(
-        tmp_path, manifest_path, fail_list
+        tmp_path, manifest_path, fail_list, zephyr_reqs
     )
     with (
         patch(
@@ -111,6 +119,27 @@ def _run_check_and_install(
             sdk=_FAKE_SDK, version="4.4.1", source=source, modules=modules, hals=hals
         )
     return calls, mock_subprocess_run
+
+
+def test_install_locks_are_per_workspace(tmp_path: Path) -> None:
+    """Workspaces of one version install apart; the venv they share has its own lock."""
+    with patch("filelock.FileLock") as file_lock:
+        _run_check_and_install(tmp_path, source=None)
+
+    lock_files = [Path(c.args[0]).name for c in file_lock.call_args_list]
+    assert lock_files == [f"{_CACHE_KEY}.lock", "penv-v4.4.1.lock"]
+
+
+def test_zephyr_requirements_install_holds_the_venv_lock(tmp_path: Path) -> None:
+    """Workspaces of one version pip-install into the venv they share one at a time."""
+    reqs = _framework(tmp_path) / "zephyr" / "scripts" / "requirements.txt"
+
+    with patch("filelock.FileLock") as file_lock:
+        calls, _ = _run_check_and_install(tmp_path, source=None, zephyr_reqs=True)
+
+    lock_files = [Path(c.args[0]).name for c in file_lock.call_args_list]
+    assert lock_files == [f"{_CACHE_KEY}.lock", "penv-v4.4.1.lock", "penv-v4.4.1.lock"]
+    assert any(c[-2:] == ["-r", str(reqs)] for c in calls)
 
 
 def _git_source(resolved_sha: str) -> dict:

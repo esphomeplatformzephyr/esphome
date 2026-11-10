@@ -137,6 +137,53 @@ def test_check_and_install_skips_download_when_sentinel_exists(
     mock_extract.assert_not_called()
 
 
+def test_check_and_install_locks_only_while_missing(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
+) -> None:
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    framework = _make_framework(tmp_path)
+    sdk_path = _sdk_install_dir("0.17.4")
+
+    with patch("filelock.FileLock") as file_lock, patch("subprocess.run") as run:
+        run.return_value.returncode = 0
+        check_and_install(framework, toolchain="riscv64-zephyr-elf")
+        lock_files = [Path(c.args[0]).name for c in file_lock.call_args_list]
+        assert lock_files == ["zephyr-sdk-0.17.4.lock"]
+
+        file_lock.reset_mock()
+        check_and_install(framework, toolchain="riscv64-zephyr-elf")
+        file_lock.assert_not_called()
+    assert (sdk_path / ".esphome_complete_riscv64-zephyr-elf").exists()
+
+
+def test_check_and_install_skips_install_finished_while_waiting(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
+) -> None:
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    mock_download, _ = mock_sdk_download_ops
+    framework = _make_framework(tmp_path)
+    sdk_path = _sdk_install_dir("0.17.4")
+    sentinel = sdk_path / ".esphome_complete_riscv64-zephyr-elf"
+
+    def _other_build_installs(*args: Any, **kwargs: Any) -> MagicMock:
+        sentinel.parent.mkdir(parents=True, exist_ok=True)
+        sentinel.touch()
+        return MagicMock()
+
+    with (
+        patch("filelock.FileLock", side_effect=_other_build_installs),
+        patch("subprocess.run") as run,
+    ):
+        assert check_and_install(framework, toolchain="riscv64-zephyr-elf") == sdk_path
+
+    mock_download.assert_not_called()
+    run.assert_not_called()
+
+
 def test_check_and_install_reuses_sdk_path_for_a_second_toolchain(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
