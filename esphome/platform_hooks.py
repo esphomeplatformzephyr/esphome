@@ -49,8 +49,8 @@ COSMETIC_HOOKS: Final = frozenset(
     {"process_stacktrace", "ota_image", "has_network_ota"}
 )
 
-# Platforms built by zephyr_rtos
-_ZEPHYR_RTOS_PLATFORMS: Final = (
+# Platforms built by the zephyr component on the Zephyr toolchain
+_ZEPHYR_TOOLCHAIN_PLATFORMS: Final = (
     PLATFORM_NRF,
     PLATFORM_NXP,
     PLATFORM_RENESAS,
@@ -92,17 +92,17 @@ STACKTRACE_GATES: Final[dict[str, str]] = {
     PLATFORM_NRF52: r"0x[0-9a-fA-F]{3,}\b|Last crash:",
     # Same trigger language as nrf52: both decode the "Last crash:" banner
     # logger_zephyr.cpp prints, followed by a "PC=... LR=..." register pair.
-    **dict.fromkeys(_ZEPHYR_RTOS_PLATFORMS, r"0x[0-9a-fA-F]{3,}\b|Last crash:"),
+    **dict.fromkeys(_ZEPHYR_TOOLCHAIN_PLATFORMS, r"0x[0-9a-fA-F]{3,}\b|Last crash:"),
 }
 
 PLATFORM_HOOKS: Final[dict[str, frozenset[str]]] = {
     "show_logs": frozenset({PLATFORM_NRF, PLATFORM_NRF52}),
     # esp32 and rp2 only for framework: type: zephyr
     "upload_program": frozenset(
-        {PLATFORM_ESP32, PLATFORM_NRF52, PLATFORM_RP2, *_ZEPHYR_RTOS_PLATFORMS}
+        {PLATFORM_ESP32, PLATFORM_NRF52, PLATFORM_RP2, *_ZEPHYR_TOOLCHAIN_PLATFORMS}
     ),
     # Whether the config has a network OTA that upload_program handles
-    # (the zephyr_rtos ones only through zephyr_mcumgr's variants)
+    # (the Zephyr toolchain ones only through zephyr_mcumgr's variants)
     "has_network_ota": frozenset(
         {PLATFORM_ESP32, PLATFORM_NRF, PLATFORM_NRF52, PLATFORM_RP2, PLATFORM_SILABS}
     ),

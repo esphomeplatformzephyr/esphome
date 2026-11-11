@@ -2335,7 +2335,7 @@ def _get_default_key(*args):
     return ["_".join([CORE.target_platform] + list(args))]
 
 
-def _zephyr_rtos_default_keys() -> list[str]:
+def _zephyr_toolchain_default_keys() -> list[str]:
     """``<platform>_<variant>`` then ``<platform>``, the variant without its platform
     prefix (``stm32_l4``, ``nrf_52``). esp32 and rp2 add ``_zephyr`` (``esp32_c3_zephyr``,
     ``rp2_zephyr``): their plain keys hold ESP-IDF and Arduino values.
@@ -2376,7 +2376,7 @@ class SplitDefault(Optional):
     so kwargs read naturally — `rp2_2040=...` is the override for the
     Pico / Pico W and `rp2_2350=...` is the override for the Pico 2.
 
-    framework: type: zephyr builds use the keys from ``_zephyr_rtos_default_keys``.
+    framework: type: zephyr builds use the keys from ``_zephyr_toolchain_default_keys``.
     """
 
     def __init__(self, key, **kwargs):
@@ -2391,7 +2391,7 @@ class SplitDefault(Optional):
     def default(self):
         keys = []
         if CORE.using_toolchain_zephyr:
-            keys += _zephyr_rtos_default_keys()
+            keys += _zephyr_toolchain_default_keys()
         elif CORE.is_esp32:
             from esphome.components.esp32 import VARIANT_ESP32, get_esp32_variant
 

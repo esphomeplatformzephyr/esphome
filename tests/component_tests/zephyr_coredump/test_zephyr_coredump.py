@@ -13,19 +13,19 @@ from esphome.components.nrf52 import set_core_data
 from esphome.components.nrf52.boards import BOOTLOADER_CONFIG
 from esphome.components.nrf52.const import FLASH_SECTOR_SIZE
 from esphome.components.zephyr import zephyr_data
+from esphome.components.zephyr.const import (
+    KEY_OVERLAY,
+    KEY_PARTITION_REQUIREMENTS,
+    KEY_PM_STATIC,
+    KEY_PRJ_CONF,
+    KEY_ZEPHYR,
+)
 from esphome.components.zephyr_coredump import (
     CONFIG_SCHEMA,
     DUMP_THREADS_MIN_VERSION,
     PARTITION_SIZE,
     _partition_address,
     to_code,
-)
-from esphome.components.zephyr_rtos.const import (
-    KEY_OVERLAY,
-    KEY_PARTITION_REQUIREMENTS,
-    KEY_PM_STATIC,
-    KEY_PRJ_CONF,
-    KEY_ZEPHYR_RTOS,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -36,7 +36,7 @@ from esphome.const import (
     KEY_TARGET_PLATFORM,
 )
 from esphome.core import CORE, ID
-from tests.unit_tests.components.zephyr_rtos.zephyr_state import (
+from tests.unit_tests.components.zephyr.zephyr_state import (
     empty_zephyr_data,
     zephyr_platform_framework,
 )
@@ -181,7 +181,7 @@ def _zephyr_core_data(variant: str) -> None:
         KEY_TARGET_PLATFORM: platform.value,
         KEY_TARGET_FRAMEWORK: framework.value,
     }
-    CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant=variant)
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant=variant)
 
 
 @pytest.mark.parametrize("variant", ["ESP32H2", "NRF54L15", "ESP32S3"])

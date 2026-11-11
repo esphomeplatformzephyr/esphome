@@ -61,7 +61,7 @@ CODEOWNERS = ["@jesserockz"]
 DOMAIN = "rp2"
 IS_TARGET_PLATFORM = True
 FRAMEWORK_ZEPHYR = "zephyr"
-# The variant families zephyr_rtos builds for framework: type: zephyr
+# The variant families zephyr builds for framework: type: zephyr
 ZEPHYR_FAMILIES = frozenset({"rpi_pico"})
 
 
@@ -72,7 +72,9 @@ def _uses_zephyr(config: ConfigType) -> bool:
 
 
 def AUTO_LOAD() -> list[str]:
-    return ["zephyr_rtos"] if CORE.using_toolchain_zephyr else ["preferences"]
+    if CORE.using_toolchain_zephyr:
+        return ["zephyr", "preferences"]
+    return ["preferences"]
 
 
 # Legacy top-level YAML keys that route here. The framework
@@ -174,9 +176,9 @@ def get_download_types(storage_json: StorageJSON) -> list[dict[str, str]]:
     doesn't have to special-case per-platform schemas.
     """
     if storage_json.framework == "zephyr":
-        from esphome.components import zephyr_rtos
+        from esphome.components import zephyr
 
-        return zephyr_rtos.get_download_types(storage_json)
+        return zephyr.get_download_types(storage_json)
     # No recorded firmware path means nothing was built; no downloads.
     if storage_json.firmware_bin_path is None:
         return []
@@ -343,14 +345,14 @@ _RP2_SCHEMA = cv.All(
 
 def _extraction_schema() -> cv.Schema:
     """The rp2: schema with framework: typed by type:, so type: zephyr and its options show."""
-    from esphome.components.zephyr_rtos import zephyr_rtos_framework_schema
+    from esphome.components.zephyr import zephyr_framework_schema
 
     return _RP2_SCHEMA.validators[0].extend(
         {
             cv.Optional(CONF_FRAMEWORK, default={}): cv.typed_schema(
                 {
                     "arduino": ARDUINO_FRAMEWORK_SCHEMA,
-                    FRAMEWORK_ZEPHYR: zephyr_rtos_framework_schema(),
+                    FRAMEWORK_ZEPHYR: zephyr_framework_schema(),
                 },
                 default_type="arduino",
             )
@@ -363,16 +365,18 @@ def CONFIG_SCHEMA(config: ConfigType) -> ConfigType:
     if config is SCHEMA_EXTRACT:
         return _extraction_schema()
     if _uses_zephyr(config):
-        from esphome.components.zephyr_rtos import zephyr_rtos_config_schema
+        from esphome.components.zephyr import zephyr_config_schema
 
-        return zephyr_rtos_config_schema(config, ZEPHYR_FAMILIES, PLATFORM_RP2)
+        return zephyr_config_schema(config, ZEPHYR_FAMILIES, PLATFORM_RP2)
     return _RP2_SCHEMA(config)
 
 
 @coroutine_with_priority(CoroPriority.PLATFORM)
 async def to_code(config: ConfigType) -> None:
     if CORE.using_toolchain_zephyr:
-        # zephyr_rtos builds it
+        from esphome.components import zephyr
+
+        await zephyr.zephyr_toolchain_to_code(config)
         return
     cg.add(rp2_ns.setup_preferences())
 
@@ -690,9 +694,9 @@ def generate_pio_files() -> bool:
 # Called by writer.py
 def copy_files() -> None:
     if CORE.using_toolchain_zephyr:
-        from esphome.components import zephyr_rtos
+        from esphome.components import zephyr
 
-        zephyr_rtos.copy_files()
+        zephyr.zephyr_toolchain_copy_files()
         return
     dir = Path(__file__).parent
     post_build_file = dir / "post_build.py.script"
@@ -716,30 +720,30 @@ def copy_files() -> None:
 def run_compile(args, config: ConfigType) -> bool:
     if not CORE.using_toolchain_zephyr:
         return False
-    from esphome.components import zephyr_rtos
+    from esphome.components import zephyr
 
-    return zephyr_rtos.run_compile(args, config)
+    return zephyr.run_compile(args, config)
 
 
 def upload_program(config: ConfigType, args, host: str) -> bool:
     if not CORE.using_toolchain_zephyr:
         return False
-    from esphome.components import zephyr_rtos
+    from esphome.components import zephyr
 
-    return zephyr_rtos.upload_program(config, args, host)
+    return zephyr.upload_program(config, args, host)
 
 
 def has_network_ota(config: ConfigType) -> bool:
     if not CORE.using_toolchain_zephyr:
         return False
-    from esphome.components import zephyr_rtos
+    from esphome.components import zephyr
 
-    return zephyr_rtos.has_network_ota(config)
+    return zephyr.has_network_ota(config)
 
 
 def process_stacktrace(config: ConfigType, line: str, backtrace_state: bool) -> bool:
     if CORE.using_toolchain_zephyr:
-        from esphome.components import zephyr_rtos
+        from esphome.components import zephyr
 
-        return zephyr_rtos.process_stacktrace(config, line, backtrace_state)
+        return zephyr.process_stacktrace(config, line, backtrace_state)
     return process_crash_handler_line(config, line, backtrace_state)

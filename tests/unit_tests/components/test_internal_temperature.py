@@ -6,10 +6,10 @@ from unittest.mock import AsyncMock, Mock, call, patch
 import pytest
 
 from esphome.components.internal_temperature import sensor as internal_temperature
-from esphome.components.zephyr_rtos.const import KEY_ZEPHYR_RTOS
+from esphome.components.zephyr.const import KEY_ZEPHYR
 from esphome.const import KEY_CORE, KEY_TARGET_FRAMEWORK, KEY_TARGET_PLATFORM, Toolchain
 from esphome.core import CORE
-from tests.unit_tests.components.zephyr_rtos.zephyr_state import (
+from tests.unit_tests.components.zephyr.zephyr_state import (
     empty_zephyr_data,
     zephyr_platform_framework,
 )
@@ -22,7 +22,7 @@ def _set_variant(variant: str) -> None:
         KEY_TARGET_FRAMEWORK: "zephyr",
     }
     CORE.toolchain = Toolchain.ZEPHYR
-    CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data(variant=variant)
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant=variant)
 
 
 async def _run_to_code() -> tuple[Mock, Mock, Mock]:

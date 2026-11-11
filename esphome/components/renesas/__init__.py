@@ -1,20 +1,21 @@
 """Renesas chips on the Zephyr RTOS."""
 
-from esphome.components.zephyr_rtos import (  # noqa: F401
-    copy_files,
+from esphome.components.zephyr import (  # noqa: F401
     get_download_types,
     process_stacktrace,
     run_compile,
     upload_program,
-    zephyr_rtos_platform_config,
+    zephyr_toolchain_config,
+    zephyr_toolchain_copy_files as copy_files,
+    zephyr_toolchain_to_code as to_code,
 )
 from esphome.const import PLATFORM_RENESAS
 
 CODEOWNERS = ["@rwrozelle"]
 DOMAIN = "renesas"
 IS_TARGET_PLATFORM = True
-AUTO_LOAD = ["zephyr_rtos"]
+AUTO_LOAD = ["zephyr", "preferences"]
 
 FAMILIES = frozenset({"renesas"})
 
-CONFIG_SCHEMA = zephyr_rtos_platform_config(PLATFORM_RENESAS, FAMILIES)
+CONFIG_SCHEMA = zephyr_toolchain_config(PLATFORM_RENESAS, FAMILIES)

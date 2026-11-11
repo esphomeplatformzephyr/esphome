@@ -32,7 +32,6 @@ on:
       - "esphome/components/rp2040/**"
       - "esphome/components/rtl87xx/**"
       - "esphome/components/zephyr/**"
-      - "esphome/components/zephyr_rtos/**"
 
 permissions:
   contents: read  # actions/checkout only

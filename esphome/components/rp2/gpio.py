@@ -109,7 +109,7 @@ def _pin_schema(value: Any) -> Any:
     if value is SCHEMA_EXTRACT:
         return RP2_PIN_SCHEMA
     if CORE.using_toolchain_zephyr:
-        from esphome.components.zephyr_rtos.gpio import ZEPHYR_PIN_SCHEMA
+        from esphome.components.zephyr.gpio import ZEPHYR_PIN_SCHEMA
 
         return ZEPHYR_PIN_SCHEMA(value)
     return RP2_PIN_SCHEMA(value)
@@ -118,7 +118,7 @@ def _pin_schema(value: Any) -> Any:
 @pins.PIN_SCHEMA_REGISTRY.register("rp2", _pin_schema)
 async def rp2_pin_to_code(config: ConfigType) -> MockObj:
     if CORE.using_toolchain_zephyr:
-        from esphome.components.zephyr_rtos.gpio import zephyr_pin_to_code
+        from esphome.components.zephyr.gpio import zephyr_pin_to_code
 
         return await zephyr_pin_to_code(config)
     var = cg.new_Pvariable(config[CONF_ID])

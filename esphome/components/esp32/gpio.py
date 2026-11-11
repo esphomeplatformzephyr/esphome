@@ -214,7 +214,7 @@ def _pin_schema(value):
     if value is SCHEMA_EXTRACT:
         return ESP32_PIN_SCHEMA
     if CORE.using_toolchain_zephyr:
-        from esphome.components.zephyr_rtos.gpio import ZEPHYR_PIN_SCHEMA
+        from esphome.components.zephyr.gpio import ZEPHYR_PIN_SCHEMA
 
         return ZEPHYR_PIN_SCHEMA(value)
     return ESP32_PIN_SCHEMA(value)
@@ -223,7 +223,7 @@ def _pin_schema(value):
 @pins.PIN_SCHEMA_REGISTRY.register(PLATFORM_ESP32, _pin_schema)
 async def esp32_pin_to_code(config):
     if CORE.using_toolchain_zephyr:
-        from esphome.components.zephyr_rtos.gpio import zephyr_pin_to_code
+        from esphome.components.zephyr.gpio import zephyr_pin_to_code
 
         return await zephyr_pin_to_code(config)
     var = cg.new_Pvariable(config[CONF_ID])

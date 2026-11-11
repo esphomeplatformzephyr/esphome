@@ -20,13 +20,11 @@ from esphome.components.esp32 import (
     VARIANT_ESP32P4,
     VARIANT_ESP32S31,
 )
-from esphome.components.zephyr.const import KEY_ZEPHYR_RTOS
-from esphome.components.zephyr_rtos.variants import VARIANTS
+from esphome.components.zephyr.const import KEY_ZEPHYR
+from esphome.components.zephyr.variants import VARIANTS
 from esphome.const import CONF_WAKEUP_PIN, PlatformFramework
 from esphome.core import CORE
-from tests.unit_tests.components.zephyr_rtos.zephyr_state import (
-    zephyr_platform_framework,
-)
+from tests.unit_tests.components.zephyr.zephyr_state import zephyr_platform_framework
 
 from ..types import SetCoreConfigCallable
 
@@ -333,7 +331,7 @@ def test_deep_sleep_zephyr_wakeup_pin(
 
 def _set_zephyr_variant(set_core_config: SetCoreConfigCallable, variant: str) -> None:
     set_core_config(zephyr_platform_framework(variant))
-    CORE.data[KEY_ZEPHYR_RTOS] = {
+    CORE.data[KEY_ZEPHYR] = {
         "variant": variant,
         "family": VARIANTS[variant].family,
     }

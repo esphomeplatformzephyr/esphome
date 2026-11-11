@@ -170,7 +170,7 @@ APP = ".west_build/zephyr/zephyr/"
         ([f"{APP}zephyr.hex"], ["zephyr.hex"]),
     ],
 )
-def test_zephyr_rtos_offers_what_the_build_made(
+def test_zephyr_toolchain_offers_what_the_build_made(
     tmp_path: Path, built: list[str], expected: list[str]
 ) -> None:
     assert _zephyr_files(tmp_path, *built) == expected

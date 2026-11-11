@@ -81,17 +81,14 @@ def test_silabs_adc_reuses_board_analog_bus(
     expected: str,
 ) -> None:
     """A bus+parity the board already allocates keeps its slot; others get slot 0."""
-    from esphome.components.zephyr import zephyr_data  # noqa: PLC0415
+    from esphome.components import zephyr  # noqa: PLC0415
     from esphome.components.zephyr.const import KEY_OVERLAY  # noqa: PLC0415
-    from esphome.components.zephyr_rtos import dts_lookup  # noqa: PLC0415
 
     states = None if board_buses is None else [("iadc0_default", ["group0"])]
-    monkeypatch.setattr(dts_lookup, "get_pinctrl_states", lambda *_: states)
-    monkeypatch.setattr(
-        dts_lookup, "get_pinctrl_group_property", lambda *_: board_buses
-    )
+    monkeypatch.setattr(zephyr, "get_pinctrl_states", lambda *_: states)
+    monkeypatch.setattr(zephyr, "get_pinctrl_group_property", lambda *_: board_buses)
 
     generate_main("tests/component_tests/adc/test_adc_zephyr_efr32mg24.yaml")
-    overlay = "".join(zephyr_data()[KEY_OVERLAY].values())
+    overlay = "".join(zephyr.zephyr_data()[KEY_OVERLAY].values())
 
     assert f"silabs,analog-bus = {expected};" in overlay

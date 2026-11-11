@@ -4,7 +4,7 @@ import pytest
 from voluptuous import Invalid
 
 from esphome.components.wifi import CONFIG_SCHEMA, _validate, validate_variant
-from esphome.components.zephyr.const import KEY_ZEPHYR_RTOS
+from esphome.components.zephyr.const import KEY_ZEPHYR
 from esphome.const import (
     CONF_AP,
     CONF_HIDDEN,
@@ -16,9 +16,7 @@ from esphome.const import (
 )
 from esphome.core import CORE
 from tests.component_tests.types import SetCoreConfigCallable
-from tests.unit_tests.components.zephyr_rtos.zephyr_state import (
-    zephyr_platform_framework,
-)
+from tests.unit_tests.components.zephyr.zephyr_state import zephyr_platform_framework
 
 
 def test_hidden_folded_into_networks() -> None:
@@ -65,7 +63,7 @@ def _set_zephyr_with_ap(set_core_config: SetCoreConfigCallable, variant: str) ->
         zephyr_platform_framework(variant),
         full_config={"wifi": {CONF_AP: {}}},
     )
-    CORE.data[KEY_ZEPHYR_RTOS] = {"variant": variant, "board": "some_board"}
+    CORE.data[KEY_ZEPHYR] = {"variant": variant, "board": "some_board"}
 
 
 def test_ap_rejected_on_nrf70(set_core_config: SetCoreConfigCallable) -> None:

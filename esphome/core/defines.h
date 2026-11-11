@@ -928,13 +928,13 @@
 #define USE_SOCKET_IMPL_BSD_SOCKETS
 // Emitted by zephyr/variants/nrf52.py when advanced: dfu: is set.
 #define USE_ZEPHYR_NRF52_DFU
-// Emitted by zephyr_rtos/variants/nrf52.py for an Adafruit bootloader.
+// Emitted by zephyr/variants/nrf52.py for an Adafruit bootloader.
 #define USE_BOOTLOADER_ADAFRUIT
 // Emitted by zephyr_add_usb_baud_rate() -- reports baud rates the USB host sets on the serial port.
 #define USE_ZEPHYR_USB_BAUD_RATE
 // Emitted by zephyr_can/canbus.py when any CAN bus has a non-zero tx_buffer_size.
 #define USE_ZEPHYR_CAN_TX_QUEUE
-// Emitted by zephyr_rtos/variants/stm32c5.py for the XIAO STM32C5's TinyUF2 bootloader (TinyUf2Touch).
+// Emitted by zephyr/variants/stm32c5.py for the XIAO STM32C5's TinyUF2 bootloader (TinyUf2Touch).
 #define USE_ZEPHYR_TINYUF2_TOUCH
 #endif
 
@@ -945,7 +945,7 @@
 #define USE_DEEP_SLEEP_ZEPHYR_WAKEUP_PIN
 #endif
 
-// Emitted by zephyr_rtos/__init__.py for Zephyr RTOS variants with a watchdog, unless
+// Emitted by zephyr/__init__.py for Zephyr RTOS variants with a watchdog, unless
 // watchdog_timeout: 0. platform: nrf52 never sets it.
 #if defined(USE_ZEPHYR_VARIANT_FAMILY_ESP32) || defined(USE_ZEPHYR_VARIANT_FAMILY_NORDIC) || \
     defined(USE_ZEPHYR_VARIANT_FAMILY_SILABS) || defined(USE_ZEPHYR_VARIANT_FAMILY_SILABS_SIWX91X) || \
