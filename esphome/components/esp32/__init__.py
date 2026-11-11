@@ -3062,6 +3062,7 @@ async def _finalize_arduino_aware_flags():
         cg.add_build_flag("-DUSE_ARDUINO")
 
 
+@coroutine_with_priority(CoroPriority.PLATFORM)
 async def to_code(config):
     if CORE.using_toolchain_zephyr:
         from esphome.components import zephyr
