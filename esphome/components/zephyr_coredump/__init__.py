@@ -1,5 +1,4 @@
 import esphome.codegen as cg
-from esphome.components.esp32.const import VARIANT_ESP32, VARIANT_ESP32S3
 from esphome.components.nrf52 import TESTING_FLASH_SIZE
 from esphome.components.nrf52.boards import BOARDS_ZEPHYR, BOOTLOADER_CONFIG
 from esphome.components.nrf52.const import FLASH_SECTOR_SIZE, VARIANT_FLASH_SIZE
@@ -19,6 +18,7 @@ from esphome.components.zephyr.const import (
     KEY_BOOTLOADER,
     KEY_PM_STATIC,
 )
+from esphome.components.zephyr.variants import variant_value
 import esphome.config_validation as cv
 from esphome.const import CONF_ID, KEY_CORE, KEY_FRAMEWORK_VERSION, Framework
 from esphome.core import CORE, CoroPriority, coroutine_with_priority
@@ -36,9 +36,6 @@ DUMP_THREADS_MIN_VERSION = cv.Version(2, 9, 2)
 SP_FIX_MIN_VERSION = cv.Version(3, 0, 0)
 # One size for every SDK, so enabling the component moves the OTA image slots the same way everywhere
 PARTITION_SIZE = 0x8000
-
-# Xtensa has no ARCH_SUPPORTS_COREDUMP_THREADS, so only the faulting thread is stored
-XTENSA_VARIANTS = (VARIANT_ESP32, VARIANT_ESP32S3)
 
 
 CONFIG_SCHEMA = cv.All(
@@ -143,7 +140,8 @@ async def to_code(config: ConfigType) -> None:
 async def _zephyr_to_code(config: ConfigType) -> None:
     """Zephyr RTOS: every supported SDK is Zephyr 4.x, so the stack pointer fix is never needed,
     and the user's devicetree provides the partition."""
-    if zephyr_variant() in XTENSA_VARIANTS:
+    # Xtensa has no ARCH_SUPPORTS_COREDUMP_THREADS, so only the faulting thread is stored
+    if variant_value(zephyr_variant(), "cpu_arch") == "xtensa":
         zephyr_add_prj_conf("DEBUG_COREDUMP_MEMORY_DUMP_MIN", True)
     else:
         zephyr_add_prj_conf("DEBUG_COREDUMP_MEMORY_DUMP_THREADS", True)

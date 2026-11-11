@@ -23,6 +23,10 @@ UART_DRIVERS: frozenset[str] = frozenset({SEGGER_RTT_UART})
 # Vendor HAL west projects this family builds against on mainline Zephyr; the other
 # vendor HALs are not fetched.
 WEST_HALS: frozenset[str] = frozenset({"hal_nordic"})
+# CPU architecture (see ZephyrVariant.cpu_arch)
+CPU_ARCH = "arm"
+# Kind of USB UART (see ZephyrVariant.usb_uart_type)
+USB_UART_TYPE = "cdc_acm"
 # Pins are named P<port>.<pin>, e.g. P0.02 (see zephyr/gpio.py)
 PIN_NOTATION = "dotted"
 MAIN_STACK_SIZE = 8192

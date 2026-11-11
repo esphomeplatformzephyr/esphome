@@ -138,6 +138,7 @@ from .variants import (
     get_variant_module,
     resolve_sdk,
     set_core_data,
+    variant_value,
 )
 
 CODEOWNERS = ["@tomaszduda23", "@rwrozelle"]
@@ -625,6 +626,13 @@ def zephyr_variant_family() -> str | None:
     return zephyr_data().get("family") if _using_zephyr_toolchain() else None
 
 
+def zephyr_usb_uart_type() -> str | None:
+    """The active variant's kind of USB UART ("cdc_acm", "serial_jtag"), or None."""
+    if (variant := zephyr_variant()) is None:
+        return None
+    return variant_value(variant, "usb_uart_type")
+
+
 def zephyr_only_on_variant(*variant_names: str):
     """Return a cv validator that requires the Zephyr variant to be one of variant_names."""
 
@@ -913,8 +921,6 @@ def _watchdog_to_code(config: ConfigType) -> None:
         # Identifies the stalled thread on the console from the watchdog callback (see
         # hal.cpp) -- without THREAD_NAME, k_thread_name_get() just returns NULL.
         zephyr_add_prj_conf("THREAD_NAME", True)
-        if VARIANTS[zephyr_variant()].arch_stack_walk:
-            cg.add_define("USE_ZEPHYR_ARCH_STACKWALK")
 
 
 @coroutine_with_priority(CoroPriority.FINAL)

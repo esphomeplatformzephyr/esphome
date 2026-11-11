@@ -238,19 +238,11 @@ def uart_selection(value: Any) -> str:
             return cv.one_of(UART0, upper=True)(value)
         return cv.one_of(*UART_SELECTION_NRF52, upper=True)(value)
     if CORE.using_toolchain_zephyr:
-        from esphome.components.esp32.const import (
-            VARIANT_ESP32C3,
-            VARIANT_ESP32C5,
-            VARIANT_ESP32C6,
-            VARIANT_ESP32H2,
-            VARIANT_ESP32S3,
-        )
         from esphome.components.zephyr import (
             RTT_PORTS,
             validate_rtt_port,
             validate_uart_label_override,
-            zephyr_variant,
-            zephyr_variant_family,
+            zephyr_usb_uart_type,
         )
 
         if (
@@ -265,16 +257,10 @@ def uart_selection(value: Any) -> str:
             return validate_rtt_port(value.upper())
         if isinstance(value, str) and value.upper() in CONSOLE_BACKENDS:
             return _console_backend(value.upper())
-        if zephyr_variant() in (
-            VARIANT_ESP32H2,
-            VARIANT_ESP32C6,
-            VARIANT_ESP32C5,
-            VARIANT_ESP32C3,
-            VARIANT_ESP32S3,
-        ):
+        usb_uart_type = zephyr_usb_uart_type()
+        if usb_uart_type == "serial_jtag":
             return cv.one_of(*UART_SELECTION_ZEPHYR_ESP32_JTAG, upper=True)(value)
-        family = zephyr_variant_family()
-        if family in {"nordic", "rpi_pico", "renesas", "stm32", "nxp"}:
+        if usb_uart_type == "cdc_acm":
             return cv.one_of(*UART_SELECTION_ZEPHYR_USB_CDC, upper=True)(value)
         return cv.one_of(*UART_SELECTION_HOST_ZEPHYR, upper=True)(value)
     raise NotImplementedError

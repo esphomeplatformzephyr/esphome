@@ -69,7 +69,10 @@ _INPUT_CAPABLE_PINS = _OUTPUT_CAPABLE_PINS | frozenset({34, 35, 36, 37, 38, 39})
 # Registry entries — collected by variants/__init__.py
 VARIANT_NAME = VARIANT_ESP32
 VARIANT = ZephyrVariant(
-    arch_stack_walk=False,
+    # No USB Serial/JTAG on the original ESP32
+    usb_uart_type=None,
+    cpu_arch="xtensa",
+    mcumgr_ota=True,
     # ROM loads the first image at 0x1000 (espressif/partitions_0x1000_*.dtsi).
     boot=BootLayout(0x1000),
     sdk=MAINLINE,

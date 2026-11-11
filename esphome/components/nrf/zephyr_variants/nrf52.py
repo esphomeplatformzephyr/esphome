@@ -171,6 +171,7 @@ _GPIO_MATRIX_PINS = frozenset(range(48))
 # Registry entries — collected by variants/__init__.py
 VARIANT_NAME = VARIANT_NRF52
 VARIANT = ZephyrVariant(
+    mcumgr_ota=True,
     # Resets from the start of flash (nordic/nrf52840_partition.dtsi). An Adafruit
     # bootloader moves this; see to_code().
     boot=BootLayout(0x0),

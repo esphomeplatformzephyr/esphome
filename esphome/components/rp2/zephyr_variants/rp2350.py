@@ -53,6 +53,7 @@ _ADC_CHANNEL_MAP = {26: 0, 27: 1, 28: 2, 29: 3}
 
 VARIANT_NAME = VARIANT_RP2350
 VARIANT = ZephyrVariant(
+    mcumgr_ota=True,
     # ROM boots from the start of flash (rpi_pico2, partitions_4M_sysbuild.dtsi).
     boot=BootLayout(0x0),
     sdk=MAINLINE,

@@ -15,9 +15,6 @@ from ..const import (
     VARIANT_ESP32S3,
 )
 
-# Xtensa: hardware FPU, but no arch_stack_walk(). The others are RISC-V.
-_XTENSA_VARIANTS = (VARIANT_ESP32, VARIANT_ESP32S3)
-
 # Devicetree property esp32-family pinctrl groups pack all their signal macros into.
 PROPERTY_NAME = "pinmux"
 
@@ -29,6 +26,10 @@ UART_DRIVERS: frozenset[str] = frozenset()
 # Vendor HAL west projects this family builds against on mainline Zephyr; the other
 # vendor HALs are not fetched.
 WEST_HALS: frozenset[str] = frozenset({"hal_espressif"})
+# CPU architecture (see ZephyrVariant.cpu_arch)
+CPU_ARCH = "riscv"
+# Kind of USB UART (see ZephyrVariant.usb_uart_type)
+USB_UART_TYPE = "serial_jtag"
 # Matches platform: esp32's 8192 loop task; UDP OTA overflows 4096
 MAIN_STACK_SIZE = 8192
 # Flashes over serial with esptool; `--device PYOCD` is not supported
@@ -40,6 +41,7 @@ def to_code(config: ConfigType) -> None:
     to MINIMAL_LIBCPP, which has no STL and breaks ESPHome's C++ headers."""
     import esphome.codegen as cg  # noqa: PLC0415
     from esphome.components.zephyr import zephyr_add_prj_conf, zephyr_variant  # noqa: PLC0415 -- avoids circular import at module load
+    from esphome.components.zephyr.variants import variant_value  # noqa: PLC0415
     from esphome.const import CONF_AP, CONF_FRAMEWORK, CONF_LOG_LEVEL, CONF_WIFI  # noqa: PLC0415
     from esphome.core import CORE  # noqa: PLC0415
 
@@ -47,7 +49,8 @@ def to_code(config: ConfigType) -> None:
     zephyr_add_prj_conf("REQUIRES_FULL_LIBCPP", True)
     # Original ESP32 (LX6) and S3 (LX7) have a hardware FPU; esp32_h2/c6/c5/c3 are
     # RV32IMAC/RV32IMC, none of which do.
-    if zephyr_variant() in _XTENSA_VARIANTS:
+    xtensa = variant_value(zephyr_variant(), "cpu_arch") == "xtensa"
+    if xtensa:
         zephyr_add_prj_conf("FPU", True)
     # random_bytes() uses sys_rand_get(), which requires the entropy subsystem.
     zephyr_add_prj_conf("ENTROPY_GENERATOR", True)
@@ -55,7 +58,7 @@ def to_code(config: ConfigType) -> None:
     # (esp32_h2/c6/c5/c3) does implement it and enables ARCH_HAS_STACKWALK
     # unconditionally, so no EXTRA_EXCEPTION_INFO is needed there either.
     log_level = config[CONF_FRAMEWORK][CONF_LOG_LEVEL]
-    if log_level != "NONE" and zephyr_variant() not in _XTENSA_VARIANTS:
+    if log_level != "NONE" and not xtensa:
         zephyr_add_prj_conf("EXCEPTION_STACK_TRACE", True)
     # Consumed by C++ code shared across every esp32-family variant (core.cpp, etc.).
     cg.add_build_flag("-DUSE_ZEPHYR_VARIANT_FAMILY_ESP32")

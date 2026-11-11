@@ -54,6 +54,7 @@ _GPIO_MATRIX_PINS = frozenset(
 # Registry entries — collected by variants/__init__.py
 VARIANT_NAME = VARIANT_EFR32MG24
 VARIANT = ZephyrVariant(
+    mcumgr_ota=True,
     # Resets from the start of flash (xg24_ek2703a.dts boot_partition@0).
     boot=BootLayout(0x0),
     # Mainline stays default; Silicon Labs' vendor SDK (SILABS) is available as an alt

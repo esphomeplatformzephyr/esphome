@@ -78,6 +78,9 @@ _GPIO_MATRIX_PINS = (
 # Registry entries — collected by variants/__init__.py
 VARIANT_NAME = VARIANT_NRF54L15
 VARIANT = ZephyrVariant(
+    # No USB controller; the XIAO's USB port is a SAMD11 bridge to uart20
+    usb_uart_type=None,
+    mcumgr_ota=True,
     # Resets from the start of RRAM (nordic/nrf54l15_cpuapp_partition.dtsi).
     boot=BootLayout(0x0),
     # Same reasoning as nrf52: NCS is Nordic's own SDK and where support for its own

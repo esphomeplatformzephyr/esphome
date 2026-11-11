@@ -3,6 +3,7 @@ import importlib
 import logging
 from pathlib import Path
 from types import ModuleType
+from typing import Any, Final
 
 import esphome.config_validation as cv
 from esphome.const import (
@@ -43,6 +44,10 @@ from ..const import (
 from ..partitions import BootLayout
 
 _LOGGER = logging.getLogger(__name__)
+
+
+# A ZephyrVariant field value that means "use the family module's value"
+FAMILY_DEFAULT: Final = "family default"
 
 
 @dataclass
@@ -330,9 +335,15 @@ class ZephyrVariant:
     # Boards whose resident vendor bootloader moves `boot`, keyed by board name without
     # revision or qualifiers.
     board_boot: dict[str, BootLayout] = field(default_factory=dict)
-    # Zephyr implements arch_stack_walk() for this CPU; for Xtensa (ESP32, S3) it
-    # doesn't, and the watchdog's stack dump would silently do nothing.
-    arch_stack_walk: bool = True
+    # CPU architecture, as Zephyr's ARCH: "arm", "riscv" or "xtensa". FAMILY_DEFAULT
+    # takes the family module's CPU_ARCH.
+    cpu_arch: str = FAMILY_DEFAULT
+    # zephyr_mcumgr OTA is supported (an MCUboot layout and SMP transport work).
+    mcumgr_ota: bool = False
+    # Kind of USB UART the chip has: "cdc_acm" (a USB device controller, zephyr_udc0),
+    # "serial_jtag" (Espressif's USB Serial/JTAG) or None. FAMILY_DEFAULT takes the
+    # family module's USB_UART_TYPE; set it only where a variant differs.
+    usb_uart_type: str | None = FAMILY_DEFAULT
 
 
 def resolve_sdk(
@@ -708,3 +719,14 @@ def get_variant_module(variant: str) -> ModuleType:
 def get_family_module(family: str) -> ModuleType:
     """The family's own module, found next to its variants."""
     return _variants_instance.family_module(family)
+
+
+def variant_value(variant: str, name: str) -> Any:
+    """A ZephyrVariant field, with FAMILY_DEFAULT resolved to the family module's
+    upper-case attribute of the same name (None when the family sets none)."""
+    info = VARIANTS[variant]
+    if (value := getattr(info, name)) != FAMILY_DEFAULT:
+        return value
+    if info.family is None:
+        return None
+    return getattr(get_family_module(info.family), name.upper(), None)

@@ -60,6 +60,7 @@ _ADC_CHANNEL_MAP = {26: 0, 27: 1, 28: 2, 29: 3}
 
 VARIANT_NAME = VARIANT_RP2040
 VARIANT = ZephyrVariant(
+    mcumgr_ota=True,
     # The first 256 bytes hold boot2, built into the first image; that image starts
     # after it (rpi_pico-common.dtsi second_stage_bootloader@0, code_partition@100).
     boot=BootLayout(0x100),

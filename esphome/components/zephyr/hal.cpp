@@ -36,7 +36,9 @@ static const device *const WDT = DEVICE_DT_GET(DT_ALIAS(watchdog0));
 // callback or hardware reset, not both.
 #if defined(USE_ZEPHYR_WATCHDOG_TIMEOUT_MS) && defined(USE_LOGGER) && !defined(USE_ZEPHYR_VARIANT_FAMILY_RENESAS) && \
     !defined(USE_ZEPHYR_VARIANT_FAMILY_SILABS) && !defined(USE_ZEPHYR_VARIANT_FAMILY_SILABS_SIWX91X)
-#ifdef USE_ZEPHYR_ARCH_STACKWALK
+// Zephyr compiles arch_stack_walk() only where the architecture has it (not Xtensa;
+// on Arm only with EXTRA_EXCEPTION_INFO).
+#ifdef CONFIG_ARCH_STACKWALK
 static bool wdt_log_stack_frame(void *cookie, unsigned long addr) {
   char msg[48];
   int len = snprintf(msg, sizeof(msg), "  at 0x%lx", addr);
@@ -59,7 +61,7 @@ static void wdt_warning_cb(const device *dev, int channel_id) {
       snprintf(msg, sizeof(msg), "Watchdog about to reset -- current thread: %s", name != nullptr ? name : "unknown");
   if (len > 0)
     logger::global_logger->write_watchdog_warning(msg, static_cast<uint16_t>(len));
-#ifdef USE_ZEPHYR_ARCH_STACKWALK
+#ifdef CONFIG_ARCH_STACKWALK
   arch_stack_walk(wdt_log_stack_frame, nullptr, current, nullptr);
 #endif
 }

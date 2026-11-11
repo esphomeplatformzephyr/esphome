@@ -15,7 +15,7 @@ from esphome.components.zephyr import (
     zephyr_add_prj_conf,
     zephyr_cdc_acm_label,
     zephyr_claim_cdc_acm,
-    zephyr_variant_family,
+    zephyr_usb_uart_type,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -67,15 +67,9 @@ def _enabled_interfaces(config: ConfigType) -> Iterator[tuple[int, ConfigType]]:
             yield index, conf
 
 
-# Zephyr RTOS families with a USB device controller, as the logger's USB_CDC option
-ZEPHYR_USB_FAMILIES = {"nordic", "rpi_pico", "renesas", "stm32", "nxp"}
-
-
 def _only_on_zephyr_usb(config: ConfigType) -> ConfigType:
-    if (
-        not CORE.using_toolchain_zephyr
-        or zephyr_variant_family() not in ZEPHYR_USB_FAMILIES
-    ):
+    # A USB device controller, as the logger's USB_CDC option
+    if not CORE.using_toolchain_zephyr or zephyr_usb_uart_type() != "cdc_acm":
         raise cv.Invalid(
             "This feature is only available when using the zephyr framework "
             "on a supported platform with USB"

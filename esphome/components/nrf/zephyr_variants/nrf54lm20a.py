@@ -81,6 +81,7 @@ _GPIO_MATRIX_PINS = (
 # Registry entries — collected by variants/__init__.py
 VARIANT_NAME = VARIANT_NRF54LM20A
 VARIANT = ZephyrVariant(
+    mcumgr_ota=True,
     # Resets from the start of RRAM (nordic/nrf54lm20a_cpuapp_partition.dtsi).
     boot=BootLayout(0x0),
     # Same reasoning as nrf52/nrf54l15: NCS is Nordic's own SDK and where support for its

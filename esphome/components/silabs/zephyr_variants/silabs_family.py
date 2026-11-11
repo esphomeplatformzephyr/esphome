@@ -16,6 +16,8 @@ UART_DRIVERS: frozenset[str] = frozenset({SEGGER_RTT_UART})
 # Vendor HAL west projects this family builds against on mainline Zephyr; the other
 # vendor HALs are not fetched.
 WEST_HALS: frozenset[str] = frozenset({"hal_silabs"})
+# CPU architecture (see ZephyrVariant.cpu_arch)
+CPU_ARCH = "arm"
 
 
 def to_code(config: ConfigType) -> None:

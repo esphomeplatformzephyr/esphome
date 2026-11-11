@@ -37,6 +37,7 @@ _GPIO_MATRIX_PINS = frozenset(range(24))
 # Registry entries — collected by variants/__init__.py
 VARIANT_NAME = VARIANT_ESP32C6
 VARIANT = ZephyrVariant(
+    mcumgr_ota=True,
     # ROM loads the first image at 0x0 (espressif/partitions_0x0_*.dtsi).
     boot=BootLayout(0x0),
     sdk=MAINLINE,

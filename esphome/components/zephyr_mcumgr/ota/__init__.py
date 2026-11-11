@@ -3,19 +3,6 @@ import logging
 from esphome import pins
 import esphome.codegen as cg
 from esphome.components import network
-from esphome.components.esp32.const import (
-    VARIANT_ESP32,
-    VARIANT_ESP32C3,
-    VARIANT_ESP32C5,
-    VARIANT_ESP32C6,
-    VARIANT_ESP32H2,
-    VARIANT_ESP32S3,
-)
-from esphome.components.nrf.const import (
-    VARIANT_NRF52,
-    VARIANT_NRF54L15,
-    VARIANT_NRF54LM20A,
-)
 from esphome.components.nrf52.boards import BOOTLOADER_CONFIG, MCUMGR_OTA_BOOTLOADERS
 from esphome.components.nrf52.const import (
     CONF_TRANSPORT,
@@ -32,8 +19,6 @@ from esphome.components.ota import (
     OTAComponent,
     ota_to_code,
 )
-from esphome.components.rp2.const import VARIANT_RP2040, VARIANT_RP2350
-from esphome.components.silabs.const import VARIANT_EFR32BG27, VARIANT_EFR32MG24
 from esphome.components.zephyr import (
     VARIANTS,
     HexValue,
@@ -108,22 +93,6 @@ def _validate_transport(conf: ConfigType) -> ConfigType:
 # Platform: zephyr variants this MCUboot image-manager path has been validated
 # against. Zephyr RTOS on other variants has its own hardened OTA path
 # instead, ota_backend_zephyr.cpp, reached via platform: esphome.
-ZEPHYR_VARIANTS = (
-    VARIANT_ESP32,
-    VARIANT_ESP32C3,
-    VARIANT_ESP32C5,
-    VARIANT_ESP32C6,
-    VARIANT_ESP32H2,
-    VARIANT_ESP32S3,
-    VARIANT_NRF52,
-    VARIANT_NRF54L15,
-    VARIANT_NRF54LM20A,
-    VARIANT_EFR32MG24,
-    VARIANT_EFR32BG27,
-    VARIANT_RP2040,
-    VARIANT_RP2350,
-)
-
 # Families whose boards actually have a USB peripheral this CDC-ACM transport can
 # use -- nordic (native USB) and legacy platform: nrf52. EFR32MG24's xg24_ek2703a
 # has no USB device controller node at all (board.yaml doesn't list "usb"), so
@@ -151,16 +120,22 @@ CDC_IDS = {"CDC": 0, "CDC1": 1}
 
 def _validate_platform(conf: ConfigType) -> ConfigType:
     # Two ways to end up on a supported chip: the legacy platform: nrf52
-    # component, or Zephyr RTOS with one of ZEPHYR_VARIANTS (a separate,
-    # mainline/NCS-based port).
+    # component, or the Zephyr toolchain with a variant that sets mcumgr_ota (a
+    # separate, mainline/NCS-based port).
     if not (
         CORE.is_nrf52
-        or (CORE.using_toolchain_zephyr and zephyr_variant() in ZEPHYR_VARIANTS)
+        or (
+            CORE.using_toolchain_zephyr
+            and (variant := zephyr_variant()) is not None
+            and VARIANTS[variant].mcumgr_ota
+        )
     ):
+        supported = ", ".join(
+            name.lower() for name, info in VARIANTS.items() if info.mcumgr_ota
+        )
         raise cv.Invalid(
             "This feature is only available on platform: nrf52, or when using the zephyr "
-            "framework with variant: esp32, esp32c3, esp32c5, esp32c6, esp32h2, "
-            "esp32s3, nrf52, nrf54l15, nrf54lm20a, efr32mg24, efr32bg27, rp2040, or rp2350."
+            f"framework with variant: {supported}."
         )
     hw_uart = conf[CONF_TRANSPORT].get(CONF_HARDWARE_UART)
     if hw_uart in CDC_IDS and not (
