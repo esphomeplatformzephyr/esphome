@@ -1,6 +1,4 @@
-from collections.abc import Iterator
 import configparser
-from contextlib import contextmanager
 import hashlib
 import logging
 import os
@@ -19,6 +17,7 @@ from esphome.core import EsphomeError
 from esphome.framework_helpers import (
     create_venv,
     get_python_env_executable_path,
+    install_lock,
     rmdir,
     run_command_ok,
 )
@@ -30,7 +29,7 @@ from .variants import ZephyrModule, ZephyrSDK
 _LOGGER = logging.getLogger(__name__)
 
 
-def _tools_path() -> Path:
+def get_zephyr_tools_path() -> Path:
     # Machine-global (OS user cache dir) so all Zephyr-based projects share one
     # SDK/toolchain/west install; see build_helpers.tools_cache.tools_cache_path
     # for the env-override and normalization rules.
@@ -38,11 +37,11 @@ def _tools_path() -> Path:
 
 
 def _python_env_path(version: str) -> Path:
-    return _tools_path() / "penvs" / version
+    return get_zephyr_tools_path() / "penvs" / version
 
 
 def _framework_path(cache_key: str) -> Path:
-    return _tools_path() / "frameworks" / cache_key
+    return get_zephyr_tools_path() / "frameworks" / cache_key
 
 
 def _source_cache_key(
@@ -187,39 +186,6 @@ def _pin_manifest_repo(manifest_dir: Path, sha: str, label: str) -> None:
         raise EsphomeError(f"Can't update Zephyr manifest repository ({label})")
 
 
-# Lock wait slices, so Ctrl-C stays responsive
-_INSTALL_LOCK_POLL = 1
-
-
-@contextmanager
-def _install_lock(name: str) -> Iterator[None]:
-    """Serialize a shared install step across builds running at once."""
-    from filelock import FileLock, Timeout
-
-    lock_path = _tools_path() / f"{name}.lock"
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
-    # No soft lock: its marker outlives a killed build and hangs every later one
-    lock = FileLock(str(lock_path), fallback_to_soft=False)
-    waiting = False
-    while True:
-        try:
-            lock.acquire(timeout=_INSTALL_LOCK_POLL)
-            break
-        except Timeout:  # before OSError, which it subclasses
-            if not waiting:
-                waiting = True
-                _LOGGER.info("Waiting for another build installing %s ...", name)
-        except OSError as err:
-            _LOGGER.warning(
-                "Can't lock %s (%s), continuing without a lock", lock_path, err
-            )
-            break
-    try:
-        yield
-    finally:
-        lock.release()
-
-
 def _extra_projects(path: Path, sdk_url: str) -> list[str]:
     """The projects a module's own west.yml lists, other than the SDK itself."""
     west_yml = path / "west.yml"
@@ -281,12 +247,12 @@ def install_git_modules(modules: list[ZephyrModule], sdk_url: str) -> list[Path]
         safe_rev = re.sub(r"[^A-Za-z0-9_.-]", "_", module.revision)
         url_hash = hashlib.sha1(module.manifest_url.encode()).hexdigest()[:8]
         key = f"{module.name}-{safe_rev}-{url_hash}"
-        path = _tools_path() / "modules" / key
+        path = get_zephyr_tools_path() / "modules" / key
         paths.append(path)
         sentinel = path / ".git" / "esphome-ready"
         if _module_is_current(sentinel, module.refresh):
             continue
-        with _install_lock(key):
+        with install_lock(get_zephyr_tools_path(), key):
             # another build fetched or checked it while this one waited
             if _module_is_current(sentinel, module.refresh):
                 continue
@@ -347,10 +313,10 @@ def check_and_install(
     hals: frozenset[str] | None = None,
 ) -> tuple[Path, Path, dict[str, str]]:
     """Install west and Zephyr SDK, serialized against other builds installing
-    the same workspace at once (see _install_lock)."""
+    the same workspace at once (see install_lock)."""
     ver_tag = f"v{version}" if not version.startswith("v") else version
     # Named after the workspace folder, so other workspaces of this version don't wait
-    with _install_lock(_source_cache_key(sdk, ver_tag, source)):
+    with install_lock(get_zephyr_tools_path(), _source_cache_key(sdk, ver_tag, source)):
         return _check_and_install(
             sdk, version, west_version, ninja_version, source, hals
         )
@@ -426,7 +392,7 @@ def _check_and_install(
 
     # Every workspace of this version shares the venv. It only changes when the west
     # requirements or overrides do, so builds that use it are not locked against that.
-    with _install_lock(f"penv-{ver_tag}"):
+    with install_lock(get_zephyr_tools_path(), f"penv-{ver_tag}"):
         venv_sentinel = python_env / ".ready"
         overrides = {"west": west_version, "ninja": ninja_version}
         effective_requirements = _effective_requirements(overrides)
@@ -626,7 +592,7 @@ def _check_and_install(
                     "-r",
                     str(zephyr_reqs),
                 ]
-                with _install_lock(f"penv-{ver_tag}"):
+                with install_lock(get_zephyr_tools_path(), f"penv-{ver_tag}"):
                     if not run_command_ok(req_cmd):
                         raise EsphomeError("Can't install Zephyr Python requirements")
 

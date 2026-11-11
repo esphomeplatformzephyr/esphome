@@ -1,0 +1,10 @@
+esphome:
+  name: mcumgrtest
+
+nrf:
+  variant: NRF54L15
+
+ota:
+  - platform: zephyr_mcumgr
+    transport:
+      hardware_uart: CDC

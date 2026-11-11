@@ -51,8 +51,8 @@ from tests.unit_tests.components.zephyr.zephyr_state import empty_zephyr_data
 def install_lock() -> Iterator[MagicMock]:
     """Keep the DTS cache lock file out of the real tools cache."""
     with patch(
-        "esphome.components.zephyr.dts_fetch._install_lock",
-        side_effect=lambda name: nullcontext(),
+        "esphome.components.zephyr.dts_fetch.install_lock",
+        side_effect=lambda root, name: nullcontext(),
     ) as lock:
         yield lock
 
@@ -619,7 +619,7 @@ def test_sparse_clone_dts_is_shared_by_every_family(
 
     mock_run.assert_not_called()
     assert [c.args for c in hal.call_args_list] == [(dest, "rp2"), (dest, "stm32")]
-    assert [c.args for c in install_lock.call_args_list] == [("dts-zephyr-4.4.1",)] * 2
+    assert [c.args[1] for c in install_lock.call_args_list] == ["dts-zephyr-4.4.1"] * 2
 
 
 # ---------------------------------------------------------------------------

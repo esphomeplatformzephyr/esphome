@@ -81,6 +81,8 @@ VARIANT = ZephyrVariant(
     # No USB controller; the XIAO's USB port is a SAMD11 bridge to uart20
     usb_uart_type=None,
     mcumgr_ota=True,
+    # No USB device, so zephyr_mcumgr's CDC transports can't build
+    mcumgr_cdc=False,
     # Resets from the start of RRAM (nordic/nrf54l15_cpuapp_partition.dtsi).
     boot=BootLayout(0x0),
     # Same reasoning as nrf52: NCS is Nordic's own SDK and where support for its own

@@ -43,7 +43,7 @@ def test_sdk_install_dir_default_is_global_cache(
 
 
 # ---------------------------------------------------------------------------
-# check_and_install -- download/extract reliability (issue #133)
+# check_and_install -- download/extract reliability
 # ---------------------------------------------------------------------------
 
 
@@ -240,6 +240,12 @@ def test_check_and_install_raises_without_setup_script(
         check_and_install(framework, toolchain="riscv64-zephyr-elf")
 
     assert not (sdk_path / ".esphome_complete_riscv64-zephyr-elf").exists()
+
+
+def test_check_and_install_raises_without_sdk_version(tmp_path: Path) -> None:
+    """A workspace with no SDK_VERSION file names the file it could not read."""
+    with pytest.raises(RuntimeError, match="Cannot read SDK_VERSION"):
+        check_and_install(tmp_path, toolchain="riscv64-zephyr-elf")
 
 
 @pytest.mark.usefixtures("linux_host")

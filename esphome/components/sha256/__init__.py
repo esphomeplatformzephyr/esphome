@@ -21,9 +21,8 @@ async def to_code(config: ConfigType) -> None:
         # All platform:zephyr variants (>= 4.4.0) are above the PSA crypto threshold.
         zephyr_add_prj_conf("PSA_CRYPTO", True)
         if zephyr_variant_family() != "nordic":
-            # NCS's nrf_security implements PSA Crypto directly (sha256.h's
-            # USE_ZEPHYR_VARIANT_FAMILY_NORDIC branch) -- this Kconfig is
-            # mainline Zephyr's own mbedtls module only.
+            # Nordic builds call the PSA Crypto API directly (sha256.h), which
+            # both NCS and mainline provide; only the mbedtls branch needs this.
             zephyr_add_prj_conf("MBEDTLS_MD_C", True)
         zephyr_add_prj_conf("PSA_WANT_ALG_SHA_256", True)
         return

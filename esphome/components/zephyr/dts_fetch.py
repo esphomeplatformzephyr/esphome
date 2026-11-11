@@ -21,10 +21,11 @@ from esphome.const import (
     TYPE_LOCAL,
 )
 from esphome.core import CORE, TimePeriodSeconds
+from esphome.framework_helpers import install_lock
 from esphome.types import ConfigType
 
 from .const import COMMIT_SHA_RE, KEY_SDK_SOURCE_RESOLVED_REF, KEY_ZEPHYR
-from .framework_west import _install_lock
+from .framework_west import get_zephyr_tools_path
 from .variants import ZephyrSDK, get_family_module
 
 _LOGGER = logging.getLogger(__name__)
@@ -499,7 +500,7 @@ def _sparse_clone_dts(
         return None
 
     # Shared by every variant, so builds running at once must not clone it together
-    with _install_lock(f"dts-{sdk_name}-{ver}"):
+    with install_lock(get_zephyr_tools_path(), f"dts-{sdk_name}-{ver}"):
         ref_marker = dest / ".resolved_ref"
         marker_content = f"{tag}#{_SPARSE_CHECKOUT_SCHEMA}"
         zephyr_dir = dest / "zephyr" if (dest / "zephyr").is_dir() else dest

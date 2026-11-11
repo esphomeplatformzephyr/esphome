@@ -1,4 +1,4 @@
-"""Download and install the Zephyr SDK and the variant's cross-compiler toolchain."""
+"""Download and install the Zephyr SDK and a cross-compiler toolchain."""
 
 from __future__ import annotations
 
@@ -10,20 +10,22 @@ import shutil
 import subprocess
 import sys
 
-from esphome.framework_helpers import download_and_extract, str_to_lst_of_str
+from esphome.framework_helpers import (
+    download_and_extract,
+    install_lock,
+    str_to_lst_of_str,
+)
 
-from .framework_west import _install_lock, _tools_path
+from .framework_west import get_zephyr_tools_path
 
 _LOGGER = logging.getLogger(__name__)
 
-# Same upstream release as nrf52/framework.py's SDK_NG_MINIMAL_MIRRORS (both fetch the
-# zephyr-sdk-ng minimal archive), kept as an independent constant/env override rather
-# than imported from nrf52 -- the two platforms are architecturally independent (see
-# issue #132's discussion of why their caches aren't shared) and this avoids a
-# zephyr -> nrf52 import dependency.
+# The sdk-ng minimal archive and its override, as in nrf52/framework.py's
+# SDK_NG_MINIMAL_MIRRORS; defined here so zephyr does not import nrf52. nrf52 and
+# Zephyr toolchain builds keep separate caches.
 SDK_NG_MINIMAL_MIRRORS = str_to_lst_of_str(
     os.environ.get(
-        "ESPHOME_ZEPHYR_SDK_NG_MINIMAL_MIRRORS",
+        "ESPHOME_SDK_NG_MINIMAL_MIRRORS",
         "https://github.com/zephyrproject-rtos/sdk-ng/releases/download/v{VERSION}/zephyr-sdk-{VERSION}_{sysname}-{machine}_minimal.{extension}",
     )
 )
@@ -41,7 +43,7 @@ def _read_sdk_version(framework_path: Path) -> str:
 
 
 def _sdk_install_dir(sdk_version: str) -> Path:
-    return _tools_path() / "toolchains" / f"zephyr-sdk-{sdk_version}"
+    return get_zephyr_tools_path() / "toolchains" / f"zephyr-sdk-{sdk_version}"
 
 
 def _sdk_platform_info() -> tuple[str, str, str]:
@@ -99,7 +101,7 @@ def check_and_install(framework_path: Path, toolchain: str) -> Path:
         _LOGGER.debug("Zephyr SDK v%s already at %s", sdk_version, sdk_path)
         return sdk_path
 
-    with _install_lock(sdk_path.name):
+    with install_lock(get_zephyr_tools_path(), sdk_path.name):
         if sentinel.exists():  # another build installed it while this one waited
             return sdk_path
 

@@ -31,7 +31,7 @@
 #elif defined(USE_ZEPHYR)
 #if defined(USE_ZEPHYR_VARIANT_FAMILY_NORDIC)
 // NCS's nrf_security (oberon-psa-crypto) doesn't ship mbedtls/build_info.h --
-// use the PSA Crypto API directly instead of probing MBEDTLS_VERSION_MAJOR.
+// use the PSA Crypto API directly, which mainline Zephyr provides as well.
 #define USE_SHA256_PSA
 #include <psa/crypto.h>
 #else

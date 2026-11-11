@@ -20,8 +20,8 @@ from esphome.components.zephyr.framework_west import (
     _git_output,
     _remote_commit,
     _source_cache_key,
-    _tools_path,
     check_and_install,
+    get_zephyr_tools_path,
     install_git_modules,
 )
 from esphome.components.zephyr.variants import ZephyrModule, ZephyrSDK
@@ -99,7 +99,7 @@ def _run_check_and_install(
     )
     with (
         patch(
-            "esphome.components.zephyr.framework_west._tools_path",
+            "esphome.components.zephyr.framework_west.get_zephyr_tools_path",
             return_value=tmp_path / "zephyr",
         ),
         patch(
@@ -453,7 +453,7 @@ def test_git_source_west_init_falls_back_to_raw_ref_when_unresolved(
 
     with (
         patch(
-            "esphome.components.zephyr.framework_west._tools_path",
+            "esphome.components.zephyr.framework_west.get_zephyr_tools_path",
             return_value=tmp_path / "zephyr",
         ),
         patch(
@@ -533,7 +533,7 @@ def _run_install_git_modules(
 
     with (
         patch(
-            "esphome.components.zephyr.framework_west._tools_path",
+            "esphome.components.zephyr.framework_west.get_zephyr_tools_path",
             return_value=tmp_path,
         ),
         patch(
@@ -791,7 +791,7 @@ def test_install_git_modules_refuses_other_projects(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# _tools_path -- machine-global cache location
+# get_zephyr_tools_path -- machine-global cache location
 # ---------------------------------------------------------------------------
 
 
@@ -800,7 +800,7 @@ def test_tools_path_env_override(
 ) -> None:
     override = tmp_path / "custom" / "zephyr"
     monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(override))
-    assert _tools_path() == override.resolve()
+    assert get_zephyr_tools_path() == override.resolve()
 
 
 def test_tools_path_default_is_global_cache(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -808,7 +808,7 @@ def test_tools_path_default_is_global_cache(monkeypatch: pytest.MonkeyPatch) -> 
     expected = (
         Path(platformdirs.user_cache_dir("esphome", appauthor=False)) / "zephyr"
     ).resolve()
-    assert _tools_path() == expected
+    assert get_zephyr_tools_path() == expected
 
 
 def _gen_defines(zephyr_dir: Path, line: str) -> Path:
