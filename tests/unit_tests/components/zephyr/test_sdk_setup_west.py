@@ -3,29 +3,38 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+import os
 from pathlib import Path
-import sys
+import time
 from typing import Any
 from unittest.mock import MagicMock, patch
 
 import platformdirs
 import pytest
 
+from esphome.components.zephyr import sdk_install
 from esphome.components.zephyr.sdk_setup_west import _sdk_install_dir, check_and_install
+
+TOOLCHAIN = "riscv64-zephyr-elf"
+
+
+@pytest.fixture(autouse=True)
+def _isolate_zephyr_tools_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep every test out of the real ~/.cache/esphome."""
+    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+
 
 # ---------------------------------------------------------------------------
 # _sdk_install_dir -- machine-global cache location
 # ---------------------------------------------------------------------------
 
 
-def test_sdk_install_dir_env_override(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    override = tmp_path / "custom" / "zephyr"
-    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(override))
+def test_sdk_install_dir_env_override(tmp_path: Path) -> None:
     assert (
-        _sdk_install_dir("0.17.4")
-        == override.resolve() / "toolchains" / "zephyr-sdk-0.17.4"
+        _sdk_install_dir("1.0.1", TOOLCHAIN)
+        == (tmp_path / "cache").resolve()
+        / "toolchains"
+        / f"zephyr-sdk-1.0.1-{TOOLCHAIN}"
     )
 
 
@@ -37,430 +46,177 @@ def test_sdk_install_dir_default_is_global_cache(
         Path(platformdirs.user_cache_dir("esphome", appauthor=False))
         / "zephyr"
         / "toolchains"
-        / "zephyr-sdk-0.17.4"
+        / f"zephyr-sdk-1.0.1-{TOOLCHAIN}"
     ).resolve()
-    assert _sdk_install_dir("0.17.4") == expected
+    assert _sdk_install_dir("1.0.1", TOOLCHAIN) == expected
 
 
 # ---------------------------------------------------------------------------
-# check_and_install -- download/extract reliability
+# check_and_install
 # ---------------------------------------------------------------------------
 
 
-def _make_framework(tmp_path: Path, sdk_version: str = "0.17.4") -> Path:
+def _make_framework(tmp_path: Path, sdk_version: str = "1.0.1") -> Path:
     framework = tmp_path / "framework"
     (framework / "zephyr").mkdir(parents=True)
     (framework / "zephyr" / "SDK_VERSION").write_text(sdk_version)
     return framework
 
 
-def _fake_extract(archive: Path, extract_dir: Path, **kwargs: Any) -> None:
-    """The real minimal archive ships setup.sh, which check_and_install() requires."""
-    Path(extract_dir).mkdir(parents=True, exist_ok=True)
-    (Path(extract_dir) / "setup.sh").touch()
-
-
-def _fake_extract_windows(archive: Path, extract_dir: Path, **kwargs: Any) -> None:
-    """The Windows minimal archive ships setup.cmd instead of setup.sh."""
-    Path(extract_dir).mkdir(parents=True, exist_ok=True)
-    (Path(extract_dir) / "setup.cmd").touch()
-
-
-def _make_complete_base(sdk_path: Path) -> None:
-    sdk_path.mkdir(parents=True)
-    (sdk_path / "setup.sh").touch()
-    (sdk_path / ".esphome_base_complete").touch()
-
-
 @pytest.fixture
-def linux_host(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The SDK archive name is picked from sys.platform, which is unsupported on Windows."""
-    monkeypatch.setattr(sys, "platform", "linux")
+def mock_download() -> Iterator[MagicMock]:
+    """download_and_extract() as seen by the installer; it creates the extract dir."""
 
+    def _extract(*args: Any, **kwargs: Any) -> str:
+        Path(args[3]).mkdir(parents=True, exist_ok=True)
+        return "https://example.com/archive"
 
-@pytest.fixture
-def mock_sdk_download_ops(linux_host: None) -> Iterator[tuple[MagicMock, MagicMock]]:
-    """Patch the download/extract seams -- download_and_extract() resolves its
-    internals in framework_helpers, matching how nrf52's own check_and_install
-    tests are patched."""
     with (
-        patch(
-            "esphome.framework_helpers.download_from_mirrors",
-            return_value="https://example.com/zephyr-sdk-0.17.4_linux-x86_64_minimal.tar.xz",
-        ) as mock_download,
-        patch(
-            "esphome.framework_helpers.archive_extract_all", side_effect=_fake_extract
-        ) as mock_extract,
+        patch.object(sdk_install, "download_and_extract", side_effect=_extract) as m,
+        patch.object(
+            sdk_install,
+            "get_sdk_host_info",
+            return_value=("linux", "x86_64", "tar.xz"),
+        ),
     ):
-        yield mock_download, mock_extract
+        yield m
 
 
-def test_check_and_install_downloads_when_sdk_path_missing(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
+def test_check_and_install_downloads_minimal_and_toolchain(
+    tmp_path: Path, mock_download: MagicMock
 ) -> None:
-    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
-    mock_download, mock_extract = mock_sdk_download_ops
     framework = _make_framework(tmp_path)
-    sdk_path = _sdk_install_dir("0.17.4")
+    sdk_path = _sdk_install_dir("1.0.1", TOOLCHAIN)
 
-    with patch("subprocess.run") as mock_subprocess_run:
-        mock_subprocess_run.return_value.returncode = 0
-        result = check_and_install(framework, toolchain="riscv64-zephyr-elf")
+    assert check_and_install(framework, toolchain=TOOLCHAIN) == sdk_path
 
-    mock_download.assert_called_once()
-    mock_extract.assert_called_once()
-    assert result == sdk_path
-    assert (sdk_path / ".esphome_base_complete").exists()
-    assert (sdk_path / ".esphome_complete_riscv64-zephyr-elf").exists()
+    (minimal, toolchain) = mock_download.call_args_list
+    assert minimal.args[0] == sdk_install.SDK_NG_MINIMAL_MIRRORS
+    assert minimal.args[2] == sdk_path.with_name(f"{sdk_path.name}.minimal.archive")
+    assert minimal.args[3] == sdk_path
+    assert toolchain.args[0] == sdk_install.SDK_NG_TOOLCHAIN_GNU_MIRRORS
+    assert toolchain.args[1] == {
+        "VERSION": "1.0.1",
+        "sysname": "linux",
+        "machine": "x86_64",
+        "extension": "tar.xz",
+        "toolchain": TOOLCHAIN,
+    }
+    assert toolchain.args[3] == sdk_path / "gnu" / TOOLCHAIN
+    assert (sdk_path / ".ready").exists()
 
 
-def test_check_and_install_skips_download_when_sentinel_exists(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
+def test_check_and_install_skips_when_ready(
+    tmp_path: Path, mock_download: MagicMock
 ) -> None:
-    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
-    mock_download, mock_extract = mock_sdk_download_ops
     framework = _make_framework(tmp_path)
-    sdk_path = _sdk_install_dir("0.17.4")
+    sdk_path = _sdk_install_dir("1.0.1", TOOLCHAIN)
     sdk_path.mkdir(parents=True)
-    (sdk_path / ".esphome_complete_riscv64-zephyr-elf").touch()
+    (sdk_path / ".ready").touch()
 
-    check_and_install(framework, toolchain="riscv64-zephyr-elf")
+    with patch("filelock.FileLock") as file_lock:
+        check_and_install(framework, toolchain=TOOLCHAIN)
 
+    file_lock.assert_not_called()
     mock_download.assert_not_called()
-    mock_extract.assert_not_called()
 
 
-def test_check_and_install_locks_only_while_missing(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
+def test_check_and_install_locks_per_sdk_and_toolchain(
+    tmp_path: Path, mock_download: MagicMock
 ) -> None:
-    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
     framework = _make_framework(tmp_path)
-    sdk_path = _sdk_install_dir("0.17.4")
 
-    with patch("filelock.FileLock") as file_lock, patch("subprocess.run") as run:
-        run.return_value.returncode = 0
-        check_and_install(framework, toolchain="riscv64-zephyr-elf")
-        lock_files = [Path(c.args[0]).name for c in file_lock.call_args_list]
-        assert lock_files == ["zephyr-sdk-0.17.4.lock"]
+    with patch("filelock.FileLock") as file_lock:
+        check_and_install(framework, toolchain=TOOLCHAIN)
 
-        file_lock.reset_mock()
-        check_and_install(framework, toolchain="riscv64-zephyr-elf")
-        file_lock.assert_not_called()
-    assert (sdk_path / ".esphome_complete_riscv64-zephyr-elf").exists()
+    lock_files = [Path(c.args[0]).name for c in file_lock.call_args_list]
+    assert lock_files == [f"toolchain-zephyr-sdk-1.0.1-{TOOLCHAIN}.lock"]
 
 
 def test_check_and_install_skips_install_finished_while_waiting(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
+    tmp_path: Path, mock_download: MagicMock
 ) -> None:
-    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
-    mock_download, _ = mock_sdk_download_ops
     framework = _make_framework(tmp_path)
-    sdk_path = _sdk_install_dir("0.17.4")
-    sentinel = sdk_path / ".esphome_complete_riscv64-zephyr-elf"
+    sdk_path = _sdk_install_dir("1.0.1", TOOLCHAIN)
 
     def _other_build_installs(*args: Any, **kwargs: Any) -> MagicMock:
-        sentinel.parent.mkdir(parents=True, exist_ok=True)
-        sentinel.touch()
+        sdk_path.mkdir(parents=True, exist_ok=True)
+        (sdk_path / ".ready").touch()
         return MagicMock()
 
-    with (
-        patch("filelock.FileLock", side_effect=_other_build_installs),
-        patch("subprocess.run") as run,
-    ):
-        assert check_and_install(framework, toolchain="riscv64-zephyr-elf") == sdk_path
+    with patch("filelock.FileLock", side_effect=_other_build_installs):
+        assert check_and_install(framework, toolchain=TOOLCHAIN) == sdk_path
 
     mock_download.assert_not_called()
-    run.assert_not_called()
 
 
-def test_check_and_install_reuses_sdk_path_for_a_second_toolchain(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
+def test_check_and_install_removes_an_unfinished_install(
+    tmp_path: Path, mock_download: MagicMock
 ) -> None:
-    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
-    mock_download, mock_extract = mock_sdk_download_ops
+    """A half-extracted toolchain without .ready is removed and installed again."""
     framework = _make_framework(tmp_path)
-    sdk_path = _sdk_install_dir("0.17.4")
-    _make_complete_base(sdk_path)
-    (sdk_path / ".esphome_complete_arm-zephyr-eabi").touch()
+    sdk_path = _sdk_install_dir("1.0.1", TOOLCHAIN)
+    leftover = sdk_path / "gnu" / TOOLCHAIN / "half-extracted"
+    leftover.parent.mkdir(parents=True)
+    leftover.touch()
 
-    with patch("subprocess.run") as mock_subprocess_run:
-        mock_subprocess_run.return_value.returncode = 0
-        check_and_install(framework, toolchain="riscv64-zephyr-elf")
+    check_and_install(framework, toolchain=TOOLCHAIN)
 
-    mock_download.assert_not_called()
-    mock_extract.assert_not_called()
-    assert (sdk_path / ".esphome_complete_riscv64-zephyr-elf").exists()
+    assert not leftover.exists()
+    assert mock_download.call_count == 2
+    assert (sdk_path / ".ready").exists()
 
 
-def test_check_and_install_reextracts_partial_sdk_path(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
+def test_check_and_install_no_marker_on_extract_failure(
+    tmp_path: Path, mock_download: MagicMock
 ) -> None:
-    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
-    mock_download, mock_extract = mock_sdk_download_ops
     framework = _make_framework(tmp_path)
-    sdk_path = _sdk_install_dir("0.17.4")
-    sdk_path.mkdir(parents=True)
-    (sdk_path / "partial_leftover").touch()
+    sdk_path = _sdk_install_dir("1.0.1", TOOLCHAIN)
+    mock_download.side_effect = ValueError("Unsupported archive format")
 
-    with patch("subprocess.run") as mock_subprocess_run:
-        mock_subprocess_run.return_value.returncode = 0
-        check_and_install(framework, toolchain="riscv64-zephyr-elf")
+    with pytest.raises(ValueError, match="Unsupported archive format"):
+        check_and_install(framework, toolchain=TOOLCHAIN)
 
-    mock_download.assert_called_once()
-    mock_extract.assert_called_once()
-    assert not (sdk_path / "partial_leftover").exists()
-    assert (sdk_path / ".esphome_base_complete").exists()
-    assert (sdk_path / ".esphome_complete_riscv64-zephyr-elf").exists()
-
-
-def test_check_and_install_raises_without_setup_script(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
-) -> None:
-    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
-    framework = _make_framework(tmp_path)
-    sdk_path = _sdk_install_dir("0.17.4")
-    _make_complete_base(sdk_path)
-    (sdk_path / "setup.sh").unlink()
-
-    with pytest.raises(RuntimeError, match="no setup.sh"):
-        check_and_install(framework, toolchain="riscv64-zephyr-elf")
-
-    assert not (sdk_path / ".esphome_complete_riscv64-zephyr-elf").exists()
+    assert not (sdk_path / ".ready").exists()
 
 
 def test_check_and_install_raises_without_sdk_version(tmp_path: Path) -> None:
     """A workspace with no SDK_VERSION file names the file it could not read."""
     with pytest.raises(RuntimeError, match="Cannot read SDK_VERSION"):
-        check_and_install(tmp_path, toolchain="riscv64-zephyr-elf")
+        check_and_install(tmp_path, toolchain=TOOLCHAIN)
 
 
-@pytest.mark.usefixtures("linux_host")
-def test_check_and_install_no_base_marker_on_extract_failure(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
+def test_check_and_install_removes_only_stale_partial_downloads(
+    tmp_path: Path, mock_download: MagicMock
 ) -> None:
-    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
+    """Partial downloads untouched for a day go; a fresh one may belong to a running build."""
     framework = _make_framework(tmp_path)
-    sdk_path = _sdk_install_dir("0.17.4")
+    toolchains = _sdk_install_dir("1.0.1", TOOLCHAIN).parent
+    toolchains.mkdir(parents=True)
+    stale = toolchains / "zephyr-sdk-0.17.4-arm-zephyr-eabi.toolchain.archive.part"
+    fresh = toolchains / "zephyr-sdk-1.0.2-arm-zephyr-eabi.toolchain.archive.part"
+    for leftover in (stale, fresh):
+        leftover.write_text("")
+    two_days_ago = time.time() - 2 * 24 * 60 * 60
+    os.utime(stale, (two_days_ago, two_days_ago))
 
-    with (
-        patch(
-            "esphome.framework_helpers.download_from_mirrors",
-            return_value="https://example.com/x.tar.xz",
-        ),
-        patch(
-            "esphome.framework_helpers.archive_extract_all",
-            side_effect=ValueError("Unsupported archive format"),
-        ),
-        pytest.raises(ValueError, match="Unsupported archive format"),
-    ):
-        check_and_install(framework, toolchain="riscv64-zephyr-elf")
+    check_and_install(framework, toolchain=TOOLCHAIN)
 
-    assert not (sdk_path / ".esphome_base_complete").exists()
+    assert not stale.exists()
+    assert fresh.exists()
 
 
-def test_check_and_install_runs_setup_script_with_the_right_arguments(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
+def test_check_and_install_keeps_going_when_a_stale_download_is_locked(
+    tmp_path: Path, mock_download: MagicMock
 ) -> None:
-    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
     framework = _make_framework(tmp_path)
-    sdk_path = _sdk_install_dir("0.17.4")
-    _make_complete_base(sdk_path)
+    toolchains = _sdk_install_dir("1.0.1", TOOLCHAIN).parent
+    toolchains.mkdir(parents=True)
+    stale = toolchains / "zephyr-sdk-0.17.4-arm-zephyr-eabi.toolchain.archive.part"
+    stale.write_text("")
+    os.utime(stale, (0, 0))
 
-    with patch("subprocess.run") as mock_subprocess_run:
-        mock_subprocess_run.return_value.returncode = 0
-        check_and_install(framework, toolchain="riscv64-zephyr-elf")
+    with patch.object(Path, "unlink", side_effect=OSError("in use")):
+        check_and_install(framework, toolchain=TOOLCHAIN)
 
-    assert mock_subprocess_run.call_args.args[0] == [
-        str(sdk_path / "setup.sh"),
-        "-t",
-        "riscv64-zephyr-elf",
-    ]
-    assert mock_subprocess_run.call_args.kwargs["env"]["ZEPHYR_SDK_INSTALL_DIR"] == str(
-        sdk_path
-    )
-
-
-def test_check_and_install_raises_when_setup_script_fails(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
-) -> None:
-    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
-    framework = _make_framework(tmp_path)
-    sdk_path = _sdk_install_dir("0.17.4")
-    _make_complete_base(sdk_path)
-
-    with patch("subprocess.run") as mock_subprocess_run:
-        mock_subprocess_run.return_value.returncode = 3
-        with pytest.raises(RuntimeError, match="setup.sh failed with exit code 3"):
-            check_and_install(framework, toolchain="riscv64-zephyr-elf")
-
-    assert not (sdk_path / ".esphome_complete_riscv64-zephyr-elf").exists()
-
-
-def test_check_and_install_rejects_unsupported_cpu(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
-) -> None:
-    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
-    framework = _make_framework(tmp_path)
-    mock_download, _mock_extract = mock_sdk_download_ops
-
-    with (
-        patch("platform.machine", return_value="riscv64"),
-        pytest.raises(RuntimeError, match="Unsupported CPU architecture"),
-    ):
-        check_and_install(framework, toolchain="riscv64-zephyr-elf")
-
-    mock_download.assert_not_called()
-
-
-def test_check_and_install_rejects_unsupported_os(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
-) -> None:
-    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
-    monkeypatch.setattr(sys, "platform", "freebsd14")
-    framework = _make_framework(tmp_path)
-
-    with pytest.raises(RuntimeError, match="Unsupported OS for Zephyr SDK"):
-        check_and_install(framework, toolchain="riscv64-zephyr-elf")
-
-
-def test_check_and_install_picks_the_macos_arm_archive(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
-) -> None:
-    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
-    monkeypatch.setattr(sys, "platform", "darwin")
-    framework = _make_framework(tmp_path)
-    mock_download, _mock_extract = mock_sdk_download_ops
-
-    with (
-        patch("platform.machine", return_value="arm64"),
-        patch("subprocess.run") as mock_subprocess_run,
-    ):
-        mock_subprocess_run.return_value.returncode = 0
-        check_and_install(framework, toolchain="riscv64-zephyr-elf")
-
-    assert mock_download.call_args.args[1] == {
-        "VERSION": "0.17.4",
-        "sysname": "macos",
-        "machine": "aarch64",
-        "extension": "tar.xz",
-    }
-
-
-def test_check_and_install_picks_the_windows_7z_archive(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
-) -> None:
-    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
-    monkeypatch.setattr(sys, "platform", "win32")
-    framework = _make_framework(tmp_path)
-    mock_download, _mock_extract = mock_sdk_download_ops
-
-    with (
-        patch("platform.machine", return_value="AMD64"),
-        patch("subprocess.run") as mock_subprocess_run,
-    ):
-        mock_subprocess_run.return_value.returncode = 0
-        # The fake extraction only creates setup.sh; Windows needs setup.cmd.
-        with patch(
-            "esphome.framework_helpers.archive_extract_all",
-            side_effect=_fake_extract_windows,
-        ):
-            check_and_install(framework, toolchain="arm-zephyr-eabi")
-
-    assert mock_download.call_args.args[1] == {
-        "VERSION": "0.17.4",
-        "sysname": "windows",
-        "machine": "x86_64",
-        "extension": "7z",
-    }
-
-
-def test_check_and_install_windows_arm_uses_the_x64_archive(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
-) -> None:
-    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
-    monkeypatch.setattr(sys, "platform", "win32")
-    framework = _make_framework(tmp_path)
-    mock_download, _mock_extract = mock_sdk_download_ops
-
-    with (
-        patch("platform.machine", return_value="ARM64"),
-        patch("subprocess.run") as mock_subprocess_run,
-        patch(
-            "esphome.framework_helpers.archive_extract_all",
-            side_effect=_fake_extract_windows,
-        ),
-    ):
-        mock_subprocess_run.return_value.returncode = 0
-        check_and_install(framework, toolchain="arm-zephyr-eabi")
-
-    assert mock_download.call_args.args[1]["machine"] == "x86_64"
-
-
-def test_check_and_install_runs_setup_cmd_with_slash_options_on_windows(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
-) -> None:
-    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
-    monkeypatch.setattr(sys, "platform", "win32")
-    framework = _make_framework(tmp_path)
-    sdk_path = _sdk_install_dir("0.17.4")
-    sdk_path.mkdir(parents=True)
-    (sdk_path / "setup.cmd").touch()
-    (sdk_path / ".esphome_base_complete").touch()
-
-    with patch("subprocess.run") as mock_subprocess_run:
-        mock_subprocess_run.return_value.returncode = 0
-        check_and_install(framework, toolchain="arm-zephyr-eabi")
-
-    assert mock_subprocess_run.call_args.args[0] == [
-        str(sdk_path / "setup.cmd"),
-        "/t",
-        "arm-zephyr-eabi",
-    ]
-    assert (sdk_path / ".esphome_complete_arm-zephyr-eabi").exists()
-
-
-def test_check_and_install_raises_without_setup_cmd_on_windows(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    mock_sdk_download_ops: tuple[MagicMock, MagicMock],
-) -> None:
-    monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path / "cache"))
-    monkeypatch.setattr(sys, "platform", "win32")
-    framework = _make_framework(tmp_path)
-    sdk_path = _sdk_install_dir("0.17.4")
-    sdk_path.mkdir(parents=True)
-    (sdk_path / ".esphome_base_complete").touch()
-
-    with pytest.raises(RuntimeError, match="no setup.cmd"):
-        check_and_install(framework, toolchain="arm-zephyr-eabi")
+    assert (_sdk_install_dir("1.0.1", TOOLCHAIN) / ".ready").exists()
