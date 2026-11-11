@@ -9,9 +9,9 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
+from esphome.components.nrf.zephyr_variants import nrf52
 from esphome.components.zephyr import reset_over_usb, upload_program
 from esphome.components.zephyr.const import KEY_ZEPHYR
-from esphome.components.zephyr.variants import nrf52
 from esphome.const import (
     CONF_FRAMEWORK,
     CONF_OTA,
@@ -417,7 +417,7 @@ async def test_dfu_to_code_without_a_reset_pin_uses_gpregret() -> None:
 
 @pytest.mark.asyncio
 async def test_bootsel_touch_to_code_subscribes_to_the_usb_component() -> None:
-    from esphome.components.zephyr.variants import rpi_pico_family
+    from esphome.components.rp2.zephyr_variants import rpi_pico_family
 
     advanced = {"bootsel_touch": "touch_id", "usb_baud_rate": "usb_id"}
     with (

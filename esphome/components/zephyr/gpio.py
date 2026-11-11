@@ -24,19 +24,21 @@ if TYPE_CHECKING:
 
 ZephyrGPIOPin = zephyr_ns.class_("ZephyrGPIOPin", cg.InternalGPIOPin)
 
-# Explicit allowlist, not a default-on fallback: future non-Nordic families (e.g.
-# STM32's GPIOA/GPIOB port letters) may use a different port-bank scheme entirely.
-_PORT_BANKED_FAMILIES = {"nordic"}
-
 _LETTERED_PIN_RE = re.compile(r"P([A-Za-z])(\d+)")
 _DOTTED_PIN_RE = re.compile(r"P(\d+)\.(\d+)")
-# Renesas RA's own notation: port digit + 2-digit zero-padded pin, no separator
-# (e.g. "P106" = port 1 pin 06).
+# Port-banked notations a family names in its PIN_NOTATION: "dotted" is "P0.02",
+# "concat" is port digit + 2-digit pin ("P106" = port 1 pin 06), "underscore" is
+# "P4_18". Without one, a family uses lettered ports or flat GPIO numbers.
 _CONCAT_PIN_RE = re.compile(r"P(\d)(\d{2})")
-_CONCAT_PORT_FAMILIES = {"renesas"}
-# NXP's own notation: port and pin joined by an underscore (e.g. "P4_18").
 _UNDERSCORE_PIN_RE = re.compile(r"P(\d+)_(\d+)")
-_UNDERSCORE_PORT_FAMILIES = {"nxp"}
+
+
+def _pin_notation(variant_info: "ZephyrVariant | None") -> str | None:
+    if variant_info is None or variant_info.family is None:
+        return None
+    from .variants import get_family_module
+
+    return getattr(get_family_module(variant_info.family), "PIN_NOTATION", None)
 
 
 def _check_lettered_port(pin: int) -> int:
@@ -64,7 +66,7 @@ def _validate_gpio_pin(value):
     # Accept a flat integer, GPIO<N> notation, or the variant's own vendor pin
     # nomenclature -- for variants with lettered GPIO ports (gpio_port_labels set,
     # e.g. Silicon Labs' PA/PB/PC/PD) that's "PA4"; for port-banked families without
-    # letters (gpio.py's own _PORT_BANKED_FAMILIES, e.g. Nordic) that's the "P0.02"
+    # letters (PIN_NOTATION "dotted", e.g. Nordic) that's the "P0.02"
     # style dump_summary() already prints back in logs.
     if isinstance(value, int):
         return _check_lettered_port(value)
@@ -105,7 +107,7 @@ def _validate_gpio_pin(value):
             from .variants import VARIANTS
 
             variant_info = VARIANTS.get(zephyr_data().get("variant"))
-            if variant_info is None or variant_info.family not in _PORT_BANKED_FAMILIES:
+            if _pin_notation(variant_info) != "dotted":
                 raise cv.Invalid(
                     f"'{value}' is not a valid pin: this variant does not use "
                     f"'P<port>.<pin>' notation."
@@ -122,7 +124,7 @@ def _validate_gpio_pin(value):
             from .variants import VARIANTS
 
             variant_info = VARIANTS.get(zephyr_data().get("variant"))
-            if variant_info is None or variant_info.family not in _CONCAT_PORT_FAMILIES:
+            if _pin_notation(variant_info) != "concat":
                 raise cv.Invalid(
                     f"'{value}' is not a valid pin: this variant does not use "
                     f"'P<port><pin>' notation."
@@ -139,10 +141,7 @@ def _validate_gpio_pin(value):
             from .variants import VARIANTS
 
             variant_info = VARIANTS.get(zephyr_data().get("variant"))
-            if (
-                variant_info is None
-                or variant_info.family not in _UNDERSCORE_PORT_FAMILIES
-            ):
+            if _pin_notation(variant_info) != "underscore":
                 raise cv.Invalid(
                     f"'{value}' is not a valid pin: this variant does not use "
                     f"'P<port>_<pin>' notation."
@@ -177,12 +176,13 @@ def _pin_name_prefix(
         # Lettered ports (e.g. Silicon Labs' gpioa/gpiob/...) use that vendor's own
         # pin-naming convention directly -- "PA5", not Nordic's "P0.05" style.
         return f"P{port_labels[port].upper()}", False
-    if variant_info.family in _PORT_BANKED_FAMILIES:
+    notation = _pin_notation(variant_info)
+    if notation == "dotted":
         return f"P{port}.", False
-    if variant_info.family in _CONCAT_PORT_FAMILIES:
-        # Renesas RA's own notation always zero-pads the pin to 2 digits (P106, not P16).
+    if notation == "concat":
+        # Always zero-pads the pin to 2 digits (P106, not P16).
         return f"P{port}", True
-    if variant_info.family in _UNDERSCORE_PORT_FAMILIES:
+    if notation == "underscore":
         return f"P{port}_", False
     return None, False
 

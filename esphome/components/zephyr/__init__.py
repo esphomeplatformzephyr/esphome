@@ -6,7 +6,7 @@ from pathlib import Path
 import re
 import subprocess
 import textwrap
-from typing import NamedTuple, NotRequired, TypedDict
+from typing import Any, NamedTuple, NotRequired, TypedDict
 
 import yaml
 
@@ -135,6 +135,7 @@ from .variants import (
     ZephyrModule,
     ZephyrModuleTemplate,
     ZephyrSDK,
+    get_family_module,
     get_variant_module,
     resolve_sdk,
     set_core_data,
@@ -789,34 +790,12 @@ def zephyr_add_blobs(module: str, allow_regex: str, sentinel_name: str) -> None:
         zephyr_data()["blobs"].append(spec)
 
 
-def _get_family_module(family: str):
-    if family == "esp32":
-        from .variants import esp32_family as mod
-    elif family == "nordic":
-        from .variants import nordic_family as mod
-    elif family == "silabs":
-        from .variants import silabs_family as mod
-    elif family == "silabs_siwx91x":
-        from .variants import silabs_siwx91x_family as mod
-    elif family == "stm32":
-        from .variants import stm32_family as mod
-    elif family == "renesas":
-        from .variants import renesas_family as mod
-    elif family == "rpi_pico":
-        from .variants import rpi_pico_family as mod
-    elif family == "nxp":
-        from .variants import nxp_family as mod
-    else:
-        raise ValueError(f"Unknown zephyr family: {family!r}")
-    return mod
-
-
 def zephyr_family_uart_drivers() -> frozenset[str]:
     """Software UART drivers (devicetree compatibles) the active family supports.
     Empty without a family (platform: nrf52)."""
     if (family := zephyr_variant_family()) is None:
         return frozenset()
-    return _get_family_module(family).UART_DRIVERS
+    return get_family_module(family).UART_DRIVERS
 
 
 def zephyr_west_hals(sdk: ZephyrSDK) -> frozenset[str] | None:
@@ -824,7 +803,7 @@ def zephyr_west_hals(sdk: ZephyrSDK) -> frozenset[str] | None:
     unfiltered (NCS, Silicon Labs' SDK, no family)."""
     if sdk is not MAINLINE or (family := zephyr_variant_family()) is None:
         return None
-    return _get_family_module(family).WEST_HALS
+    return get_family_module(family).WEST_HALS
 
 
 def _base_to_code(config: ConfigType) -> None:
@@ -897,9 +876,9 @@ def _base_to_code(config: ConfigType) -> None:
 
 
 def _main_stack_to_code(config: ConfigType) -> None:
-    # Espressif matches platform: esp32's 8192 loop task; UDP OTA overflows 4096
+    family = zephyr_variant_family()
     default_stack = (
-        8192 if zephyr_variant_family() in ("esp32", "nordic", "rpi_pico") else 4096
+        getattr(get_family_module(family), "MAIN_STACK_SIZE", 4096) if family else 4096
     )
     zephyr_add_prj_conf(
         "MAIN_STACK_SIZE",
@@ -935,12 +914,7 @@ def _watchdog_to_code(config: ConfigType) -> None:
         # Identifies the stalled thread on the console from the watchdog callback (see
         # hal.cpp) -- without THREAD_NAME, k_thread_name_get() just returns NULL.
         zephyr_add_prj_conf("THREAD_NAME", True)
-        # arch_stack_walk() isn't implemented for Xtensa (ESP32, S3); the call
-        # would silently do nothing there.
-        # Platform components import this package, so their constants load late.
-        from esphome.components.esp32.const import VARIANT_ESP32, VARIANT_ESP32S3
-
-        if zephyr_variant() not in (VARIANT_ESP32, VARIANT_ESP32S3):
+        if VARIANTS[zephyr_variant()].arch_stack_walk:
             cg.add_define("USE_ZEPHYR_ARCH_STACKWALK")
 
 
@@ -1814,7 +1788,7 @@ async def zephyr_toolchain_to_code(config: ConfigType) -> None:
     _base_to_code(config)
     family = zephyr_variant_family()
     if family is not None:
-        _get_family_module(family).to_code(config)
+        get_family_module(family).to_code(config)
     await get_variant_module(variant).to_code(config)
 
 
@@ -1844,7 +1818,7 @@ def _restore_upload_data(zephyr_config: ConfigType) -> None:
     set_core_data(
         variant,
         zephyr_config[CONF_BOARD],
-        _get_family_module(variant_data.family).bootloader(advanced)
+        get_family_module(variant_data.family).bootloader(advanced)
         if variant_data.family
         else "",
         CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION],
@@ -1858,6 +1832,21 @@ def _restore_upload_data(zephyr_config: ConfigType) -> None:
     )
 
 
+def _variant_hook(name: str, default: Any = None) -> Any:
+    """The active variant's module attribute `name`, the way its family and variant
+    modules plug optional behaviour into upload, reset and compile."""
+    if (variant := zephyr_variant()) is None:
+        return default
+    return getattr(get_variant_module(variant), name, default)
+
+
+def _family_hook(name: str, default: Any = None) -> Any:
+    """The active family's module attribute `name`; see _variant_hook()."""
+    if (family := zephyr_variant_family()) is None:
+        return default
+    return getattr(get_family_module(family), name, default)
+
+
 def reset_over_usb(config: ConfigType, port: str, timeout: float = 10.0) -> bool:
     """Restart a running device by opening its USB serial port at 2001 baud, then wait
     for the port to disappear and come back. Returns False, sending nothing, if the
@@ -1866,11 +1855,7 @@ def reset_over_usb(config: ConfigType, port: str, timeout: float = 10.0) -> bool
 
     import serial  # noqa: PLC0415
 
-    from esphome.components.nrf.const import VARIANT_NRF52  # noqa: PLC0415
-    from esphome.components.stm32.const import VARIANT_STM32C5  # noqa: PLC0415
     from esphome.util import get_serial_ports  # noqa: PLC0415
-
-    from .variants.nrf52 import CONF_DFU  # noqa: PLC0415
 
     if KEY_ZEPHYR not in CORE.data:
         # Best effort: logs do not need a compiled build, so do not fail them.
@@ -1880,20 +1865,8 @@ def reset_over_usb(config: ConfigType, port: str, timeout: float = 10.0) -> bool
             _LOGGER.debug("Skipping USB reset: %s", err)
             return False
 
-    from .variants import stm32c5
-
-    has_handler = (
-        zephyr_variant_family() == "rpi_pico"
-        or (
-            zephyr_variant() == VARIANT_NRF52
-            and config[CORE.target_platform][CONF_FRAMEWORK]
-            .get(CONF_ADVANCED, {})
-            .get(CONF_DFU)
-            is not None
-        )
-        or (zephyr_variant() == VARIANT_STM32C5 and stm32c5.uses_tinyuf2())
-    )
-    if not has_handler:
+    has_usb_reset = _variant_hook("has_usb_reset") or _family_hook("has_usb_reset")
+    if has_usb_reset is None or not has_usb_reset(config):
         return False
     try:
         with serial.Serial(port, baudrate=2001):
@@ -2032,8 +2005,6 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
             )
         _restore_upload_data(zephyr_config)
 
-    from esphome.components.nrf.const import VARIANT_NRF52
-    from esphome.components.stm32.const import VARIANT_STM32C5
     from esphome.upload_targets import PortType, get_port_type
 
     if host == "PYOCD" or get_port_type(host) in (PortType.SERIAL, PortType.BOOTSEL):
@@ -2043,17 +2014,12 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
         check_bootloader_built(CORE.relative_build_path(".west_build"))
 
     if host == "BOOTSEL":
-        from .variants import rpi_pico_family
-
-        if zephyr_data().get(KEY_RUNNER):
-            _LOGGER.info(
-                "Configured advanced.runner has no effect on BOOTSEL/picotool flashing"
-            )
-        return rpi_pico_family.upload_using_picotool()
+        upload_bootsel = _family_hook("upload_bootsel")
+        return upload_bootsel is not None and upload_bootsel()
 
     if host == "PYOCD":
-        if zephyr_variant_family() == "esp32":
-            return False  # PYOCD isn't supported on esp32-family; it flashes over serial instead
+        if not _family_hook("PYOCD_UPLOAD", True):
+            return False
 
         configured_runner = zephyr_data().get(KEY_RUNNER)
         if configured_runner and configured_runner != "pyocd":
@@ -2082,44 +2048,23 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
             raise EsphomeError("Zephyr pyocd flash failed")
         return True
 
-    # XIAO STM32C5's TinyUF2 bootloader: 1200-baud touch, then write zephyr.uf2 to its disk.
-    if zephyr_variant() == VARIANT_STM32C5:
-        from .variants import stm32c5
-
-        if stm32c5.uses_tinyuf2() and get_port_type(host) == PortType.SERIAL:
-            return stm32c5.upload_program(host)
-
-    # nRF52 with an Adafruit bootloader: BLE DFU, or 1200-baud touch then serial DFU.
-    if zephyr_variant() == VARIANT_NRF52:
-        from .variants import nrf52
-
-        if nrf52.upload_adafruit_ble(config, host):
-            return True
-        if nrf52.uses_serial_dfu() and get_port_type(host) == PortType.SERIAL:
-            return nrf52.upload_serial_dfu(host)
+    # A variant's own bootloader (TinyUF2, an Adafruit nRF52 bootloader) goes first;
+    # None means it did not handle this upload.
+    if (upload_bootloader := _variant_hook("upload_bootloader")) is not None and (
+        result := upload_bootloader(config, args, host)
+    ) is not None:
+        return result
 
     if _upload_mcumgr(config, args, host):
         return True
 
-    # rpi_pico-family variants (RP2040/RP2350) given a normal serial port instead of
-    # BOOTSEL: the board's default west runner (uf2) only works once already in
-    # BOOTSEL, so trigger that ourselves first via the 1200-baud touch (see
-    # USE_ZEPHYR_BOOTSEL_TOUCH), then flash the same way `--device BOOTSEL` would.
-    if zephyr_variant_family() == "rpi_pico":
-        from .variants import rpi_pico_family
+    # A family with its own upload flow (rpi_pico's 1200-baud touch, esp32's
+    # esptool runner) decides the result.
+    if (family_upload := _family_hook("upload_program")) is not None:
+        return family_upload(config, args, host)
 
-        return rpi_pico_family.upload_program(host)
-
-    # Every esp32-family variant flashes the same way: Zephyr's generic esp32
-    # runner (runners/esp32.py, wrapping esptool) via `west flash`.
-    if zephyr_variant_family() == "esp32":
-        from .variants import esp32_family
-
-        return esp32_family.upload_program(host, args)
-
-    # Non-ESP32 Zephyr variants (for example EFR32/nRF in SDK-Zephyr mode) are
-    # generally flashed by the board's default west runner (jlink, pyocd, etc.)
-    # rather than esptool over a selected serial port.
+    # Every other family is flashed by the board's default west runner (jlink,
+    # pyocd, etc.) rather than over a selected serial port.
     if get_port_type(host) != PortType.SERIAL:
         return False
 
@@ -2164,7 +2109,6 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
 
 
 def run_compile(args, config: ConfigType) -> bool:
-    from esphome.components.nrf.const import VARIANT_NRF52
 
     from .library import generate_zephyr_modules
 
@@ -2241,11 +2185,8 @@ def run_compile(args, config: ConfigType) -> bool:
     from .mcuboot import check_mcuboot_swap_limit
 
     check_mcuboot_swap_limit(build_dir, CORE.firmware_bin)
-    if zephyr_variant() == VARIANT_NRF52:
-        from .variants import nrf52
-
-        if nrf52.uses_serial_dfu():
-            nrf52.build_dfu_package(python_bin, west_env)
+    if (post_build := _variant_hook("post_build")) is not None:
+        post_build(python_bin, west_env)
 
     from esphome.build_helpers.idedata import warn_if_idedata_missing
 

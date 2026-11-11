@@ -1,4 +1,4 @@
-"""Unit tests for esphome.components.zephyr.variants.rpi_pico_family."""
+"""Unit tests for esphome.components.rp2.zephyr_variants.rpi_pico_family."""
 
 from __future__ import annotations
 
@@ -8,7 +8,9 @@ from unittest.mock import MagicMock, patch
 
 import serial
 
-from esphome.components.zephyr.variants.rpi_pico_family import touch_1200_baud_reboot
+from esphome.components.rp2.zephyr_variants.rpi_pico_family import (
+    touch_1200_baud_reboot,
+)
 
 _TARGET = "/dev/ttyACM0"
 
@@ -44,7 +46,7 @@ def _run_touch(
         clock = patch("time.monotonic", side_effect=[0.0, 0.2, 0.4])
     with (
         patch(
-            "esphome.components.zephyr.variants.rpi_pico_family.find_picotool",
+            "esphome.components.rp2.zephyr_variants.rpi_pico_family.find_picotool",
             return_value=picotool,
         ),
         patch("serial.tools.list_ports.comports", return_value=ports),

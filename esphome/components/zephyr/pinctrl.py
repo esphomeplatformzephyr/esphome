@@ -9,11 +9,10 @@ of them."""
 from collections.abc import Callable
 import logging
 
-import esphome.config_validation as cv
 from esphome.core import EsphomeError
 
 from .gpio import pin_summary
-from .variants import VARIANTS
+from .variants import VARIANTS, get_family_module
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -348,27 +347,18 @@ def zephyr_setup_uart_pinctrl(
         )
         return _BOARD_DEFAULT, _BOARD_DEFAULT
 
-    prefix = port_label.upper()
     family = zephyr_variant_family()
-    if family == "nordic":
-        from .variants import nordic_family as family_module
-
-        prefix = "UART"
-    elif family == "silabs":
-        from .variants import silabs_family as family_module
-    elif family == "esp32":
-        from .variants import esp32_family as family_module
-    elif family == "rpi_pico":
-        from .variants import rpi_pico_family as family_module
-    else:
-        # No overlay-generation branch for this family -- don't silently ignore the
+    family_module = get_family_module(family) if family else None
+    if family_module is None or not hasattr(family_module, "uart_pinctrl"):
+        # The family generates no UART pinctrl overlay -- don't silently ignore the
         # pins. Every family with uart_valid_pins/uart_valid_pins_by_instance set
-        # (the only way validate_zephyr_config lets tx_pin/rx_pin through) is
-        # already handled above, so this should be unreachable in practice.
+        # (the only way validate_zephyr_config lets tx_pin/rx_pin through) has
+        # uart_pinctrl, so this should be unreachable in practice.
         raise EsphomeError(
             f"tx_pin:/rx_pin: are not supported for UART on this Zephyr variant "
             f"('{zephyr_variant()}') -- remove them to use the board's default UART pins."
         )
+    prefix = getattr(family_module, "UART_PREFIX", port_label.upper())
 
     tx_value = family_module.pin_macro(prefix, "TX", tx_pin, zephyr_variant())
     rx_value = family_module.pin_macro(prefix, "RX", rx_pin, zephyr_variant())
@@ -431,13 +421,10 @@ def zephyr_setup_i2c_pinctrl(
     own name (e.g. "GPIO37, PC5") for whichever pin was actually given, "board default" for
     whichever wasn't (independently, not all-or-nothing: giving only one remaps
     just that signal, leaving the other at the board's own existing wiring)."""
-    from esphome.components.esp32.const import VARIANT_ESP32  # noqa: PLC0415
-
     from . import (  # noqa: PLC0415 -- avoids circular import at module load
         _require_zephyr_toolchain,
         zephyr_add_overlay,
         zephyr_data,
-        zephyr_variant,
         zephyr_variant_family,
     )
 
@@ -454,56 +441,16 @@ def zephyr_setup_i2c_pinctrl(
 
     family = zephyr_variant_family()
     role_values: dict[str, str] = {}
-    prefix = bus_label.upper()
-    if family == "nordic":
-        from .variants import nordic_family as family_module
-
-        # Resolved via DTS first like esp32/silabs, in case a board ever does
-        # pre-wire it.
-        prefix = "TWIM"
-    elif family == "esp32":
-        from .variants import esp32_family as family_module
-
-        if zephyr_variant() == VARIANT_ESP32 and (sda is None) != (scl is None):
-            # Original ESP32's software bus-clear needs a real sda-gpios/scl-gpios
-            # pair below -- it can't express "leave it as-is" as a GPIO phandle.
-            raise EsphomeError(
-                "sda: and scl: must be given together for I2C on original ESP32 -- "
-                "its software bus-clear workaround needs both real pin numbers."
-            )
-    elif family == "silabs":
-        # Silabs macros are lettered-port form ({BUS}_{SIGNAL}_P{port}{n}, e.g.
-        # I2C0_SDA_PC5), not ESP32's flat GPIO{n}.
-        from .variants import silabs_family as family_module
-    elif family == "rpi_pico":
-        from .variants import rpi_pico_family as family_module
-
-        # Each pin is tied to one fixed I2C instance+role -- both are needed
-        # together to even know which instance is being targeted.
-        if sda is None or scl is None:
-            raise EsphomeError(
-                f"sda: and scl: must be given together for I2C on '{bus_label}' "
-                f"({variant_name}) -- its GPIO mux ties each pin to a fixed "
-                "instance+role pair."
-            )
-        instance_pins = VARIANTS[variant_name].i2c_valid_pins_by_instance.get(
-            bus_label.upper()
-        )
-        if (
-            instance_pins is None
-            or sda not in instance_pins.get("sda", frozenset())
-            or scl not in instance_pins.get("scl", frozenset())
-        ):
-            raise EsphomeError(
-                f"GPIO{sda}/GPIO{scl} are not a valid sda:/scl: pair for '{bus_label}' "
-                f"on {variant_name}."
-            )
-    else:
-        # No overlay-generation branch for this family -- don't silently ignore the pins.
+    family_module = get_family_module(family) if family else None
+    if family_module is None or not hasattr(family_module, "i2c_value_role_decoder"):
+        # The family generates no I2C pinctrl overlay -- don't silently ignore the pins.
         raise EsphomeError(
             f"sda:/scl: are not supported for I2C on this Zephyr variant "
             f"('{variant_name}') -- remove them to use the board's default I2C pins."
         )
+    prefix = getattr(family_module, "I2C_PREFIX", bus_label.upper())
+    if (check_pins := getattr(family_module, "i2c_check_pins", None)) is not None:
+        check_pins(bus_label, sda, scl, variant_name)
 
     if sda is not None:
         role_values["sda"] = family_module.pin_macro(prefix, "SDA", sda, variant_name)
@@ -528,16 +475,8 @@ def zephyr_setup_i2c_pinctrl(
         value_role_decoder,
         VARIANTS[variant_name].pinctrl_node_label,
     )
-    if family == "esp32" and zephyr_variant() == VARIANT_ESP32:
-        # sda/scl are both real ints here (raised above otherwise).
-        sda_ctlr, sda_pin = ("gpio1", sda - 32) if sda >= 32 else ("gpio0", sda)
-        scl_ctlr, scl_pin = ("gpio1", scl - 32) if scl >= 32 else ("gpio0", scl)
-        pinctrl_overlay += f"""
-            &{bus_label} {{
-                sda-gpios = <&{sda_ctlr} {sda_pin} GPIO_OPEN_DRAIN>;
-                scl-gpios = <&{scl_ctlr} {scl_pin} GPIO_OPEN_DRAIN>;
-            }};
-        """
+    if (extra_overlay := getattr(family_module, "i2c_extra_overlay", None)) is not None:
+        pinctrl_overlay += extra_overlay(bus_label, sda, scl, variant_name)
     zephyr_add_overlay(pinctrl_overlay)
 
     return sda_display, scl_display
@@ -682,11 +621,11 @@ def zephyr_setup_spi_pinctrl(
     mosi: int | None = None,
     data_pins: list[int] | None = None,
 ) -> None:
-    """Enable the hardware SPI bus node for `bus_label`. esp32/nordic/silabs are
-    free-mux, so clk/miso/mosi/data_pins generate a pinctrl overlay merged into
-    the board's real pinctrl group(s) resolved from DTS (mirrors
-    zephyr_setup_uart_pinctrl()). Every other family (stm32, renesas, rp2040, ...)
-    has no generated overlay -- the board's own pinctrl (if any) is trusted as-is,
+    """Enable the hardware SPI bus node for `bus_label`. For a family with
+    spi_pin_values() (free-mux: esp32/nordic/silabs), clk/miso/mosi/data_pins
+    generate a pinctrl overlay merged into the board's real pinctrl group(s)
+    resolved from DTS (mirrors zephyr_setup_uart_pinctrl()). Every other family
+    (stm32, renesas, rp2040, ...) has no generated overlay -- the board's own pinctrl (if any) is trusted as-is,
     same fallback has_pinctrl_configured() warns about below when it's missing.
     A None pin leaves that signal at the board's default pinctrl entry instead
     of remapping it."""
@@ -719,77 +658,17 @@ def zephyr_setup_spi_pinctrl(
             bus_label,
         )
 
-    if family not in ("esp32", "nordic", "silabs", "silabs_siwx91x"):
-        # stm32, renesas, rp2040, and any other family: no generated pinctrl overlay
-        # -- clk/miso/mosi are irrelevant here, whatever the board (or the user's own
-        # framework: overlays:) already wires is trusted as-is.
+    family_module = get_family_module(family) if family else None
+    if family_module is None or not hasattr(family_module, "spi_pin_values"):
+        # The family generates no SPI pinctrl overlay -- clk/miso/mosi are irrelevant
+        # here, whatever the board (or the user's own framework: overlays:) already
+        # wires is trusted as-is.
         zephyr_add_overlay(f'&{bus_label} {{ status = "okay"; }};')
         return
 
-    if family == "nordic":
-        from .variants import nordic_family as family_module
-
-        prefix = "SPIM"
-        clk_signal, miso_signal, mosi_signal = "SCK", "MISO", "MOSI"
-    elif family == "silabs":
-        from .variants import silabs_family as family_module
-
-        prefix = bus_label.upper()
-        # EUSART's clock signal macro is SCLK, not CLK like classic USART (verified
-        # xg24-pinctrl.h) -- TX/RX names and en_bit values are otherwise identical.
-        clk_signal = "SCLK" if bus_label.startswith("eusart") else "CLK"
-        miso_signal, mosi_signal = "RX", "TX"
-    elif family == "silabs_siwx91x":
-        from .variants import silabs_siwx91x_family as family_module
-
-        # No per-pin macro formula (unlike EFR32/Nordic/ESP32 above/below) --
-        # family_module.pin_macro() looks up spi_pin_macros by these generic
-        # signal keys directly, so prefix is unused here.
-        prefix = None
-        clk_signal, miso_signal, mosi_signal = "clk", "miso", "mosi"
-    else:
-        from .variants import esp32_family as family_module
-
-        valid_instances = family_module.SPI_INSTANCE_SIGNAL_PREFIX.get(
-            zephyr_variant(), {}
-        )
-        instance = (
-            int(bus_label.removeprefix("spi")) if bus_label[3:].isdigit() else None
-        )
-        if instance not in valid_instances:
-            listed = ", ".join(f"spi{n}" for n in sorted(valid_instances))
-            raise cv.Invalid(
-                f"'{bus_label}' is not a valid SPI bus for Zephyr variant "
-                f"{zephyr_variant()!r} -- valid options: {listed}"
-            )
-
-        prefix = f"SPIM{instance}"
-        if data_pins:
-            # Quad mode routes mosi/miso through data_pins[0]/[1] (D0/D1) instead of
-            # separate mosi_pin/miso_pin -- schema forbids the latter for quad.
-            mosi, miso = data_pins[0], data_pins[1]
-        clk_signal, miso_signal, mosi_signal = "SCLK", "MISO", "MOSI"
-
-    values: dict[str, str] = {}
-    if clk is not None:
-        values["clk"] = family_module.pin_macro(
-            prefix, clk_signal, clk, zephyr_variant()
-        )
-    if miso is not None:
-        values["miso"] = family_module.pin_macro(
-            prefix, miso_signal, miso, zephyr_variant()
-        )
-    if mosi is not None:
-        values["mosi"] = family_module.pin_macro(
-            prefix, mosi_signal, mosi, zephyr_variant()
-        )
-    if family == "esp32" and data_pins:
-        # data_pins[2]/[3] are WP/HD, same order as ESP-IDF's
-        # data0_io_num..data3_io_num (spi_esp_idf.cpp).
-        instance_prefix = valid_instances[instance]
-        wp, hd = data_pins[2], data_pins[3]
-        values["wp"] = family_module.spi_quad_macro(wp, instance_prefix, "WP")
-        values["hd"] = family_module.spi_quad_macro(hd, instance_prefix, "HD")
+    values = family_module.spi_pin_values(
+        bus_label, clk, miso, mosi, data_pins, zephyr_variant()
+    )
     resolvers = family_module.spi_pinctrl(board, bus_label)
     property_name = family_module.PROPERTY_NAME
 
@@ -828,3 +707,21 @@ def zephyr_setup_spi_pinctrl(
     )
     if data_pins:
         zephyr_add_prj_conf("SPI_EXTENDED_MODES", True)
+
+
+def spi_signal_values(
+    pin_macro: Callable[[str | None, str, int, str], str],
+    prefix: str | None,
+    signals: tuple[str, str, str],
+    pins: tuple[int | None, int | None, int | None],
+    variant: str,
+) -> dict[str, str]:
+    """clk/miso/mosi pinctrl values from a family's pin_macro, for its
+    spi_pin_values(); `signals` and `pins` are both in (clk, miso, mosi) order."""
+    return {
+        role: pin_macro(prefix, signal, pin, variant)
+        for role, signal, pin in zip(
+            ("clk", "miso", "mosi"), signals, pins, strict=True
+        )
+        if pin is not None
+    }

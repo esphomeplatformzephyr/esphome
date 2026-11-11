@@ -51,10 +51,10 @@ def test_rtt_port_rejected_on_family_without_rtt(
     ["nordic", "stm32", "silabs", "silabs_siwx91x", "rpi_pico", "renesas", "nxp"],
 )
 def test_every_rtt_family_declares_it(family: str) -> None:
-    from esphome.components.zephyr import _get_family_module  # noqa: PLC0415
     from esphome.components.zephyr.const import SEGGER_RTT_UART  # noqa: PLC0415
+    from esphome.components.zephyr.variants import get_family_module  # noqa: PLC0415
 
-    assert SEGGER_RTT_UART in _get_family_module(family).UART_DRIVERS
+    assert SEGGER_RTT_UART in get_family_module(family).UART_DRIVERS
 
 
 def test_rtt_port_rejects_pins(set_core_config: SetCoreConfigCallable) -> None:

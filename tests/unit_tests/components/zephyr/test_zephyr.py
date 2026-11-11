@@ -9,7 +9,17 @@ from unittest.mock import AsyncMock, call, patch
 
 import pytest
 
+from esphome.components.esp32.zephyr_variants.esp32_family import (
+    _uart_signal_groups as _esp32_uart_signal_groups,
+    uart_pinctrl as _esp32_uart_group_roles,
+)
+from esphome.components.nrf.zephyr_variants.nordic_family import (
+    uart_group_roles as _nordic_uart_group_roles,
+)
 from esphome.components.ota import reject_swap_method_off_zephyr
+from esphome.components.silabs.zephyr_variants.silabs_family import (
+    uart_group_roles as _silabs_uart_group_roles,
+)
 from esphome.components.zephyr import (
     _MODULE_SCHEMA,
     ZephyrData,
@@ -60,16 +70,6 @@ from esphome.components.zephyr.variants import (
     ZephyrModuleTemplate,
     ZephyrSDK,
     ZephyrVariant,
-)
-from esphome.components.zephyr.variants.esp32_family import (
-    _uart_signal_groups as _esp32_uart_signal_groups,
-    uart_pinctrl as _esp32_uart_group_roles,
-)
-from esphome.components.zephyr.variants.nordic_family import (
-    uart_group_roles as _nordic_uart_group_roles,
-)
-from esphome.components.zephyr.variants.silabs_family import (
-    uart_group_roles as _silabs_uart_group_roles,
 )
 import esphome.config_validation as cv
 from esphome.const import (

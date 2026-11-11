@@ -7,8 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+from esphome.components.nxp.zephyr_variants import mcxn236
 from esphome.components.zephyr.const import BOOTLOADER_MCUBOOT, KEY_BOOTLOADER
-from esphome.components.zephyr.variants import mcxn236
 from esphome.const import CONF_BOARD, CONF_WATCHDOG_TIMEOUT
 from esphome.core import TimePeriod
 

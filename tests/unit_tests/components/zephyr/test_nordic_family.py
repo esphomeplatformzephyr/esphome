@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
+from esphome.components.nrf.zephyr_variants import nordic_family
 from esphome.components.zephyr import zephyr_data
 from esphome.components.zephyr.const import KEY_PRJ_CONF, KEY_ZEPHYR
-from esphome.components.zephyr.variants import nordic_family
 from esphome.core import CORE
 from tests.unit_tests.components.zephyr.zephyr_state import empty_zephyr_data
 

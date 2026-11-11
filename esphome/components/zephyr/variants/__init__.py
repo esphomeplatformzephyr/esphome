@@ -16,6 +16,13 @@ from esphome.const import (
     KEY_CORE,
     KEY_FRAMEWORK_VERSION,
     KEY_TARGET_FRAMEWORK,
+    PLATFORM_ESP32,
+    PLATFORM_NRF,
+    PLATFORM_NXP,
+    PLATFORM_RENESAS,
+    PLATFORM_RP2,
+    PLATFORM_SILABS,
+    PLATFORM_STM32,
     TYPE_GIT,
     Toolchain,
 )
@@ -323,6 +330,9 @@ class ZephyrVariant:
     # Boards whose resident vendor bootloader moves `boot`, keyed by board name without
     # revision or qualifiers.
     board_boot: dict[str, BootLayout] = field(default_factory=dict)
+    # Zephyr implements arch_stack_walk() for this CPU; for Xtensa (ESP32, S3) it
+    # doesn't, and the watchdog's stack dump would silently do nothing.
+    arch_stack_walk: bool = True
 
 
 def resolve_sdk(
@@ -603,34 +613,17 @@ SILABS: ZephyrSDK = ZephyrSDK(
     resolve_boards_ref_via_manifest=True,
 )
 
-# Module names under this package that define a variant.
-# Each module must export VARIANT_NAME and a ZephyrVariant instance named VARIANT.
-_VARIANT_MODULES = [
-    "esp32",
-    "esp32_h2",
-    "esp32_c6",
-    "esp32_c5",
-    "esp32_c3",
-    "esp32_s3",
-    "nrf52",
-    "nrf5340",
-    "nrf54l15",
-    "nrf54lm20a",
-    "efr32mg24",
-    "simg301",
-    "efr32bg27",
-    "stm32l4",
-    "stm32f4",
-    "stm32wb55",
-    "stm32f1",
-    "stm32u5",
-    "stm32c5",
-    "rp2040",
-    "rp2350",
-    "ra4m1",
-    "siwx917",
-    "mcxn236",
-]
+# Platforms that keep Zephyr variants in a zephyr_variants package, which lists them
+# in VARIANT_MODULES. A family's module sits next to its variants as <family>_family.
+_ZEPHYR_PLATFORMS = (
+    PLATFORM_ESP32,
+    PLATFORM_NRF,
+    PLATFORM_SILABS,
+    PLATFORM_STM32,
+    PLATFORM_RP2,
+    PLATFORM_RENESAS,
+    PLATFORM_NXP,
+)
 
 
 class _LazyVariants(dict):
@@ -638,24 +631,40 @@ class _LazyVariants(dict):
 
     _built: bool = False
     _modules: dict[str, ModuleType]
+    _families: dict[str, ModuleType]
 
     def __init__(self) -> None:
         super().__init__()
         self._modules = {}
+        self._families = {}
 
     def _ensure(self) -> None:
         if self._built:
             return
         self._built = True
-        for mod_name in _VARIANT_MODULES:
-            mod = importlib.import_module(f".{mod_name}", package=__name__)
-            self[mod.VARIANT_NAME] = mod.VARIANT
-            self._modules[mod.VARIANT_NAME] = mod
+        for platform in _ZEPHYR_PLATFORMS:
+            package = importlib.import_module(
+                f"esphome.components.{platform}.zephyr_variants"
+            )
+            for mod_name in package.VARIANT_MODULES:
+                mod = importlib.import_module(f".{mod_name}", package.__name__)
+                self[mod.VARIANT_NAME] = mod.VARIANT
+                self._modules[mod.VARIANT_NAME] = mod
+                if (family := mod.VARIANT.family) and family not in self._families:
+                    self._families[family] = importlib.import_module(
+                        f".{family}_family", package.__name__
+                    )
 
     def module(self, key: str) -> ModuleType:
         """Look up the variant's own module -- config_schema/to_code live there."""
         self._ensure()
         return self._modules[key]
+
+    def family_module(self, family: str) -> ModuleType:
+        self._ensure()
+        if (mod := self._families.get(family)) is None:
+            raise ValueError(f"Unknown zephyr family: {family!r}")
+        return mod
 
     def __getitem__(self, key):
         self._ensure()
@@ -694,3 +703,8 @@ def get_variant_module(variant: str) -> ModuleType:
     """The variant's own module (its config_schema/to_code live there) -- the
     generic dispatch target so callers don't need a hardcoded per-variant chain."""
     return _variants_instance.module(variant)
+
+
+def get_family_module(family: str) -> ModuleType:
+    """The family's own module, found next to its variants."""
+    return _variants_instance.family_module(family)

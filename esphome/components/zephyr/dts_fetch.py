@@ -25,7 +25,7 @@ from esphome.types import ConfigType
 
 from .const import COMMIT_SHA_RE, KEY_SDK_SOURCE_RESOLVED_REF, KEY_ZEPHYR
 from .framework_west import _install_lock
-from .variants import ZephyrSDK
+from .variants import ZephyrSDK, get_family_module
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -63,13 +63,14 @@ _DTS_SPARSE_PATHS = (
     # files automatically (see test_sparse_clone_dts_sparse_checkout_never_lists_version_file).
 )
 
-# Verified per-entry against a real failing #include (item 44), not guessed --
-# esp32/renesas/rp2040/nordic board DTS needs nothing extra. Add a family only once
-# its own failure against modules/hal/<name> is confirmed the same way.
-_HAL_MODULES_BY_FAMILY: dict[str, tuple[str, ...]] = {
-    "stm32": ("hal_stm32",),
-    "nxp": ("hal_nxp",),
-}
+
+def _dts_hal_modules(family: str | None) -> tuple[str, ...]:
+    """HAL modules whose dts/ the family's board devicetrees #include, from the
+    family module's DTS_HAL_MODULES. Set one only once a real failing #include
+    against modules/hal/<name> confirms it."""
+    if family is None:
+        return ()
+    return getattr(get_family_module(family), "DTS_HAL_MODULES", ())
 
 
 def _git_sparse_fetch(
@@ -302,7 +303,7 @@ def _native_dts_path(sdk: ZephyrSDK, family: str | None = None) -> Path | None:
         return None
     # A workspace with the HAL filter may not have this family's HAL yet
     hal_dir = candidate.parent / "modules" / "hal"
-    for name in _HAL_MODULES_BY_FAMILY.get(family or "", ()):
+    for name in _dts_hal_modules(family):
         if not (hal_dir / name.removeprefix("hal_")).is_dir():
             return None
     return candidate
@@ -392,11 +393,11 @@ def _resolve_boards_ref(sdk: ZephyrSDK, ver: str) -> str | None:
 
 
 def _sparse_clone_hal_modules(zephyr_dir: Path, family: str | None) -> None:
-    """Fetch dts/ only from each HAL module `family` needs (_HAL_MODULES_BY_FAMILY),
+    """Fetch dts/ only from each HAL module `family` needs (_dts_hal_modules()),
     into zephyr_dir.parent / <its west.yml path> -- matches the layout
     dts_lookup.py's _get_dts_include_paths() expects. Best-effort, never raises.
     """
-    module_names = _HAL_MODULES_BY_FAMILY.get(family or "")
+    module_names = _dts_hal_modules(family)
     if not module_names:
         return
 

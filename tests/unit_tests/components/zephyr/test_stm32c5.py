@@ -10,9 +10,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 import serial
 
+from esphome.components.stm32.zephyr_variants import stm32c5
 from esphome.components.zephyr import reset_over_usb, upload_program
 from esphome.components.zephyr.const import CONF_BOOTLOADER, KEY_ZEPHYR
-from esphome.components.zephyr.variants import stm32c5
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ADVANCED,
