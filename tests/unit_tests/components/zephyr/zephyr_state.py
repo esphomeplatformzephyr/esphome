@@ -14,12 +14,12 @@ from esphome.core import CORE
 
 _PLATFORM_FAMILIES = {
     Platform.ESP32: esp32.ZEPHYR_FAMILIES,
-    Platform.NRF: nrf.FAMILIES,
-    Platform.NXP: nxp.FAMILIES,
-    Platform.RENESAS: renesas.FAMILIES,
+    Platform.NRF: nrf.ZEPHYR_FAMILIES,
+    Platform.NXP: nxp.ZEPHYR_FAMILIES,
+    Platform.RENESAS: renesas.ZEPHYR_FAMILIES,
     Platform.RP2: rp2.ZEPHYR_FAMILIES,
-    Platform.SILABS: silabs.FAMILIES,
-    Platform.STM32: stm32.FAMILIES,
+    Platform.SILABS: silabs.ZEPHYR_FAMILIES,
+    Platform.STM32: stm32.ZEPHYR_FAMILIES,
 }
 
 

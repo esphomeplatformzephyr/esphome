@@ -43,7 +43,6 @@ from esphome.const import (
 from esphome.core import CORE, CoroPriority, EsphomeError, coroutine_with_priority
 from esphome.cpp_generator import MockObj
 from esphome.helpers import copy_file_if_changed, rmtree, write_file_if_changed
-from esphome.schema_extractors import SCHEMA_EXTRACT, schema_extractor
 from esphome.storage_json import StorageJSON
 from esphome.types import ConfigType
 from esphome.writer import clean_cmake_cache
@@ -1716,20 +1715,6 @@ def zephyr_config_schema(
     zephyr_data()[KEY_SHIELD_ROOT] = shield_root
     zephyr_data()[KEY_SNIPPET_ROOT] = snippet_root
     return config
-
-
-def zephyr_toolchain_config(
-    platform: str, families: frozenset[str]
-) -> Callable[[ConfigType], ConfigType]:
-    """CONFIG_SCHEMA for the <platform>: block of a Zephyr RTOS platform."""
-
-    @schema_extractor("schema")
-    def validator(config: ConfigType) -> ConfigType:
-        if config is SCHEMA_EXTRACT:
-            return zephyr_toolchain_schema(families)
-        return zephyr_config_schema(config, families, platform)
-
-    return validator
 
 
 # The platform's to_code on the Zephyr toolchain. Not this component's own to_code,

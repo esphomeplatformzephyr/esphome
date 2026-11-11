@@ -28,8 +28,9 @@ from esphome.const import (
     PLATFORM_RTL87XX,
     PLATFORM_SILABS,
     PLATFORM_STM32,
+    Toolchain,
 )
-from esphome.core import EsphomeError
+from esphome.core import CORE, EsphomeError
 
 CONFIG = {"esphome": {"name": "test"}}
 
@@ -285,7 +286,12 @@ GATE_EXEMPT_PATTERNS = {
 
 
 # Hooks that wrap a shared decoder for framework: type: zephyr: (module, function)
-_SHARED_DECODERS = {PLATFORM_RP2: ("esphome.stacktrace", "process_crash_handler_line")}
+_SHARED_DECODERS = {
+    PLATFORM_RP2: ("esphome.stacktrace", "process_crash_handler_line"),
+    **dict.fromkeys(
+        _ZEPHYR_TOOLCHAIN_PLATFORMS, ("esphome.components.zephyr", "process_stacktrace")
+    ),
+}
 
 
 def _decoder_module(platform: str):
@@ -297,7 +303,9 @@ def _decoder_module(platform: str):
 
 
 @pytest.mark.parametrize("platform", sorted(CRASH_SAMPLES))
-def test_platform_declarations_match_decoder(platform: str) -> None:
+def test_platform_declarations_match_decoder(
+    platform: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
     r"""Samples, declared patterns, and the decoder must agree.
 
     Checks: declared patterns exist, samples and patterns cover each
@@ -349,6 +357,9 @@ def test_platform_declarations_match_decoder(platform: str) -> None:
         "DECODER_PATTERNS with samples"
     )
 
+    if platform in _ZEPHYR_TOOLCHAIN_PLATFORMS:
+        # As `esphome logs` has it, from the config or the build's sidecar
+        monkeypatch.setattr(CORE, "toolchain", Toolchain.ZEPHYR)
     for marker in CRASH_SAMPLES[platform]["state_markers"]:
         assert module.process_stacktrace(CONFIG, marker, False) is True, (
             f"{marker!r} no longer opens {platform}'s dump region; update "

@@ -4,17 +4,7 @@ from typing import TYPE_CHECKING
 from esphome import pins
 import esphome.codegen as cg
 import esphome.config_validation as cv
-from esphome.const import (
-    CONF_ID,
-    CONF_INVERTED,
-    CONF_MODE,
-    CONF_NUMBER,
-    PLATFORM_NRF,
-    PLATFORM_NXP,
-    PLATFORM_RENESAS,
-    PLATFORM_SILABS,
-    PLATFORM_STM32,
-)
+from esphome.const import CONF_ID, CONF_INVERTED, CONF_MODE, CONF_NUMBER
 from esphome.core import EsphomeError
 
 from .const import zephyr_ns
@@ -241,13 +231,3 @@ async def zephyr_pin_to_code(config):
         cg.add(var.set_inverted(True))
     cg.add(var.set_flags(pins.gpio_flags_expr(config[CONF_MODE])))
     return var
-
-
-for _platform in (
-    PLATFORM_NRF,
-    PLATFORM_NXP,
-    PLATFORM_RENESAS,
-    PLATFORM_SILABS,
-    PLATFORM_STM32,
-):
-    pins.PIN_SCHEMA_REGISTRY.register(_platform, ZEPHYR_PIN_SCHEMA)(zephyr_pin_to_code)
