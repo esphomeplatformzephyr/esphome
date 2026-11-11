@@ -448,7 +448,12 @@ def validate_variant(_):
                 f"Use a WiFi-capable board like 'rpipicow' or 'rpipico2w'."
             )
     if CORE.using_toolchain_zephyr:
-        from esphome.components.zephyr import VARIANTS, zephyr_data, zephyr_variant
+        from esphome.components.zephyr import (
+            VARIANTS,
+            get_family_module,
+            zephyr_data,
+            zephyr_variant,
+        )
         from esphome.components.zephyr.const import KEY_BOARD
 
         variant_name = zephyr_variant()
@@ -483,14 +488,13 @@ def validate_variant(_):
                 f"eap is not supported on Zephyr variant '{variant_name}'",
                 [CONF_NETWORKS],
             )
-        board = zephyr_data()[KEY_BOARD]
-        # "w" is a qualifier segment, not necessarily the last one -- e.g.
-        # 'rpi_pico/rp2040/w/mcuboot' is still wifi-capable.
-        if variant.family == "rpi_pico" and "w" not in board.split("/"):
-            raise cv.Invalid(
-                f"board '{board}' has no CYW43 wireless chip -- use a "
-                "wireless-qualified board (e.g. 'rpi_pico/rp2040/w')"
-            )
+        family_module = (
+            get_family_module(variant.family) if variant.family is not None else None
+        )
+        if (
+            check_board := getattr(family_module, "wifi_check_board", None)
+        ) is not None:
+            check_board(zephyr_data()[KEY_BOARD])
 
 
 def _validate_min_auth_mode(value: str) -> str:

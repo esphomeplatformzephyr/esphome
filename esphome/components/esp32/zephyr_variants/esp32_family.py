@@ -30,6 +30,8 @@ WEST_HALS: frozenset[str] = frozenset({"hal_espressif"})
 CPU_ARCH = "riscv"
 # Kind of USB UART (see ZephyrVariant.usb_uart_type)
 USB_UART_TYPE = "serial_jtag"
+# See ZephyrVariant.has_poweroff
+HAS_POWEROFF = True
 # Matches platform: esp32's 8192 loop task; UDP OTA overflows 4096
 MAIN_STACK_SIZE = 8192
 # Flashes over serial with esptool; `--device PYOCD` is not supported

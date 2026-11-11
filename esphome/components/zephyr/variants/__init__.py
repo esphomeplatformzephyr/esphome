@@ -344,6 +344,12 @@ class ZephyrVariant:
     # "serial_jtag" (Espressif's USB Serial/JTAG) or None. FAMILY_DEFAULT takes the
     # family module's USB_UART_TYPE; set it only where a variant differs.
     usb_uart_type: str | None = FAMILY_DEFAULT
+    # zephyr_mcumgr may use the CDC/CDC1 transports. FAMILY_DEFAULT takes the family
+    # module's MCUMGR_CDC.
+    mcumgr_cdc: bool = FAMILY_DEFAULT
+    # The SoC selects HAS_POWEROFF, which deep_sleep's sys_poweroff() needs.
+    # FAMILY_DEFAULT takes the family module's HAS_POWEROFF.
+    has_poweroff: bool = FAMILY_DEFAULT
 
 
 def resolve_sdk(

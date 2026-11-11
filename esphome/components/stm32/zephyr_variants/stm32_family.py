@@ -20,6 +20,8 @@ WEST_HALS: frozenset[str] = frozenset({"hal_stm32"})
 CPU_ARCH = "arm"
 # Kind of USB UART (see ZephyrVariant.usb_uart_type)
 USB_UART_TYPE = "cdc_acm"
+# See ZephyrVariant.has_poweroff
+HAS_POWEROFF = True
 # Board devicetrees #include from this HAL, so the devicetree fetch needs it
 DTS_HAL_MODULES = ("hal_stm32",)
 

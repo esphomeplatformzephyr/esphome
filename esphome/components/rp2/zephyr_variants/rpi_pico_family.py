@@ -33,6 +33,8 @@ WEST_HALS: frozenset[str] = frozenset({"hal_rpi_pico"})
 CPU_ARCH = "arm"
 # Kind of USB UART (see ZephyrVariant.usb_uart_type)
 USB_UART_TYPE = "cdc_acm"
+# See ZephyrVariant.mcumgr_cdc
+MCUMGR_CDC = True
 MAIN_STACK_SIZE = 8192
 
 BootselTouch = zephyr_ns.class_("BootselTouch", cg.Component)
@@ -460,6 +462,17 @@ def i2c_check_pins(
         raise EsphomeError(
             f"GPIO{sda}/GPIO{scl} are not a valid sda:/scl: pair for '{bus_label}' "
             f"on {variant}."
+        )
+
+
+def wifi_check_board(board: str) -> None:
+    """Only the "w" boards carry the CYW43 wireless chip."""
+    # "w" is a qualifier segment, not necessarily the last one -- e.g.
+    # 'rpi_pico/rp2040/w/mcuboot' is still wifi-capable.
+    if "w" not in board.split("/"):
+        raise cv.Invalid(
+            f"board '{board}' has no CYW43 wireless chip -- use a "
+            "wireless-qualified board (e.g. 'rpi_pico/rp2040/w')"
         )
 
 

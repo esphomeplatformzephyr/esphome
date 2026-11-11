@@ -24,6 +24,7 @@ from esphome.components.zephyr import (
     HexValue,
     apply_swap_method,
     validate_swap_method,
+    variant_value,
     zephyr_add_overlay,
     zephyr_add_prj_conf,
     zephyr_add_sysbuild_conf,
@@ -32,7 +33,6 @@ from esphome.components.zephyr import (
     zephyr_data,
     zephyr_framework_type,
     zephyr_variant,
-    zephyr_variant_family,
 )
 from esphome.components.zephyr.const import (
     BOOTLOADER_MCUBOOT,
@@ -90,19 +90,6 @@ def _validate_transport(conf: ConfigType) -> ConfigType:
     )
 
 
-# Platform: zephyr variants this MCUboot image-manager path has been validated
-# against. Zephyr RTOS on other variants has its own hardened OTA path
-# instead, ota_backend_zephyr.cpp, reached via platform: esphome.
-# Families whose boards actually have a USB peripheral this CDC-ACM transport can
-# use -- nordic (native USB) and legacy platform: nrf52. EFR32MG24's xg24_ek2703a
-# has no USB device controller node at all (board.yaml doesn't list "usb"), so
-# CDC/CDC1 would fail with an opaque "undefined node label 'zephyr_udc0'"
-# devicetree error instead of a clear config-time one -- same rule logger's own
-# hardware_uart: already applies (UART_SELECTION_ZEPHYR_USB_CDC is the only zephyr
-# family list that includes USB_CDC).
-_CDC_CAPABLE_FAMILIES = {"nordic", "rpi_pico"}
-
-
 def _require_ipv6_for_udp(conf: ConfigType) -> ConfigType:
     if conf[CONF_TRANSPORT][CONF_UDP]:
         network.require_ipv6("zephyr_mcumgr")(conf)
@@ -139,7 +126,7 @@ def _validate_platform(conf: ConfigType) -> ConfigType:
         )
     hw_uart = conf[CONF_TRANSPORT].get(CONF_HARDWARE_UART)
     if hw_uart in CDC_IDS and not (
-        CORE.is_nrf52 or zephyr_variant_family() in _CDC_CAPABLE_FAMILIES
+        CORE.is_nrf52 or variant_value(zephyr_variant(), "mcumgr_cdc")
     ):
         raise cv.Invalid(
             f"'{hw_uart}' is not available on this variant -- it has no USB "

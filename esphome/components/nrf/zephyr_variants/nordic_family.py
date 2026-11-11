@@ -27,6 +27,9 @@ WEST_HALS: frozenset[str] = frozenset({"hal_nordic"})
 CPU_ARCH = "arm"
 # Kind of USB UART (see ZephyrVariant.usb_uart_type)
 USB_UART_TYPE = "cdc_acm"
+# See ZephyrVariant.mcumgr_cdc and has_poweroff
+MCUMGR_CDC = True
+HAS_POWEROFF = True
 # Pins are named P<port>.<pin>, e.g. P0.02 (see zephyr/gpio.py)
 PIN_NOTATION = "dotted"
 MAIN_STACK_SIZE = 8192
