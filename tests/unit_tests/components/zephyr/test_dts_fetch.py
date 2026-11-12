@@ -263,7 +263,7 @@ def test_native_dts_path_none_when_tools_subdir_unset() -> None:
 def test_native_dts_path_matches_the_machine_global_cache_key(
     sdk: ZephyrSDK, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # Must land at the same directory framework_west._source_cache_key() would
+    # Must land at the same directory framework._source_cache_key() would
     # produce for the plain official-source (no sdk_source:, no modules) case --
     # sdk.tools_subdir-prefixed, nested under the shared zephyr cache root.
     monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path))

@@ -1,4 +1,4 @@
-"""Unit tests for esphome.components.zephyr.framework_west."""
+"""Unit tests for esphome.components.zephyr.framework."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ import platformdirs
 import pytest
 
 from esphome.components.zephyr.const import KEY_SDK_SOURCE_RESOLVED_REF
-from esphome.components.zephyr.framework_west import (
+from esphome.components.zephyr.framework import (
     _NEUTRAL_HALS,
     _git_output,
     _remote_commit,
@@ -99,19 +99,19 @@ def _run_check_and_install(
     )
     with (
         patch(
-            "esphome.components.zephyr.framework_west.get_zephyr_tools_path",
+            "esphome.components.zephyr.framework.get_zephyr_tools_path",
             return_value=tmp_path / "zephyr",
         ),
         patch(
-            "esphome.components.zephyr.framework_west._source_cache_key",
+            "esphome.components.zephyr.framework._source_cache_key",
             return_value=_CACHE_KEY,
         ),
         patch(
-            "esphome.components.zephyr.framework_west.run_command_ok",
+            "esphome.components.zephyr.framework.run_command_ok",
             side_effect=fake_run_command_ok,
         ),
         patch(
-            "esphome.components.zephyr.framework_west.create_venv",
+            "esphome.components.zephyr.framework.create_venv",
             side_effect=_fake_create_venv,
         ),
         patch("subprocess.run") as mock_subprocess_run,
@@ -453,19 +453,19 @@ def test_git_source_west_init_falls_back_to_raw_ref_when_unresolved(
 
     with (
         patch(
-            "esphome.components.zephyr.framework_west.get_zephyr_tools_path",
+            "esphome.components.zephyr.framework.get_zephyr_tools_path",
             return_value=tmp_path / "zephyr",
         ),
         patch(
-            "esphome.components.zephyr.framework_west._source_cache_key",
+            "esphome.components.zephyr.framework._source_cache_key",
             return_value=_CACHE_KEY,
         ),
         patch(
-            "esphome.components.zephyr.framework_west.run_command_ok",
+            "esphome.components.zephyr.framework.run_command_ok",
             side_effect=fake_run_command_ok,
         ),
         patch(
-            "esphome.components.zephyr.framework_west.create_venv",
+            "esphome.components.zephyr.framework.create_venv",
             side_effect=lambda root, msg=None: Path(root).mkdir(
                 parents=True, exist_ok=True
             ),
@@ -533,11 +533,11 @@ def _run_install_git_modules(
 
     with (
         patch(
-            "esphome.components.zephyr.framework_west.get_zephyr_tools_path",
+            "esphome.components.zephyr.framework.get_zephyr_tools_path",
             return_value=tmp_path,
         ),
         patch(
-            "esphome.components.zephyr.framework_west.run_command_ok",
+            "esphome.components.zephyr.framework.run_command_ok",
             side_effect=fake_run_command_ok,
         ),
     ):
@@ -620,7 +620,7 @@ def _refresh(
         return f"{_HEAD}\n"
 
     with patch(
-        "esphome.components.zephyr.framework_west._git_output",
+        "esphome.components.zephyr.framework._git_output",
         side_effect=fake_git_output,
     ):
         calls, _ = _run_install_git_modules(
@@ -632,7 +632,7 @@ def _refresh(
 def test_install_git_modules_skips_the_check_before_refresh(tmp_path: Path) -> None:
     _run_install_git_modules(tmp_path, [_BRANCH_MODULE])
 
-    with patch("esphome.components.zephyr.framework_west._git_output") as git_output:
+    with patch("esphome.components.zephyr.framework._git_output") as git_output:
         calls, _ = _run_install_git_modules(tmp_path, [_BRANCH_MODULE])
 
     assert not calls
@@ -707,7 +707,7 @@ def test_git_output_runs_git(tmp_path: Path) -> None:
 )
 def test_remote_commit(ls_remote: str | None, expected: str | None) -> None:
     with patch(
-        "esphome.components.zephyr.framework_west._git_output",
+        "esphome.components.zephyr.framework._git_output",
         return_value=ls_remote,
     ):
         assert _remote_commit("https://example.invalid/mod.git", "main") == expected
@@ -821,7 +821,7 @@ def _gen_defines(zephyr_dir: Path, line: str) -> Path:
 
 def test_patch_gen_defines_dts_path_strips_the_directory(tmp_path: Path) -> None:
     """The devicetree header comment keeps only the dts basename, once."""
-    from esphome.components.zephyr.framework_west import _patch_gen_defines_dts_path
+    from esphome.components.zephyr.framework import _patch_gen_defines_dts_path
 
     path = _gen_defines(tmp_path, "  {edt.dts_path}")
     mode = path.stat().st_mode
@@ -837,7 +837,7 @@ def test_patch_gen_defines_dts_path_warns_on_drift(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     """A reformatted upstream line is left alone and reported."""
-    from esphome.components.zephyr.framework_west import _patch_gen_defines_dts_path
+    from esphome.components.zephyr.framework import _patch_gen_defines_dts_path
 
     path = _gen_defines(tmp_path, " {edt.dts_source}")
     before = path.read_text()
@@ -848,7 +848,7 @@ def test_patch_gen_defines_dts_path_warns_on_drift(
 
 def test_patch_gen_defines_dts_path_without_the_script(tmp_path: Path) -> None:
     """A tree without gen_defines.py is skipped quietly."""
-    from esphome.components.zephyr.framework_west import _patch_gen_defines_dts_path
+    from esphome.components.zephyr.framework import _patch_gen_defines_dts_path
 
     _patch_gen_defines_dts_path(tmp_path)
 
@@ -858,9 +858,7 @@ def test_patch_west_build_tolerates_a_source_dir_on_another_drive(
 ) -> None:
     """West build's relative source path raises across Windows drives; the
     patch applies Zephyr main's fallback to the absolute path."""
-    from esphome.components.zephyr.framework_west import (
-        _patch_west_build_source_dir_relpath,
-    )
+    from esphome.components.zephyr.framework import _patch_west_build_source_dir_relpath
 
     build = tmp_path / "scripts" / "west_commands" / "build.py"
     build.parent.mkdir(parents=True)
@@ -886,7 +884,7 @@ def test_patch_west_build_tolerates_a_source_dir_on_another_drive(
 def test_new_venv_gets_the_windows_rmtree_fix(tmp_path: Path) -> None:
     """As nrf52: west init's manifest move needs it on Windows; only a new venv gets it."""
     with patch(
-        "esphome.components.nrf52.framework._install_sitecustomize"
+        "esphome.components.zephyr.framework.install_sitecustomize"
     ) as install_sitecustomize:
         _run_check_and_install(tmp_path, None)
         _run_check_and_install(tmp_path, None)

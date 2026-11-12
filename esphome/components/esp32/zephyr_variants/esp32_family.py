@@ -290,9 +290,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
     from esphome.components.zephyr import zephyr_data, zephyr_variant, zephyr_west_hals  # noqa: PLC0415
     from esphome.components.zephyr.build_zephyr import run_west_flash  # noqa: PLC0415
     from esphome.components.zephyr.const import KEY_FRAMEWORK_TYPE, KEY_RUNNER  # noqa: PLC0415
-    from esphome.components.zephyr.framework_west import (
-        check_and_install as west_install,  # noqa: PLC0415
-    )
+    from esphome.components.zephyr.framework import check_and_install as west_install  # noqa: PLC0415
     from esphome.components.zephyr.variants import VARIANTS, resolve_sdk  # noqa: PLC0415
     from esphome.const import KEY_CORE, KEY_FRAMEWORK_VERSION  # noqa: PLC0415
     from esphome.core import CORE, EsphomeError  # noqa: PLC0415

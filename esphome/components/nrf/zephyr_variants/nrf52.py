@@ -480,9 +480,7 @@ def upload_serial_dfu(host: str) -> bool:
     from esphome.__main__ import check_permissions  # noqa: PLC0415
     from esphome.components.zephyr import zephyr_data, zephyr_variant, zephyr_west_hals  # noqa: PLC0415
     from esphome.components.zephyr.const import KEY_FRAMEWORK_TYPE  # noqa: PLC0415
-    from esphome.components.zephyr.framework_west import (
-        check_and_install as west_install,  # noqa: PLC0415
-    )
+    from esphome.components.zephyr.framework import check_and_install as west_install  # noqa: PLC0415
     from esphome.components.zephyr.variants import VARIANTS, resolve_sdk  # noqa: PLC0415
 
     package = CORE.relative_build_path(_DFU_PACKAGE)

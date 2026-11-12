@@ -1310,7 +1310,7 @@ _SNIPPET_SOURCE_SCHEMA = cv.Any(
 
 # A user-authored additive west module -- no username:/password: (unlike
 # board_source:/shield_source:/snippet_source:, these are fetched by
-# framework_west.install_git_modules(), not ESPHome's own git.clone_or_update cache).
+# framework.install_git_modules(), not ESPHome's own git.clone_or_update cache).
 _MODULE_GIT_SCHEMA = cv.Schema(
     {
         cv.Required(CONF_URL): cv.url,
@@ -2021,7 +2021,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
             )
 
         from .build_zephyr import run_west_flash_pyocd
-        from .framework_west import check_and_install as west_install
+        from .framework import check_and_install as west_install
 
         version = str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION])
         variant_data = VARIANTS[zephyr_variant()]
@@ -2060,7 +2060,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
         return False
 
     from .build_zephyr import resolve_dev_id, run_west_flash_generic
-    from .framework_west import check_and_install as west_install
+    from .framework import check_and_install as west_install
 
     version = str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION])
     variant_data = VARIANTS[zephyr_variant()]
@@ -2110,7 +2110,7 @@ def run_compile(args, config: ConfigType) -> bool:
         return False
 
     from .build_zephyr import generate_cmake_lists, run_west_blobs_fetch, run_west_build
-    from .framework_west import check_and_install as west_install, install_git_modules
+    from .framework import check_and_install as west_install, install_git_modules
     from .sdk_setup_west import check_and_install as sdk_install
 
     variant_data = VARIANTS[variant]

@@ -25,7 +25,7 @@ from esphome.framework_helpers import install_lock
 from esphome.types import ConfigType
 
 from .const import COMMIT_SHA_RE, KEY_SDK_SOURCE_RESOLVED_REF, KEY_ZEPHYR
-from .framework_west import get_zephyr_tools_path
+from .framework import get_zephyr_tools_path
 from .variants import ZephyrSDK, get_family_module
 
 _LOGGER = logging.getLogger(__name__)
@@ -246,12 +246,12 @@ def resolve_sdk_source_version(source: ConfigType, refresh: TimePeriodSeconds) -
     For a git source, also resolves the moving ref (branch, or an omitted ref: meaning
     "default branch") to one concrete commit SHA and stashes it onto source under
     KEY_SDK_SOURCE_RESOLVED_REF -- the single authoritative resolution the rest of the
-    build (fetch_board_dts(), framework_west's SDK install) pins to, instead of each
+    build (fetch_board_dts(), framework.py's SDK install) pins to, instead of each
     independently re-resolving the same moving ref against its own timer.
     """
     if source[CONF_TYPE] == TYPE_LOCAL:
         # Points at the zephyr manifest repo itself, not a workspace root -- matches
-        # framework_west.py's local_path/"west.yml" check.
+        # framework.py's local_path/"west.yml" check.
         version_file = source[CONF_PATH] / "VERSION"
         if not version_file.is_file():
             raise cv.Invalid(
@@ -288,7 +288,7 @@ def _native_dts_path(sdk: ZephyrSDK, family: str | None = None) -> Path | None:
     directory literally named "zephyr" (the bundled sdk-zephyr fork project -- confirmed
     against a real local NCS install), so this needs no per-sdk branching beyond the cache
     key. Only matches the plain official-source install (no sdk_source: override) --
-    framework_west._source_cache_key()'s other branches aren't reproducible
+    framework._source_cache_key()'s other branches aren't reproducible
     here without the source info this function doesn't have; those cases just
     fall through to the caller's git-fetch fallback.
     """

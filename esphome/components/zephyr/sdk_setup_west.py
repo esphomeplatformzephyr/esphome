@@ -8,7 +8,7 @@ import time
 
 from esphome.framework_helpers import install_lock
 
-from .framework_west import get_zephyr_tools_path
+from .framework import get_zephyr_tools_path
 from .sdk_install import install_sdk
 
 _LOGGER = logging.getLogger(__name__)

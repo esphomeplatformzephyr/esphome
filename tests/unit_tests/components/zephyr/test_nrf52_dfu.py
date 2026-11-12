@@ -122,7 +122,7 @@ def test_build_dfu_package_raises_when_genpkg_fails(tmp_path: Path) -> None:
 def _upload_patches(**overrides: object) -> list:
     """Patch everything upload_serial_dfu touches outside this module's own logic."""
     targets = {
-        "esphome.components.zephyr.framework_west.check_and_install": {
+        "esphome.components.zephyr.framework.check_and_install": {
             "return_value": (Path("python"), Path("framework"), {})
         },
         "esphome.__main__.check_permissions": {},

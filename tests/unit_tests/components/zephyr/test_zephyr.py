@@ -1882,7 +1882,7 @@ def test_upload_program_resolves_variant_and_flashes(tmp_path: Path) -> None:
         patch("esphome.upload_targets.get_port_type", return_value=PortType.SERIAL),
         patch("esphome.__main__.check_permissions"),
         patch(
-            "esphome.components.zephyr.framework_west.check_and_install",
+            "esphome.components.zephyr.framework.check_and_install",
             return_value=("python_bin", "framework_path", {}),
         ) as mock_west_install,
         patch(
