@@ -4,9 +4,7 @@ import logging
 import os
 from pathlib import Path
 import re
-import shutil
 import subprocess
-import tempfile
 import time
 
 import yaml
@@ -24,7 +22,11 @@ from esphome.framework_helpers import (
 from esphome.types import ConfigType
 
 from .const import COMMIT_SHA_RE, KEY_SDK_SOURCE_RESOLVED_REF
-from .framework_helpers import install_sitecustomize
+from .framework_helpers import (
+    install_sitecustomize,
+    patch_gen_defines_dts_path,
+    patch_west_build_source_dir_relpath,
+)
 from .variants import ZephyrModule, ZephyrSDK
 
 _LOGGER = logging.getLogger(__name__)
@@ -600,8 +602,8 @@ def _check_and_install(
 
     if not is_local:
         # Never edit a sdk_source: local checkout; it is the user's own tree.
-        _patch_gen_defines_dts_path(zephyr_dir)
-        _patch_west_build_source_dir_relpath(zephyr_dir)
+        patch_gen_defines_dts_path(framework)
+        patch_west_build_source_dir_relpath(framework)
     return python_bin, framework, west_env
 
 
@@ -617,61 +619,3 @@ def _restore_patched_scripts(zephyr_dir: Path) -> None:
                 check=False,
                 capture_output=True,
             )
-
-
-def _write_script(path: Path, content: str) -> None:
-    """Replace a framework script atomically, keeping its mode."""
-    # Unique sibling tmp: two builds may patch at once.
-    fd, tmp_name = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
-    tmp = Path(tmp_name)
-    try:
-        with os.fdopen(fd, "w", encoding="utf-8") as f:
-            f.write(content)
-        shutil.copymode(path, tmp)
-        tmp.replace(path)
-    except BaseException:
-        tmp.unlink(missing_ok=True)
-        raise
-
-
-def _patch_gen_defines_dts_path(zephyr_dir: Path) -> None:
-    """As nrf52's patch: the absolute zephyr.dts.pre path in the devicetree
-    header comment is its only per-device byte and blocks ccache sharing."""
-    gen_defines = zephyr_dir / _GEN_DEFINES
-    if not gen_defines.is_file():
-        return
-    content = gen_defines.read_text(encoding="utf-8")
-    new = "  {os.path.basename(edt.dts_path)}"
-    if new in content:
-        return
-    patched = content.replace("  {edt.dts_path}", new)
-    if patched == content:
-        _LOGGER.warning(
-            "gen_defines.py no longer matches; the devicetree header "
-            "stays per device and ccache sharing between devices degrades"
-        )
-        return
-    _write_script(gen_defines, patched)
-
-
-_WEST_BUILD_RELPATH = "        srcrel = os.path.relpath(self.source_dir)\n"
-# Zephyr main's replacement, verbatim (zephyr commit dfbdca0e13)
-_WEST_BUILD_RELPATH_SAFE = """        try:
-            srcrel = pathlib.Path(self.source_dir).relative_to(pathlib.Path.cwd(), walk_up=True)
-        except ValueError:
-            srcrel = self.source_dir
-"""
-
-
-def _patch_west_build_source_dir_relpath(zephyr_dir: Path) -> None:
-    """As nrf52's patch: west build names the source dir relative to the
-    workspace, which Python refuses on Windows when the project is on another
-    drive. SDKs that carry Zephyr main's fix (4.5.0) have no line to patch."""
-    build = zephyr_dir / _WEST_BUILD
-    if not build.is_file():
-        return
-    content = build.read_text(encoding="utf-8")
-    if _WEST_BUILD_RELPATH in content:
-        _write_script(
-            build, content.replace(_WEST_BUILD_RELPATH, _WEST_BUILD_RELPATH_SAFE)
-        )
