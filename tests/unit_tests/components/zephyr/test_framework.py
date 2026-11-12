@@ -110,8 +110,13 @@ def _run_check_and_install(
             "esphome.components.zephyr.framework.run_command_ok",
             side_effect=fake_run_command_ok,
         ),
+        # The venv build lives in the shared Zephyr framework helpers
         patch(
-            "esphome.components.zephyr.framework.create_venv",
+            "esphome.components.zephyr.framework_helpers.run_command_ok",
+            side_effect=fake_run_command_ok,
+        ),
+        patch(
+            "esphome.components.zephyr.framework_helpers.create_venv",
             side_effect=_fake_create_venv,
         ),
         patch("subprocess.run") as mock_subprocess_run,
@@ -464,8 +469,13 @@ def test_git_source_west_init_falls_back_to_raw_ref_when_unresolved(
             "esphome.components.zephyr.framework.run_command_ok",
             side_effect=fake_run_command_ok,
         ),
+        # The venv build lives in the shared Zephyr framework helpers
         patch(
-            "esphome.components.zephyr.framework.create_venv",
+            "esphome.components.zephyr.framework_helpers.run_command_ok",
+            side_effect=fake_run_command_ok,
+        ),
+        patch(
+            "esphome.components.zephyr.framework_helpers.create_venv",
             side_effect=lambda root, msg=None: Path(root).mkdir(
                 parents=True, exist_ok=True
             ),
@@ -814,7 +824,7 @@ def test_tools_path_default_is_global_cache(monkeypatch: pytest.MonkeyPatch) -> 
 def test_new_venv_gets_the_windows_rmtree_fix(tmp_path: Path) -> None:
     """As nrf52: west init's manifest move needs it on Windows; only a new venv gets it."""
     with patch(
-        "esphome.components.zephyr.framework.install_sitecustomize"
+        "esphome.components.zephyr.framework_helpers.install_sitecustomize"
     ) as install_sitecustomize:
         _run_check_and_install(tmp_path, None)
         _run_check_and_install(tmp_path, None)

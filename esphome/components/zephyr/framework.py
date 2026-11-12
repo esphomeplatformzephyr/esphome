@@ -13,7 +13,6 @@ from esphome.build_helpers.tools_cache import ZEPHYR_TOOLS_CACHE, tools_cache_pa
 from esphome.const import CONF_PATH, CONF_REF, CONF_TYPE, CONF_URL, TYPE_LOCAL
 from esphome.core import EsphomeError
 from esphome.framework_helpers import (
-    create_venv,
     get_python_env_executable_path,
     install_lock,
     rmdir,
@@ -23,13 +22,15 @@ from esphome.types import ConfigType
 
 from .const import COMMIT_SHA_RE, KEY_SDK_SOURCE_RESOLVED_REF
 from .framework_helpers import (
-    install_sitecustomize,
+    ensure_venv,
     patch_gen_defines_dts_path,
     patch_west_build_source_dir_relpath,
 )
 from .variants import ZephyrModule, ZephyrSDK
 
 _LOGGER = logging.getLogger(__name__)
+
+_REQUIREMENTS = Path(__file__).parent / "requirements.txt"
 
 
 def get_zephyr_tools_path() -> Path:
@@ -39,7 +40,7 @@ def get_zephyr_tools_path() -> Path:
     return tools_cache_path(*ZEPHYR_TOOLS_CACHE)
 
 
-def _python_env_path(version: str) -> Path:
+def _get_python_env_path(version: str) -> Path:
     return get_zephyr_tools_path() / "penvs" / version
 
 
@@ -72,15 +73,11 @@ def _source_cache_key(
     return key
 
 
-def _requirements_path() -> Path:
-    return Path(__file__).parent / "requirements.txt"
-
-
 def _effective_requirements(overrides: dict[str, str | None]) -> str:
     """Return zephyr/requirements.txt's content, substituting the version on any pinned
     `pkg==...` line whose package name has a non-None override (e.g. {"west": "1.4.0"},
     from CONF_WEST_VERSION/CONF_NINJA_VERSION)."""
-    text = _requirements_path().read_text()
+    text = _REQUIREMENTS.read_text()
     if not any(overrides.values()):
         return text
     lines = []
@@ -367,7 +364,7 @@ def _check_and_install(
       - west_env        — environment dict with ZEPHYR_BASE and PATH set
     """
     ver_tag = f"v{version}" if not version.startswith("v") else version
-    python_env = _python_env_path(ver_tag)
+    python_env = _get_python_env_path(ver_tag)
     python_bin = get_python_env_executable_path(python_env, "python")
 
     is_local = source is not None and source[CONF_TYPE] == TYPE_LOCAL
@@ -396,43 +393,12 @@ def _check_and_install(
     # Every workspace of this version shares the venv. It only changes when the west
     # requirements or overrides do, so builds that use it are not locked against that.
     with install_lock(get_zephyr_tools_path(), f"penv-{ver_tag}"):
-        venv_sentinel = python_env / ".ready"
         overrides = {"west": west_version, "ninja": ninja_version}
-        effective_requirements = _effective_requirements(overrides)
-
-        install_venv = not python_bin.exists()
-        # Compares content, not mtime -- an override changes what should be installed without
-        # touching zephyr/requirements.txt itself, so mtime alone would miss it.
-        requirements_changed = (
-            not venv_sentinel.exists()
-            or venv_sentinel.read_text() != effective_requirements
-        )
-
-        if install_venv:
-            rmdir(python_env, msg=f"Clean up {ver_tag} Python environment")
-            create_venv(python_env, msg=ver_tag)
-            install_sitecustomize(python_env)
-
-        if install_venv or requirements_changed:
-            _LOGGER.info(
-                "Installing Python packages: %s", effective_requirements.split()
-            )
-            requirements_file = python_env / ".requirements.effective.txt"
-            requirements_file.write_text(effective_requirements)
-            cmd = [
-                str(python_bin),
-                "-m",
-                "pip",
-                "install",
-                "--upgrade",
-                "-r",
-                str(requirements_file),
-            ]
-            if not run_command_ok(cmd):
-                raise EsphomeError(
-                    f"Upgrade {ver_tag} Python environment packages failure"
-                )
-            venv_sentinel.write_text(effective_requirements)
+        # Beside the venv, not in it: a rebuild removes the venv folder
+        requirements = python_env.with_name(f"{python_env.name}.requirements.txt")
+        requirements.parent.mkdir(parents=True, exist_ok=True)
+        requirements.write_text(_effective_requirements(overrides))
+        install_venv = ensure_venv(python_env, requirements, ver_tag)
 
     manifest_url = (
         source[CONF_URL] if (source is not None and not is_local) else sdk.manifest_url
