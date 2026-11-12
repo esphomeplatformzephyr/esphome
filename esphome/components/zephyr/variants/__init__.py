@@ -1,3 +1,4 @@
+from collections.abc import ItemsView, Iterator, ValuesView
 from dataclasses import dataclass, field
 import importlib
 import logging
@@ -473,7 +474,12 @@ def resolve_framework_version(
         if version_str == VERSION_RECOMMENDED:
             version_str = default_version
 
-    framework_ver = cv.Version.parse(version_str)
+    try:
+        framework_ver = cv.Version.parse(version_str)
+    except ValueError as err:
+        raise cv.Invalid(
+            f"'{version_str}' is not a version number", [CONF_FRAMEWORK, CONF_VERSION]
+        ) from err
     if framework_ver < min_version:
         raise cv.Invalid(
             f"{variant_name} requires {sdk_name} >= {min_version} ({requires_reason}). "
@@ -643,8 +649,8 @@ _ZEPHYR_PLATFORMS = (
 )
 
 
-class _LazyVariants(dict):
-    """Defers variant module loading until first access to avoid circular imports."""
+class _LazyVariants(dict[str, ZephyrVariant]):
+    """Loads the variant modules on first use; they import this package."""
 
     _built: bool = False
     _modules: dict[str, ModuleType]
@@ -658,7 +664,19 @@ class _LazyVariants(dict):
     def _ensure(self) -> None:
         if self._built:
             return
+        # Set first: a variant module may read the registry while it loads
         self._built = True
+        try:
+            self._load()
+        except BaseException:
+            # Raise the import error again next time, not a KeyError on a partial registry
+            self._built = False
+            self.clear()
+            self._modules.clear()
+            self._families.clear()
+            raise
+
+    def _load(self) -> None:
         for platform in _ZEPHYR_PLATFORMS:
             package = importlib.import_module(
                 f"esphome.components.{platform}.zephyr_variants"
@@ -673,46 +691,45 @@ class _LazyVariants(dict):
                     )
 
     def module(self, key: str) -> ModuleType:
-        """Look up the variant's own module -- config_schema/to_code live there."""
         self._ensure()
         return self._modules[key]
 
     def family_module(self, family: str) -> ModuleType:
         self._ensure()
         if (mod := self._families.get(family)) is None:
-            raise ValueError(f"Unknown zephyr family: {family!r}")
+            raise ValueError(f"Unknown Zephyr family: {family!r}")
         return mod
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> ZephyrVariant:
         self._ensure()
         return super().__getitem__(key)
 
-    def __contains__(self, key):
+    def __contains__(self, key: object) -> bool:
         self._ensure()
         return super().__contains__(key)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[str]:
         self._ensure()
         return super().__iter__()
 
-    def __len__(self):
+    def __len__(self) -> int:
         self._ensure()
         return super().__len__()
 
-    def items(self):
+    def items(self) -> ItemsView[str, ZephyrVariant]:
         self._ensure()
         return super().items()
 
-    def values(self):
+    def values(self) -> ValuesView[ZephyrVariant]:
         self._ensure()
         return super().values()
 
-    def get(self, key, default=None):
+    def get(self, key: str, default: Any = None) -> Any:
         self._ensure()
         return super().get(key, default)
 
 
-_variants_instance = _LazyVariants()
+_variants_instance: _LazyVariants = _LazyVariants()
 VARIANTS: dict[str, ZephyrVariant] = _variants_instance
 
 
