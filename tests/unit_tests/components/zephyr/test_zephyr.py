@@ -70,6 +70,7 @@ from esphome.components.zephyr.variants import (
     ZephyrModuleTemplate,
     ZephyrSDK,
     ZephyrVariant,
+    _variants_instance,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -1810,7 +1811,7 @@ def test_variant_config_schema_raises_for_unregistered_variant(
 
     _init_variant_schema_core()
     fake_variant = ZephyrVariant(sdk=ZephyrSDK(manifest_url="http://dummy"))
-    monkeypatch.setitem(VARIANTS, "FAKE_VARIANT", fake_variant)
+    monkeypatch.setitem(_variants_instance._variants, "FAKE_VARIANT", fake_variant)
     framework = zephyr_module._FRAMEWORK_SCHEMA({})
     monkeypatch.setattr(
         zephyr_module,

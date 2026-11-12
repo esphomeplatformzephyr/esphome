@@ -80,7 +80,7 @@ def config_schema(config: ConfigType) -> ConfigType:
     bootloader = config[CONF_FRAMEWORK][CONF_ADVANCED][CONF_BOOTLOADER]
     config[CONF_BOARD] = qualify_board(VARIANT, config[CONF_BOARD])
     _, framework_ver, sdk_name, _ = resolve_framework_version(
-        VARIANT, "stm32", config, "mainline STM32 support"
+        VARIANT, VARIANT_NAME, config, "mainline STM32 support"
     )
     set_core_data(
         VARIANT_NAME,
