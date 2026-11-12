@@ -58,11 +58,8 @@ def _fake_extract(archive: Path, extract_dir: Path, **kwargs: Any) -> None:
 
 @pytest.fixture
 def mock_commander_download_ops() -> Iterator[tuple[MagicMock, MagicMock]]:
-    """Patch the download/extract seams. Unlike sdk_setup_west.py (which calls
-    the combined download_and_extract() and so is patched in framework_helpers,
-    where that function resolves its own internals), commander_setup.py calls
-    download_with_resume()/archive_extract_all() directly by their imported
-    names, so the seams are patched on commander_setup's own module instead."""
+    """Patch the download/extract seams on commander_setup itself, which imports
+    download_with_resume() and archive_extract_all() by name."""
     with (
         patch(
             "esphome.components.zephyr.commander_setup.download_with_resume"

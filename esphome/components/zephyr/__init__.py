@@ -2110,8 +2110,11 @@ def run_compile(args, config: ConfigType) -> bool:
         return False
 
     from .build_zephyr import generate_cmake_lists, run_west_blobs_fetch, run_west_build
-    from .framework import check_and_install as west_install, install_git_modules
-    from .sdk_setup_west import check_and_install as sdk_install
+    from .framework import (
+        check_and_install as west_install,
+        install_git_modules,
+        install_toolchain,
+    )
 
     variant_data = VARIANTS[variant]
     sdk_name, sdk = resolve_sdk(variant_data, zephyr_data().get(KEY_FRAMEWORK_TYPE))
@@ -2138,7 +2141,7 @@ def run_compile(args, config: ConfigType) -> bool:
         )
         commander_dir = commander_install(commander_version)
         west_env["PATH"] = f"{commander_dir}{os.pathsep}{west_env['PATH']}"
-    sdk_dir = sdk_install(framework_path, toolchain=variant_data.toolchain)
+    sdk_dir = install_toolchain(framework_path, variant_data.toolchain)
     blob_specs = list(zephyr_data()["blobs"])
     if variant_data.blobs:
         blob_specs.append(variant_data.blobs)

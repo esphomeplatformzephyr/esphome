@@ -6,8 +6,7 @@ shells out to the `commander` binary for secure-boot image signing whenever
 CONFIG_MCUBOOT + CONFIG_BOOT_SIGNATURE_TYPE_ECDSA_P256 are both set. Commander's
 own release cadence is independent of the SDK version (build "1v24p1b1980" vs.
 SDK "2026.6.0"), so it's tracked and cached separately here, the same way
-sdk_setup_west.py tracks the Zephyr SDK/toolchain independently of the
-framework version.
+the Zephyr SDK is cached independently of the framework version.
 """
 
 from __future__ import annotations
