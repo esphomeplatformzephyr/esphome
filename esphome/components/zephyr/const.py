@@ -82,7 +82,7 @@ ADVANCED_SCHEMA = cv.Schema(
     {
         cv.Optional(CONF_RUNNER): cv.string_strict,
         cv.Optional(CONF_MAIN_STACK_SIZE): cv.int_range(min=4096),
-        # Override requirements_west.txt's pinned west/ninja version, decoupled from
+        # Override zephyr/requirements.txt's pinned west/ninja version, decoupled from
         # framework: version: since their release cadence isn't tied to Zephyr's.
         cv.Optional(CONF_WEST_VERSION): cv.string_strict,
         cv.Optional(CONF_NINJA_VERSION): cv.string_strict,

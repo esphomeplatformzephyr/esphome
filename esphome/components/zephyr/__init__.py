@@ -236,9 +236,9 @@ class ZephyrData(TypedDict):
     ]
     # board -> list[str] | _NOT_FOUND; cleared each run
     board_yaml_cache: NotRequired[dict[str, object]]
-    # None = use requirements_west.txt's pinned version
+    # None = use zephyr/requirements.txt's pinned version
     west_version: NotRequired[str | None]
-    # None = use requirements_west.txt's pinned version
+    # None = use zephyr/requirements.txt's pinned version
     ninja_version: NotRequired[str | None]
     # framework: snippets: -- one `-S <name>` per entry to `west build`
     snippets: NotRequired[list[str]]

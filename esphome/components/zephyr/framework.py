@@ -73,11 +73,11 @@ def _source_cache_key(
 
 
 def _requirements_path() -> Path:
-    return Path(__file__).parent / "requirements_west.txt"
+    return Path(__file__).parent / "requirements.txt"
 
 
 def _effective_requirements(overrides: dict[str, str | None]) -> str:
-    """Return requirements_west.txt's content, substituting the version on any pinned
+    """Return zephyr/requirements.txt's content, substituting the version on any pinned
     `pkg==...` line whose package name has a non-None override (e.g. {"west": "1.4.0"},
     from CONF_WEST_VERSION/CONF_NINJA_VERSION)."""
     text = _requirements_path().read_text()
@@ -335,7 +335,7 @@ def _check_and_install(
 ) -> tuple[Path, Path, dict[str, str]]:
     """Install west and Zephyr SDK.
 
-    west_version/ninja_version override requirements_west.txt's pinned versions
+    west_version/ninja_version override zephyr/requirements.txt's pinned versions
     (CONF_WEST_VERSION/CONF_NINJA_VERSION). source, if given (framework: source:), overrides
     which Zephyr gets fetched -- a git fork/branch/ref (cloned into ESPHome's own managed
     cache, same as the official source), or a `local:` path to a manifest repo (e.g. a Zephyr
@@ -402,7 +402,7 @@ def _check_and_install(
 
         install_venv = not python_bin.exists()
         # Compares content, not mtime -- an override changes what should be installed without
-        # touching requirements_west.txt itself, so mtime alone would miss it.
+        # touching zephyr/requirements.txt itself, so mtime alone would miss it.
         requirements_changed = (
             not venv_sentinel.exists()
             or venv_sentinel.read_text() != effective_requirements
