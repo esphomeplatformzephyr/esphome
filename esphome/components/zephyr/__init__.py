@@ -806,16 +806,21 @@ def zephyr_family_uart_drivers() -> frozenset[str]:
     return get_family_module(family).UART_DRIVERS
 
 
-def zephyr_west_projects(sdk: ZephyrSDK) -> frozenset[str]:
-    """The west projects this build needs beyond the SDK's required ones: the
-    family's vendor HALs on mainline, the projects components ask for on NCS."""
+def zephyr_additional_framework_projects(sdk: ZephyrSDK) -> frozenset[str]:
+    """The framework projects this build needs beyond the framework's required ones:
+    the family's vendor HALs on mainline, the projects components ask for on NCS."""
     if sdk is NCS:
         # The same list as nrf52's: components add to it with include_west_project()
         from esphome.components.nrf52.framework import wanted_west_projects  # noqa: PLC0415
 
-        return frozenset(wanted_west_projects())
+        projects = wanted_west_projects()
+        # Sysbuild builds the MCUboot image from the mcuboot project
+        sysbuild_conf = zephyr_data()[KEY_SYSBUILD_CONF]
+        if sysbuild_conf.get("SB_CONFIG_BOOTLOADER_MCUBOOT", (False,))[0]:
+            projects.add("mcuboot")
+        return frozenset(projects)
     if sdk is ZEPHYR_MAINLINE and (family := zephyr_variant_family()) is not None:
-        return get_family_module(family).WEST_HALS
+        return get_family_module(family).ADDITIONAL_FRAMEWORK_PROJECTS
     return frozenset()
 
 
@@ -2038,7 +2043,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
             zephyr_data()["west_version"],
             zephyr_data()["ninja_version"],
             zephyr_data()["sdk_source"],
-            projects=zephyr_west_projects(sdk),
+            projects=zephyr_additional_framework_projects(sdk),
         )
         build_dir = CORE.relative_build_path(".west_build")
         if not run_west_flash_pyocd(python_bin, framework_path, west_env, build_dir):
@@ -2077,7 +2082,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
         zephyr_data()["west_version"],
         zephyr_data()["ninja_version"],
         zephyr_data()["sdk_source"],
-        projects=zephyr_west_projects(sdk),
+        projects=zephyr_additional_framework_projects(sdk),
     )
     build_dir = CORE.relative_build_path(".west_build")
     configured_runner = zephyr_data().get(KEY_RUNNER)
@@ -2135,7 +2140,7 @@ def run_compile(args, config: ConfigType) -> bool:
         zephyr_data()["west_version"],
         zephyr_data()["ninja_version"],
         zephyr_data()["sdk_source"],
-        projects=zephyr_west_projects(sdk),
+        projects=zephyr_additional_framework_projects(sdk),
     )
     if sdk_name == "silabs":
         from .commander_setup import check_and_install as commander_install

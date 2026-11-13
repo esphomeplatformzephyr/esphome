@@ -42,6 +42,7 @@ from esphome.components.zephyr import (
     zephyr_add_prj_conf,
     zephyr_add_sysbuild_conf,
     zephyr_add_user,
+    zephyr_additional_framework_projects,
     zephyr_cdc_acm_label,
     zephyr_claim_cdc_acm,
     zephyr_config_schema,
@@ -53,9 +54,13 @@ from esphome.components.zephyr import (
     zephyr_setup_uart_pinctrl,
     zephyr_variant,
     zephyr_variant_family,
-    zephyr_west_projects,
 )
-from esphome.components.zephyr.const import CONF_BOARD_SOURCE, KEY_PRJ_CONF, KEY_ZEPHYR
+from esphome.components.zephyr.const import (
+    CONF_BOARD_SOURCE,
+    KEY_PRJ_CONF,
+    KEY_SYSBUILD_CONF,
+    KEY_ZEPHYR,
+)
 from esphome.components.zephyr.framework_helpers import FrameworkSource
 from esphome.components.zephyr.mcuboot import zephyr_skip_bootloader_supported
 from esphome.components.zephyr.pinctrl import (
@@ -2633,22 +2638,43 @@ def test_zephyr_toolchain_store() -> None:
     assert zephyr_data() is rtos_store
 
 
-def test_zephyr_west_projects_mainline_takes_the_family_hals() -> None:
+def test_zephyr_additional_framework_projects_mainline_takes_the_family_hals() -> None:
 
     with patch("esphome.components.zephyr.zephyr_variant_family", return_value="stm32"):
-        assert zephyr_west_projects(ZEPHYR_MAINLINE) == frozenset({"hal_stm32"})
+        assert zephyr_additional_framework_projects(ZEPHYR_MAINLINE) == frozenset(
+            {"hal_stm32"}
+        )
 
 
-def test_zephyr_west_projects_ncs_takes_nrf52s_list() -> None:
-    """The projects NCS components ask for with include_west_project()."""
-
-    with patch(
-        "esphome.components.nrf52.framework.wanted_west_projects",
-        return_value={"zephyr", "openthread"},
+@pytest.mark.parametrize(
+    ("sysbuild_conf", "expected"),
+    [
+        pytest.param({}, {"zephyr", "openthread"}, id="no_mcuboot"),
+        pytest.param(
+            {"SB_CONFIG_BOOTLOADER_MCUBOOT": (True, True)},
+            {"zephyr", "openthread", "mcuboot"},
+            id="mcuboot",
+        ),
+    ],
+)
+def test_zephyr_additional_framework_projects_ncs_takes_nrf52s_list(
+    sysbuild_conf: dict[str, tuple[bool, bool]], expected: set[str]
+) -> None:
+    """The projects NCS components ask for with include_west_project(), and the
+    mcuboot project when sysbuild builds the MCUboot image."""
+    with (
+        patch(
+            "esphome.components.nrf52.framework.wanted_west_projects",
+            return_value={"zephyr", "openthread"},
+        ),
+        patch(
+            "esphome.components.zephyr.zephyr_data",
+            return_value={KEY_SYSBUILD_CONF: sysbuild_conf},
+        ),
     ):
-        assert zephyr_west_projects(NCS) == frozenset({"zephyr", "openthread"})
+        assert zephyr_additional_framework_projects(NCS) == frozenset(expected)
 
 
-def test_zephyr_west_projects_silabs_adds_nothing() -> None:
+def test_zephyr_additional_framework_projects_silabs_adds_nothing() -> None:
 
-    assert zephyr_west_projects(SILABS) == frozenset()
+    assert zephyr_additional_framework_projects(SILABS) == frozenset()

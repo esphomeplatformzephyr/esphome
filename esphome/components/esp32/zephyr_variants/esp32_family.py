@@ -25,7 +25,7 @@ UART_DRIVERS: frozenset[str] = frozenset()
 
 # Vendor HAL west projects this family builds against on mainline Zephyr; the other
 # vendor HALs are not fetched.
-WEST_HALS: frozenset[str] = frozenset({"hal_espressif"})
+ADDITIONAL_FRAMEWORK_PROJECTS: frozenset[str] = frozenset({"hal_espressif"})
 # CPU architecture (see ZephyrVariant.cpu_arch)
 CPU_ARCH = "riscv"
 # Kind of USB UART (see ZephyrVariant.usb_uart_type)
@@ -288,9 +288,9 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
 
     from esphome.__main__ import check_permissions  # noqa: PLC0415
     from esphome.components.zephyr import (  # noqa: PLC0415
+        zephyr_additional_framework_projects,
         zephyr_data,
         zephyr_variant,
-        zephyr_west_projects,
     )
     from esphome.components.zephyr.build_zephyr import run_west_flash  # noqa: PLC0415
     from esphome.components.zephyr.const import KEY_FRAMEWORK_TYPE, KEY_RUNNER  # noqa: PLC0415
@@ -310,7 +310,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
         zephyr_data()["west_version"],
         zephyr_data()["ninja_version"],
         zephyr_data()["sdk_source"],
-        projects=zephyr_west_projects(sdk),
+        projects=zephyr_additional_framework_projects(sdk),
     )
 
     build_dir = CORE.relative_build_path(".west_build")

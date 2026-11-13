@@ -15,7 +15,7 @@ UART_DRIVERS: frozenset[str] = frozenset({SEGGER_RTT_UART})
 
 # Vendor HAL west projects this family builds against on mainline Zephyr; the other
 # vendor HALs are not fetched.
-WEST_HALS: frozenset[str] = frozenset({"hal_stm32"})
+ADDITIONAL_FRAMEWORK_PROJECTS: frozenset[str] = frozenset({"hal_stm32"})
 # CPU architecture (see ZephyrVariant.cpu_arch)
 CPU_ARCH = "arm"
 # Kind of USB UART (see ZephyrVariant.usb_uart_type)

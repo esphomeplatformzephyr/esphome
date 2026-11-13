@@ -321,6 +321,6 @@ def test_simg301_rejects_an_unknown_advanced_key() -> None:
 
 def test_every_family_names_its_vendor_hals() -> None:
     for family in {v.family for v in VARIANTS.values() if v.family}:
-        hals = get_family_module(family).WEST_HALS
+        hals = get_family_module(family).ADDITIONAL_FRAMEWORK_PROJECTS
         assert hals
         assert all(h.startswith("hal_") for h in hals)
