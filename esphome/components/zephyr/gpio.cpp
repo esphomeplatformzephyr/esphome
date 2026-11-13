@@ -134,8 +134,8 @@ int ZephyrGPIOPin::arm_wakeup(bool level) {
 #endif
   return gpio_pin_configure(
       this->gpio_, pin,
-      flags_to_mode(gpio::FLAG_INPUT | (this->flags_ & (gpio::FLAG_PULLUP | gpio::FLAG_PULLDOWN)), false, false) |
-          wake | (level ? 0 : GPIO_ACTIVE_LOW));
+      flags_to_mode(gpio::FLAG_INPUT | (this->flags_ & (gpio::FLAG_PULLUP | gpio::FLAG_PULLDOWN))) | wake |
+          (level ? 0 : GPIO_ACTIVE_LOW));
 #endif
 }
 #endif
