@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 from pathlib import Path
-from unittest.mock import AsyncMock, call, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -2492,18 +2492,17 @@ def test_zephyr_cdc_acm_ports_reuse_board_node() -> None:
     assert "CONFIG_USB_DEVICE_STACK" not in prj_conf
 
 
-@pytest.mark.parametrize(("ports", "multi"), [((0,), False), ((0, 1), True)])
-def test_zephyr_cdc_acm_second_port_uses_own_usb_device(
-    ports: tuple[int, ...], multi: bool
-) -> None:
-    """Zephyr's boot-time setup registers only port 0, so a second port switches to usb_device.cpp."""
-    with _zephyr_cdc_core(None), patch("esphome.codegen.add_define") as mock_define:
+@pytest.mark.parametrize("ports", [(0,), (0, 1)])
+def test_zephyr_cdc_acm_ports_use_usb_device_setup(ports: tuple[int, ...]) -> None:
+    """usb_device.cpp starts the device for any number of ports, not Zephyr's boot-time setup."""
+    with _zephyr_cdc_core(None):
         for port in ports:
             zephyr_claim_cdc_acm(port, f"user{port}")
         _zephyr_toolchain_cdc_acm_add_ports()
     prj_conf = CORE.data[KEY_ZEPHYR]["prj_conf"][""]
-    assert prj_conf["CONFIG_CDC_ACM_SERIAL_INITIALIZE_AT_BOOT"][0] is not multi
-    assert (call("USE_ZEPHYR_USB_DEVICE") in mock_define.call_args_list) is multi
+    assert prj_conf["CONFIG_CDC_ACM_SERIAL_INITIALIZE_AT_BOOT"][0] is False
+    for option in ("USBD_CDC_ACM_CLASS", "UART_LINE_CTRL", "HWINFO"):
+        assert prj_conf[f"CONFIG_{option}"][0] is True
 
 
 def test_zephyr_cdc_acm_ports_board_node_only_adds_no_overlay() -> None:

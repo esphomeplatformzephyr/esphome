@@ -127,7 +127,6 @@ from .rtt import (  # noqa: F401
     rtt_label_channel,
     validate_rtt_port,
 )
-from .usb_baud_rate import CONF_USB_BAUD_RATE
 from .variants import (
     NCS,
     VARIANTS,
@@ -1099,13 +1098,17 @@ def _zephyr_toolchain_cdc_acm_add_ports() -> None:
     users = zephyr_data()["cdc_acm_users"]
     if not users:
         return
-    zephyr_add_prj_conf("CONFIG_USB_DEVICE_STACK_NEXT", True)
-    # Zephyr's boot-time setup registers only port 0; usb_device.cpp registers every port
-    multi_port = max(users) > 0
-    zephyr_add_prj_conf("CONFIG_CDC_ACM_SERIAL_INITIALIZE_AT_BOOT", not multi_port)
-    if multi_port:
-        cg.add_define("USE_ZEPHYR_USB_DEVICE")
     zephyr_add_prj_conf("SERIAL", True)
+    # DTR (port opened) and the bit rate are read with uart_line_ctrl_get()
+    zephyr_add_prj_conf("UART_LINE_CTRL", True)
+    zephyr_add_prj_conf("USB_DEVICE_STACK_NEXT", True)
+    zephyr_add_prj_conf("USBD_CDC_ACM_CLASS", True)
+    # The serial number string descriptor is read from the chip ID
+    zephyr_add_prj_conf("HWINFO", True)
+    # prevent logging when buffer is full
+    zephyr_add_prj_conf("USBD_CDC_ACM_LOG_LEVEL_WRN", True)
+    # usb_device.cpp starts the device with every port, the board's own included
+    zephyr_add_prj_conf("CDC_ACM_SERIAL_INITIALIZE_AT_BOOT", False)
     nodes = "".join(
         f"""
                 {label}: {label} {{
@@ -1123,21 +1126,14 @@ def _zephyr_toolchain_cdc_acm_add_ports() -> None:
         )
 
 
-async def zephyr_add_usb_baud_rate(config: ConfigType) -> MockObj:
-    """Ensure the USB serial port exists and that baud rates the host sets on it are
-    reported (see usb_baud_rate.h). Returns the UsbBaudRate component for consumers to
-    subscribe to. config must hold the CONF_USB_BAUD_RATE id declared at validation (the
-    Pico family keeps it in advanced:), because components are counted then."""
-    cg.add_define("USE_ZEPHYR_USB_BAUD_RATE")
+def zephyr_add_cdc_acm_rate_callback() -> MockObj:
+    """Pass the bit rates the USB host sets to zephyr::CdcAcm, for the 1200 baud touch
+    components (DFU, BOOTSEL, TinyUF2). Returns port 0's device: only its rates count."""
     # Reads the line settings only: no IRQ callback and no output, so it shares port 0 with anything.
     # Claimed here rather than at validation since its users are variant code, before the FINAL port setup
     zephyr_claim_cdc_acm(0, "usb_baud_rate", write_only=True, allow_write_only=True)
-    # Needed to read the rate the host set.
-    zephyr_add_prj_conf("UART_LINE_CTRL", True)
-    port = MockObj(f"DEVICE_DT_GET(DT_NODELABEL({zephyr_cdc_acm_label(0)}))")
-    var = cg.new_Pvariable(config[CONF_USB_BAUD_RATE], port)
-    await cg.register_component(var, {})
-    return var
+    zephyr_enable_cdc_acm_rate_callback()
+    return MockObj(f"DEVICE_DT_GET(DT_NODELABEL({zephyr_cdc_acm_label(0)}))")
 
 
 def zephyr_add_user(key, value):

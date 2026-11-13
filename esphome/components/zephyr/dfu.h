@@ -5,13 +5,14 @@
 #include "esphome/core/component.h"
 #include "esphome/core/gpio.h"
 
-namespace esphome::zephyr {
+#include <zephyr/device.h>
 
-class UsbBaudRate;
+namespace esphome::zephyr {
 
 class DeviceFirmwareUpdate final : public Component {
  public:
-  explicit DeviceFirmwareUpdate(UsbBaudRate *usb_baud_rate) : usb_baud_rate_(usb_baud_rate) {}
+  /// port: the USB serial port whose bit rate requests an action
+  explicit DeviceFirmwareUpdate(const device *port) : port_(port) {}
   void setup() override;
   void set_reset_pin(GPIOPin *reset) { this->reset_pin_ = reset; }
   void dump_config() override;
@@ -19,7 +20,7 @@ class DeviceFirmwareUpdate final : public Component {
  protected:
   void on_baud_rate(uint32_t rate);
 
-  UsbBaudRate *usb_baud_rate_;
+  const device *port_;
   GPIOPin *reset_pin_{nullptr};
 };
 

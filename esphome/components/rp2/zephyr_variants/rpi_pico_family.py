@@ -8,11 +8,10 @@ import subprocess
 from typing import Any
 
 import esphome.codegen as cg
-from esphome.components.zephyr.const import SEGGER_RTT_UART, zephyr_ns
-from esphome.components.zephyr.usb_baud_rate import (
-    CONF_USB_BAUD_RATE,
-    UsbBaudRate,
+from esphome.components.zephyr.const import (
+    SEGGER_RTT_UART,
     declare_component_id,
+    zephyr_ns,
 )
 from esphome.components.zephyr.variants import mcuboot_or_none
 import esphome.config_validation as cv
@@ -44,16 +43,14 @@ CONF_BOOTSEL_TOUCH = "bootsel_touch"
 BOOTSEL_TOUCH_SCHEMA = cv.Schema(
     {
         cv.Optional(CONF_BOOTSEL_TOUCH): declare_component_id(BootselTouch),
-        cv.Optional(CONF_USB_BAUD_RATE): declare_component_id(UsbBaudRate),
     }
 )
 
 
 def declare_bootsel_touch(advanced: ConfigType) -> None:
-    """Declare BootselTouch and the UsbBaudRate it uses in the validated advanced: block:
+    """Declare BootselTouch in the validated advanced: block:
     components are counted at validation, so they cannot be created later in to_code."""
     advanced.setdefault(CONF_BOOTSEL_TOUCH, declare_component_id(BootselTouch)(None))
-    advanced.setdefault(CONF_USB_BAUD_RATE, declare_component_id(UsbBaudRate)(None))
 
 
 # Devicetree property rpi_pico pinctrl groups pack all their signal macros into.
@@ -204,10 +201,11 @@ def to_code(config: ConfigType) -> None:
 
 @coroutine_with_priority(CoroPriority.DIAGNOSTICS)
 async def _bootsel_touch_to_code(advanced: ConfigType) -> None:
-    from esphome.components.zephyr import zephyr_add_usb_baud_rate  # noqa: PLC0415 -- avoids circular import at module load
+    from esphome.components.zephyr import zephyr_add_cdc_acm_rate_callback  # noqa: PLC0415 -- avoids circular import at module load
 
-    usb_baud_rate = await zephyr_add_usb_baud_rate(advanced)
-    var = cg.new_Pvariable(advanced[CONF_BOOTSEL_TOUCH], usb_baud_rate)
+    var = cg.new_Pvariable(
+        advanced[CONF_BOOTSEL_TOUCH], zephyr_add_cdc_acm_rate_callback()
+    )
     await cg.register_component(var, {})
 
 

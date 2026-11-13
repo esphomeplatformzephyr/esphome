@@ -349,34 +349,26 @@ def test_reset_over_usb_does_nothing_when_the_build_data_is_missing(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.asyncio
-async def test_zephyr_add_usb_baud_rate_creates_the_declared_component() -> None:
-    from esphome.components.zephyr import zephyr_add_usb_baud_rate
+def test_zephyr_add_cdc_acm_rate_callback_returns_port_0() -> None:
+    from esphome.components.zephyr import zephyr_add_cdc_acm_rate_callback
 
-    config = {"usb_baud_rate": "declared_id"}
     with (
         patch("esphome.components.zephyr.zephyr_claim_cdc_acm") as mock_claim,
-        patch("esphome.components.zephyr.zephyr_add_prj_conf") as mock_conf,
+        patch(
+            "esphome.components.zephyr.zephyr_enable_cdc_acm_rate_callback"
+        ) as mock_rate,
         patch(
             "esphome.components.zephyr.zephyr_cdc_acm_label",
             return_value="board_cdc_acm_uart",
         ),
-        patch("esphome.codegen.add_define") as mock_define,
-        patch("esphome.codegen.new_Pvariable", return_value="var") as mock_new,
-        patch("esphome.codegen.register_component", new=AsyncMock()) as mock_register,
     ):
-        assert await zephyr_add_usb_baud_rate(config) == "var"
-    mock_define.assert_called_once_with("USE_ZEPHYR_USB_BAUD_RATE")
+        port = zephyr_add_cdc_acm_rate_callback()
     mock_claim.assert_called_once_with(
         0, "usb_baud_rate", write_only=True, allow_write_only=True
     )
-    mock_conf.assert_called_once_with("UART_LINE_CTRL", True)
-    mock_new.assert_called_once()
-    declared_id, port = mock_new.call_args.args
-    assert declared_id == "declared_id"
+    mock_rate.assert_called_once_with()
     # Only port 0 (the logger's) may reboot the board on a 1200 baud touch
     assert str(port) == "DEVICE_DT_GET(DT_NODELABEL(board_cdc_acm_uart))"
-    mock_register.assert_awaited_once()
 
 
 async def _run_dfu_to_code(dfu_config: dict) -> MagicMock:
@@ -384,8 +376,8 @@ async def _run_dfu_to_code(dfu_config: dict) -> MagicMock:
     var = MagicMock()
     with (
         patch(
-            "esphome.components.zephyr.zephyr_add_usb_baud_rate",
-            new=AsyncMock(return_value="usb"),
+            "esphome.components.zephyr.zephyr_add_cdc_acm_rate_callback",
+            return_value="port",
         ),
         patch("esphome.codegen.add_define") as mock_define,
         patch("esphome.codegen.new_Pvariable", return_value=var) as mock_new,
@@ -399,7 +391,7 @@ async def _run_dfu_to_code(dfu_config: dict) -> MagicMock:
     ):
         await nrf52._dfu_to_code(dfu_config)
     mock_define.assert_called_once_with("USE_ZEPHYR_NRF52_DFU")
-    mock_new.assert_called_once_with("dfu_id", "usb")
+    mock_new.assert_called_once_with("dfu_id", "port")
     return var
 
 
@@ -416,21 +408,21 @@ async def test_dfu_to_code_without_a_reset_pin_uses_gpregret() -> None:
 
 
 @pytest.mark.asyncio
-async def test_bootsel_touch_to_code_subscribes_to_the_usb_component() -> None:
+async def test_bootsel_touch_to_code_watches_port_0() -> None:
     from esphome.components.rp2.zephyr_variants import rpi_pico_family
 
-    advanced = {"bootsel_touch": "touch_id", "usb_baud_rate": "usb_id"}
+    advanced = {"bootsel_touch": "touch_id"}
     with (
         patch(
-            "esphome.components.zephyr.zephyr_add_usb_baud_rate",
-            new=AsyncMock(return_value="usb"),
-        ) as mock_usb,
+            "esphome.components.zephyr.zephyr_add_cdc_acm_rate_callback",
+            return_value="port",
+        ) as mock_port,
         patch("esphome.codegen.new_Pvariable") as mock_new,
         patch("esphome.codegen.register_component", new=AsyncMock()) as mock_register,
     ):
         await rpi_pico_family._bootsel_touch_to_code(advanced)
-    mock_usb.assert_awaited_once_with(advanced)
-    mock_new.assert_called_once_with("touch_id", "usb")
+    mock_port.assert_called_once_with()
+    mock_new.assert_called_once_with("touch_id", "port")
     mock_register.assert_awaited_once()
 
 

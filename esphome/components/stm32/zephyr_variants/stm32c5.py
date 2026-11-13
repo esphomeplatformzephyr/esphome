@@ -12,14 +12,10 @@ from esphome.components.zephyr.const import (
     CONF_RUNNER,
     KEY_BOARD,
     KEY_BOOTLOADER,
+    declare_component_id,
     zephyr_ns,
 )
 from esphome.components.zephyr.partitions import BootLayout
-from esphome.components.zephyr.usb_baud_rate import (
-    CONF_USB_BAUD_RATE,
-    UsbBaudRate,
-    declare_component_id,
-)
 from esphome.components.zephyr.variants import (
     ZEPHYR_MAINLINE,
     ZephyrVariant,
@@ -151,7 +147,6 @@ CONF_TINYUF2_TOUCH = "tinyuf2_touch"
 _ADVANCED_SCHEMA = _ADVANCED_SCHEMA.extend(
     {
         cv.Optional(CONF_TINYUF2_TOUCH): declare_component_id(TinyUf2Touch),
-        cv.Optional(CONF_USB_BAUD_RATE): declare_component_id(UsbBaudRate),
     }
 )
 
@@ -172,7 +167,6 @@ def _xiao_config_schema(config: ConfigType) -> None:
         advanced.setdefault(
             CONF_TINYUF2_TOUCH, declare_component_id(TinyUf2Touch)(None)
         )
-        advanced.setdefault(CONF_USB_BAUD_RATE, declare_component_id(UsbBaudRate)(None))
 
 
 def _xiao_to_code(config: ConfigType) -> None:
@@ -203,12 +197,11 @@ def _xiao_to_code(config: ConfigType) -> None:
 
 @coroutine_with_priority(CoroPriority.DIAGNOSTICS)
 async def _tinyuf2_touch_to_code(advanced: ConfigType) -> None:
-    from esphome.components.zephyr import zephyr_add_usb_baud_rate
+    from esphome.components.zephyr import zephyr_add_cdc_acm_rate_callback
 
-    usb_baud_rate = await zephyr_add_usb_baud_rate(advanced)
     var = cg.new_Pvariable(
         advanced[CONF_TINYUF2_TOUCH],
-        usb_baud_rate,
+        zephyr_add_cdc_acm_rate_callback(),
         cg.RawExpression(hex(_XIAO_DBL_TAP_ADDR)),
     )
     await cg.register_component(var, {})

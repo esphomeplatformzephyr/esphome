@@ -4,19 +4,20 @@
 #ifdef USE_ZEPHYR_BOOTSEL_TOUCH
 #include "esphome/core/component.h"
 
-namespace esphome::zephyr {
+#include <zephyr/device.h>
 
-class UsbBaudRate;
+namespace esphome::zephyr {
 
 // A host opening the USB serial port at 1200 baud (the "1200 baud touch") reboots into the ROM USB bootloader;
 // 2001 baud reboots into the application.
 class BootselTouch final : public Component {
  public:
-  explicit BootselTouch(UsbBaudRate *usb_baud_rate) : usb_baud_rate_(usb_baud_rate) {}
+  /// port: the USB serial port whose bit rate requests a reboot
+  explicit BootselTouch(const device *port) : port_(port) {}
   void setup() override;
 
  protected:
-  UsbBaudRate *usb_baud_rate_;
+  const device *port_;
 };
 
 }  // namespace esphome::zephyr

@@ -5,21 +5,20 @@
 #include "esphome/core/component.h"
 
 #include <cstdint>
+#include <zephyr/device.h>
 
 namespace esphome::zephyr {
-
-class UsbBaudRate;
 
 // A host opening the USB serial port at 1200 baud reboots into the TinyUF2 bootloader;
 // 2001 baud reboots into the application.
 class TinyUf2Touch final : public Component {
  public:
-  TinyUf2Touch(UsbBaudRate *usb_baud_rate, uintptr_t dbl_tap_addr)
-      : usb_baud_rate_(usb_baud_rate), dbl_tap_addr_(dbl_tap_addr) {}
+  /// port: the USB serial port whose bit rate requests a reboot
+  TinyUf2Touch(const device *port, uintptr_t dbl_tap_addr) : port_(port), dbl_tap_addr_(dbl_tap_addr) {}
   void setup() override;
 
  protected:
-  UsbBaudRate *usb_baud_rate_;
+  const device *port_;
   uintptr_t dbl_tap_addr_;
 };
 

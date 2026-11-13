@@ -12,14 +12,10 @@ from esphome.components.zephyr.const import (
     CONF_RUNNER,
     KEY_BOOTLOADER,
     KEY_MODULE_REQUESTS,
+    declare_component_id,
     zephyr_ns,
 )
 from esphome.components.zephyr.partitions import BootLayout
-from esphome.components.zephyr.usb_baud_rate import (
-    CONF_USB_BAUD_RATE,
-    UsbBaudRate,
-    declare_component_id,
-)
 from esphome.components.zephyr.variants import (
     NCS,
     ZEPHYR_MAINLINE,
@@ -99,7 +95,6 @@ DeviceFirmwareUpdate = zephyr_ns.class_("DeviceFirmwareUpdate", cg.Component)
 _DFU_SCHEMA = cv.Schema(
     {
         cv.GenerateID(): declare_component_id(DeviceFirmwareUpdate),
-        cv.GenerateID(CONF_USB_BAUD_RATE): declare_component_id(UsbBaudRate),
         cv.Optional(CONF_RESET_PIN): pins.gpio_output_pin_schema,
     }
 )
@@ -325,11 +320,10 @@ async def to_code(config: ConfigType) -> None:
 
 @coroutine_with_priority(CoroPriority.DIAGNOSTICS)
 async def _dfu_to_code(dfu_config: ConfigType) -> None:
-    from esphome.components.zephyr import zephyr_add_usb_baud_rate
+    from esphome.components.zephyr import zephyr_add_cdc_acm_rate_callback
 
     cg.add_define("USE_ZEPHYR_NRF52_DFU")
-    usb_baud_rate = await zephyr_add_usb_baud_rate(dfu_config)
-    var = cg.new_Pvariable(dfu_config[CONF_ID], usb_baud_rate)
+    var = cg.new_Pvariable(dfu_config[CONF_ID], zephyr_add_cdc_acm_rate_callback())
     await cg.add_pin(var.set_reset_pin, dfu_config.get(CONF_RESET_PIN))
     await cg.register_component(var, dfu_config)
 

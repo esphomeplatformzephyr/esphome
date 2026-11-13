@@ -2,7 +2,8 @@
 
 #ifdef USE_ZEPHYR_NRF52_DFU
 
-#include "usb_baud_rate.h"
+#include "cdc_acm.h"
+#include "usb_device.h"
 #include "esphome/core/application.h"
 #include "esphome/core/hal.h"
 #include "esphome/core/log.h"
@@ -24,7 +25,14 @@ void DeviceFirmwareUpdate::setup() {
   if (this->reset_pin_ != nullptr) {
     this->reset_pin_->setup();
   }
-  this->usb_baud_rate_->add_on_baud_rate_callback([this](uint32_t rate) { this->on_baud_rate(rate); });
+  // Needed when no other component uses USB (logger on a hardware UART or off)
+  if (int err = usb_device_enable(); err != 0)
+    ESP_LOGE(TAG, "USB device setup failed: %d", err);
+  // Other CDC ports carry user data, where 1200 baud must not reboot the board
+  CdcAcm::add_on_rate_callback([this](const device *dev, uint32_t rate) {
+    if (dev == this->port_)
+      this->on_baud_rate(rate);
+  });
 }
 
 void DeviceFirmwareUpdate::on_baud_rate(uint32_t rate) {
