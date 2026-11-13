@@ -106,6 +106,8 @@ VARIANT = ZephyrVariant(
     # nrf54l15dk_common.dtsi only enables uart20 (routed to the DK's VCOM0/J-Link USB
     # serial, the natural default) and uart30 -- there is no uart0/uart1 node on this SoC.
     uart_node_labels={},
+    # nrf54l_05_10_15.dtsi: gpio1 is domain 20 (gpiote20), gpio0 domain 30 (gpiote30)
+    i2c_ports_by_instance={"I2C20": (1,), "I2C21": (1,), "I2C22": (1,), "I2C30": (0,)},
     # nrf54l_05_10_15.dtsi defines pwm20/pwm21/pwm22 -- same peripheral-instance-number
     # convention as uart_node_labels above, not nRF52840's pwm0-pwm3 low-number scheme.
     pwm_node_labels=["pwm20", "pwm21", "pwm22"],

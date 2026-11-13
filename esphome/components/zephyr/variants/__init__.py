@@ -269,6 +269,9 @@ class ZephyrVariant:
     i2c_valid_pins_by_instance: dict[str, dict[str, frozenset[int]]] = field(
         default_factory=dict
     )
+    # I2C instance ("I2C21") -> the GPIO ports of its power domain; SDA and SCL must be on
+    # one of them, both on the same port (nRF54L datasheet). Empty = no port rule.
+    i2c_ports_by_instance: dict[str, tuple[int, ...]] = field(default_factory=dict)
     # Like uart_valid_pins, but for SPI's clk/mosi/miso. Empty = not wired up
     # (left to zephyr_setup_spi_pinctrl() at codegen time instead).
     spi_valid_pins: dict[str, frozenset[int]] = field(default_factory=dict)

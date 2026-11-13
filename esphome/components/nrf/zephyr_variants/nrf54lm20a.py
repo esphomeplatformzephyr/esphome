@@ -109,6 +109,11 @@ VARIANT = ZephyrVariant(
     # the DK board itself but is a real SoC instance (e.g. wired to header pins on the
     # Seeed xiao_nrf54lm20a board).
     uart_node_labels={},
+    # nrf54lm20_a_b.dtsi: gpio1 and gpio3 are domain 20 (gpiote20), gpio0 domain 30 (gpiote30)
+    i2c_ports_by_instance={
+        **dict.fromkeys(("I2C20", "I2C21", "I2C22", "I2C23", "I2C24"), (1, 3)),
+        "I2C30": (0,),
+    },
     # nrf54lm20_a_b.dtsi defines pwm20/pwm21/pwm22 -- same peripheral-instance-number
     # convention as uart_node_labels above, not nRF52840's pwm0-pwm3 low-number scheme.
     pwm_node_labels=["pwm20", "pwm21", "pwm22"],

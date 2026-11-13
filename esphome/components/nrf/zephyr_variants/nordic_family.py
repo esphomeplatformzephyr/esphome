@@ -96,6 +96,8 @@ I2C_FALLBACK_STATE_SUFFIXES = ("default", "sleep")
 # fixed across every nRF chip generation, unlike ESP32's per-instance signal IDs.
 _NRF_PSEL_FUN_SHIFT = 24
 _NRF_PSEL_FUN_MASK = 0xFF
+# NRF_PIN_MSK (nrf-pinctrl.h): the flat pin, port * 32 + pin
+_NRF_PSEL_PIN_MASK = 0x1FF
 
 # NRF_FUN_TWIM_{SDA,SCL} (nrf-pinctrl.h) -- fixed across every nRF chip.
 _NRF_I2C_SIGNAL_NAMES = {12: "sda", 11: "scl"}
@@ -119,6 +121,56 @@ def pin_macro(prefix: str, signal: str, pin: int | None, variant: str) -> str | 
 def i2c_value_role(value: int) -> str | None:
     fun = (value >> _NRF_PSEL_FUN_SHIFT) & _NRF_PSEL_FUN_MASK
     return _NRF_I2C_SIGNAL_NAMES.get(fun)
+
+
+def _board_i2c_pin(board: str, bus_label: str, role: str) -> int | None:
+    """The pin the board's default pinctrl state (pinctrl-0) gives `role` ("sda"/"scl")."""
+    from esphome.components.zephyr.dts_lookup import (  # noqa: PLC0415
+        get_pinctrl_group_property,
+        get_pinctrl_states,
+    )
+
+    if not (states := get_pinctrl_states(board, bus_label)):
+        return None
+    label, groups = states[0]
+    for group in groups:
+        for raw in get_pinctrl_group_property(board, label, group, PROPERTY_NAME) or []:
+            if i2c_value_role(raw) == role:
+                return raw & _NRF_PSEL_PIN_MASK
+    return None
+
+
+def i2c_check_pins(
+    bus_label: str, sda: int | None, scl: int | None, variant: str
+) -> None:
+    """Reject pins outside the bus's power domain, or SDA and SCL on two ports (nRF54L)."""
+    from esphome.components.zephyr import zephyr_data  # noqa: PLC0415
+    from esphome.components.zephyr.const import KEY_BOARD  # noqa: PLC0415
+    from esphome.components.zephyr.variants import VARIANTS  # noqa: PLC0415
+    from esphome.core import EsphomeError  # noqa: PLC0415
+
+    if (
+        ports := VARIANTS[variant].i2c_ports_by_instance.get(bus_label.upper())
+    ) is None:
+        return
+    for role, pin in (("sda", sda), ("scl", scl)):
+        if pin is not None and pin // 32 not in ports:
+            allowed = " or ".join(f"P{p}" for p in ports)
+            raise EsphomeError(
+                f"{role}: P{pin // 32}.{pin % 32:02d} is not in the power domain of "
+                f"'{bus_label}' on {variant}; use a pin on {allowed}"
+            )
+    # The pin not given stays on the board's own wiring
+    board = zephyr_data()[KEY_BOARD]
+    if sda is None:
+        sda = _board_i2c_pin(board, bus_label, "sda")
+    if scl is None:
+        scl = _board_i2c_pin(board, bus_label, "scl")
+    if sda is not None and scl is not None and sda // 32 != scl // 32:
+        raise EsphomeError(
+            f"sda: P{sda // 32}.{sda % 32:02d} and scl: P{scl // 32}.{scl % 32:02d} of "
+            f"'{bus_label}' must be on the same GPIO port"
+        )
 
 
 def i2c_value_role_decoder(bus_label: str) -> Callable[[int], str | None] | None:
