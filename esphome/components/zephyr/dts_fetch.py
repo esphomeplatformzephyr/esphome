@@ -313,20 +313,20 @@ def _native_dts_path(sdk: ZephyrSDK, family: str | None = None) -> Path | None:
 def _resolve_boards_ref(sdk: ZephyrSDK, ver: str) -> str | None:
     """Return the git ref to check out sdk.boards_repo_url at, for a resolved version `ver`.
 
-    Mainline-shaped SDKs tag boards_repo_url (== manifest_url when unset) directly at
+    Mainline-shaped SDKs tag boards_repo_url (== source.url when unset) directly at
     f"v{ver}". SDKs with resolve_boards_ref_via_manifest=True (NCS) instead fetch
-    manifest_url's own west.yml at tag f"v{ver}" and read the boards_repo_url project's
+    source.url's own west.yml at tag f"v{ver}" and read the boards_repo_url project's
     own `revision:` field -- the only correct way to know it; see
     ZephyrSDK.resolve_boards_ref_via_manifest for why a guessed format string can't work.
     Cached under the machine-global zephyr cache root's manifest_revision_cache/
-    (small -- just the resolved string), immutable per (manifest_url, ver) since ver
+    (small -- just the resolved string), immutable per (source.url, ver) since ver
     always maps to the same immutable upstream tag.
     """
     if not sdk.resolve_boards_ref_via_manifest:
         return f"v{ver}"
 
     cache_root = _manifest_revision_cache_root()
-    cache_key = hashlib.sha1(f"{sdk.manifest_url}@v{ver}".encode()).hexdigest()[:16]
+    cache_key = hashlib.sha1(f"{sdk.source.url}@v{ver}".encode()).hexdigest()[:16]
     cache_file = cache_root / cache_key
     if cache_file.is_file():
         return cache_file.read_text().strip() or None
@@ -342,7 +342,7 @@ def _resolve_boards_ref(sdk: ZephyrSDK, ver: str) -> str | None:
                     "--sparse",
                     "--branch",
                     f"v{ver}",
-                    sdk.manifest_url,
+                    sdk.source.url,
                     tmp,
                 ],
                 check=True,
@@ -352,7 +352,7 @@ def _resolve_boards_ref(sdk: ZephyrSDK, ver: str) -> str | None:
         except (subprocess.CalledProcessError, FileNotFoundError) as exc:
             _LOGGER.warning(
                 "[zephyr] Could not fetch %s@v%s to resolve boards revision: %s",
-                sdk.manifest_url,
+                sdk.source.url,
                 ver,
                 exc,
             )
@@ -361,7 +361,7 @@ def _resolve_boards_ref(sdk: ZephyrSDK, ver: str) -> str | None:
         west_yml = Path(tmp) / "west.yml"
         if not west_yml.is_file():
             _LOGGER.warning(
-                "[zephyr] %s@v%s has no top-level west.yml", sdk.manifest_url, ver
+                "[zephyr] %s@v%s has no top-level west.yml", sdk.source.url, ver
             )
             return None
         try:
@@ -383,7 +383,7 @@ def _resolve_boards_ref(sdk: ZephyrSDK, ver: str) -> str | None:
     if revision is None:
         _LOGGER.warning(
             "[zephyr] %s@v%s's west.yml has no project matching %s",
-            sdk.manifest_url,
+            sdk.source.url,
             ver,
             sdk.boards_repo_url,
         )
@@ -485,7 +485,7 @@ def _sparse_clone_dts(
     Returns None if git is unavailable, the tag/ref can't be resolved, or the clone
     fails.
     """
-    repo = sdk.boards_repo_url or sdk.manifest_url
+    repo = sdk.boards_repo_url or sdk.source.url
     ver = _framework_base_version()
     # A level down, so the HAL modules beside it stay within this version
     dest = _dts_cache_root() / sdk_name / ver / "zephyr"

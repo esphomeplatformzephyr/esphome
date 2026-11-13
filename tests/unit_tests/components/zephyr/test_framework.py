@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterator
-import configparser
+from collections.abc import Iterator
 import os
 from pathlib import Path
 import subprocess
@@ -17,7 +16,6 @@ import pytest
 from esphome.components.zephyr import framework, sdk_install
 from esphome.components.zephyr.const import KEY_SDK_SOURCE_RESOLVED_REF
 from esphome.components.zephyr.framework import (
-    _NEUTRAL_HALS,
     _git_output,
     _remote_commit,
     _source_cache_key,
@@ -25,13 +23,20 @@ from esphome.components.zephyr.framework import (
     get_zephyr_tools_path,
     install_git_modules,
 )
+from esphome.components.zephyr.framework_helpers import FrameworkSource
 from esphome.components.zephyr.variants import ZephyrModule, ZephyrSDK
 from esphome.core import EsphomeError
 from esphome.framework_helpers import get_python_env_executable_path
 
-_FAKE_SDK = ZephyrSDK(manifest_url="https://example.invalid/zephyr")
 TOOLCHAIN: str = "riscv64-zephyr-elf"
-_CACHE_KEY = "v4.4.1-my-branch-00000000"
+_SHA: str = "a" * 40
+_SOURCE: FrameworkSource = FrameworkSource(
+    name="Zephyr",
+    url="https://example.invalid/zephyr",
+    optional=("hal_.*",),
+    required=frozenset({"hal_common"}),
+)
+_SDK: ZephyrSDK = ZephyrSDK(source=_SOURCE, workspace_prefix="zephyr")
 
 
 class _Calls(list):
@@ -42,77 +47,66 @@ class _Calls(list):
         self.cwds: list[str | None] = []
 
 
-def _make_fake_run_command_ok(
+def _fake_create_venv(root: Path, msg: str | None = None) -> None:
+    # Must match get_python_env_executable_path()'s real path (bin/python vs.
+    # Scripts/python.exe), or the venv looks missing forever on Windows.
+    python = get_python_env_executable_path(root, "python")
+    python.parent.mkdir(parents=True, exist_ok=True)
+    python.touch()
+
+
+def _git_source(sha: str | None = _SHA) -> dict[str, Any]:
+    source: dict[str, Any] = {
+        "type": "git",
+        "url": "https://example.invalid/fork.git",
+        "ref": "my-branch",
+    }
+    if sha is not None:
+        source[KEY_SDK_SOURCE_RESOLVED_REF] = sha
+    return source
+
+
+def _workspace(tmp_path: Path, source: dict[str, Any] | None = None) -> Path:
+    return (
+        tmp_path / "zephyr" / "frameworks" / _source_cache_key(_SDK, "v4.4.1", source)
+    )
+
+
+def _install(
     tmp_path: Path,
+    source: dict[str, Any] | None = None,
+    projects: frozenset[str] = frozenset({"hal_stm32"}),
     manifest_path: str = "zephyr",
-    fail_list: bool = False,
-    zephyr_reqs: bool = False,
-) -> tuple[_Calls, Callable[..., bool]]:
-    """Record every run_command_ok() call; a `west init` also creates the
-    framework and .west/config it would leave on disk (manifest.path is where west put
-    the manifest repository), since check_and_install() depends on them existing."""
+    sdk: ZephyrSDK = _SDK,
+) -> tuple[_Calls, tuple[Path, Path, dict[str, str]]]:
+    """Run check_and_install() against a fake west; return its commands and result.
+
+    A ``west init`` leaves .west/config (manifest.path is where west put the manifest
+    repository) and Zephyr's requirements; ``west init -l`` leaves .west/.
+    """
     calls = _Calls()
 
     def fake_run_command_ok(cmd: list[str], **kwargs: Any) -> bool:
         calls.append(cmd)
         calls.cwds.append(kwargs.get("cwd"))
         if cmd[2:4] == ["west", "init"]:
-            west_dir = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY / ".west"
-            west_dir.mkdir(parents=True, exist_ok=True)
-            (west_dir / "config").write_text(f"[manifest]\npath = {manifest_path}\n")
-        if zephyr_reqs and cmd[2:4] == ["west", "init"]:
-            reqs = _framework(tmp_path) / "zephyr" / "scripts" / "requirements.txt"
-            reqs.parent.mkdir(parents=True, exist_ok=True)
-            reqs.write_text("pyelftools\n")
-        if cmd[2:5] == list(_FILTER_CMD):
-            config_path = (
-                tmp_path / "zephyr" / "frameworks" / _CACHE_KEY / ".west" / "config"
-            )
-            config = configparser.ConfigParser()
-            config.read(config_path)
-            config["manifest"]["project-filter"] = cmd[-1]
-            with config_path.open("w") as f:
-                config.write(f)
-        return not (fail_list and cmd[2:4] == ["west", "list"])
+            if "-l" in cmd:
+                (Path(kwargs["cwd"]) / ".west").mkdir()
+            else:
+                workspace = Path(cmd[-1])
+                (workspace / ".west").mkdir(parents=True, exist_ok=True)
+                (workspace / ".west" / "config").write_text(
+                    f"[manifest]\npath = {manifest_path}\n"
+                )
+                reqs = workspace / "zephyr" / "scripts" / "requirements.txt"
+                reqs.parent.mkdir(parents=True, exist_ok=True)
+                reqs.write_text("pyelftools\n")
+        return True
 
-    return calls, fake_run_command_ok
-
-
-def _fake_create_venv(root: Path, msg: str | None = None) -> None:
-    # Must match get_python_env_executable_path()'s real path (bin/python vs.
-    # Scripts/python.exe), or install_venv looks true forever on Windows.
-    python = get_python_env_executable_path(root, "python")
-    python.parent.mkdir(parents=True, exist_ok=True)
-    python.touch()
-
-
-def _run_check_and_install(
-    tmp_path: Path,
-    source: dict | None,
-    manifest_path: str = "zephyr",
-    update_returncode: int = 0,
-    hals: frozenset[str] | None = None,
-    fail_list: bool = False,
-    zephyr_reqs: bool = False,
-) -> tuple[_Calls, MagicMock]:
-    """Return the run_command_ok() calls and the mocked subprocess.run."""
-    calls, fake_run_command_ok = _make_fake_run_command_ok(
-        tmp_path, manifest_path, fail_list, zephyr_reqs
-    )
     with (
-        patch(
-            "esphome.components.zephyr.framework.get_zephyr_tools_path",
-            return_value=tmp_path / "zephyr",
+        patch.object(
+            framework, "get_zephyr_tools_path", return_value=tmp_path / "zephyr"
         ),
-        patch(
-            "esphome.components.zephyr.framework._source_cache_key",
-            return_value=_CACHE_KEY,
-        ),
-        patch(
-            "esphome.components.zephyr.framework.run_command_ok",
-            side_effect=fake_run_command_ok,
-        ),
-        # The venv build lives in the shared Zephyr framework helpers
         patch(
             "esphome.components.zephyr.framework_helpers.run_command_ok",
             side_effect=fake_run_command_ok,
@@ -121,375 +115,182 @@ def _run_check_and_install(
             "esphome.components.zephyr.framework_helpers.create_venv",
             side_effect=_fake_create_venv,
         ),
-        patch("subprocess.run") as mock_subprocess_run,
+        patch("esphome.components.zephyr.framework_helpers.rmdir"),
     ):
-        mock_subprocess_run.return_value.returncode = update_returncode
-        check_and_install(sdk=_FAKE_SDK, version="4.4.1", source=source, hals=hals)
-    return calls, mock_subprocess_run
+        result = check_and_install(
+            sdk=sdk, version="4.4.1", source=source, projects=projects
+        )
+    return calls, result
 
 
-def test_install_locks_are_per_workspace(tmp_path: Path) -> None:
-    """Workspaces of one version install apart; the venv they share has its own lock."""
-    with patch("filelock.FileLock") as file_lock:
-        _run_check_and_install(tmp_path, source=None)
-
-    lock_files = [Path(c.args[0]).name for c in file_lock.call_args_list]
-    assert lock_files == [f"{_CACHE_KEY}.lock", "penv-v4.4.1.lock"]
+def _west(calls: _Calls, subcommand: str) -> list[list[str]]:
+    return [c for c in calls if c[2:4] == ["west", subcommand]]
 
 
-def test_zephyr_requirements_install_holds_the_venv_lock(tmp_path: Path) -> None:
-    """Workspaces of one version pip-install into the venv they share one at a time."""
-    reqs = _framework(tmp_path) / "zephyr" / "scripts" / "requirements.txt"
-
-    with patch("filelock.FileLock") as file_lock:
-        calls, _ = _run_check_and_install(tmp_path, source=None, zephyr_reqs=True)
-
-    lock_files = [Path(c.args[0]).name for c in file_lock.call_args_list]
-    assert lock_files == [f"{_CACHE_KEY}.lock", "penv-v4.4.1.lock", "penv-v4.4.1.lock"]
-    assert any(c[-2:] == ["-r", str(reqs)] for c in calls)
-
-
-def _git_source(resolved_sha: str) -> dict:
-    return {
-        "type": "git",
-        "url": "https://example.invalid/fork.git",
-        "ref": "my-branch",
-        KEY_SDK_SOURCE_RESOLVED_REF: resolved_sha,
-    }
-
-
-def _git_calls(calls: list[list[str]]) -> list[list[str]]:
+def _git(calls: _Calls) -> list[list[str]]:
     return [c for c in calls if c[0] == "git"]
 
 
-def test_git_source_west_init_uses_ref_then_pins_manifest_repo_to_sha(
-    tmp_path: Path,
-) -> None:
-    """A git sdk_source: is pinned to one resolved commit SHA before
-    check_and_install() ever runs (dts_fetch.resolve_sdk_source_version()). `west init
-    --mr` can't take a SHA (git clone --branch rejects it), so it inits at the source's
-    own ref and the manifest repository is then pinned to the SHA with git."""
-    resolved_sha = "a" * 40
-    calls, _ = _run_check_and_install(tmp_path, _git_source(resolved_sha))
+def test_install_locks_are_per_workspace(tmp_path: Path) -> None:
+    """Workspaces of one version install apart; the venv they share has its own
+    lock, for building it and for installing Zephyr's requirements."""
+    with patch("filelock.FileLock") as file_lock:
+        _install(tmp_path)
 
-    init_calls = [c for c in calls if c[2:4] == ["west", "init"]]
-    assert len(init_calls) == 1
-    assert init_calls[0][init_calls[0].index("--mr") + 1] == "my-branch"
-    assert resolved_sha not in init_calls[0]
-    assert _git_calls(calls) == [
-        ["git", "fetch", "--depth=1", "--", "origin", resolved_sha],
+    lock_files = [Path(c.args[0]).name for c in file_lock.call_args_list]
+    workspace = _workspace(tmp_path).name
+    assert lock_files == [f"{workspace}.lock", "penv-v4.4.1.lock", "penv-v4.4.1.lock"]
+
+
+def test_official_source_fetches_the_build_projects(tmp_path: Path) -> None:
+    calls, (python_bin, framework_path, west_env) = _install(tmp_path)
+
+    workspace = _workspace(tmp_path)
+    (init,) = _west(calls, "init")
+    assert init[init.index("init") :] == [
+        "init",
+        "-m",
+        _SOURCE.url,
+        "-o=--depth=1",
+        "--mr",
+        "v4.4.1",
+        str(workspace),
+    ]
+    assert _west(calls, "config")[0][-1] == "-hal_.*,+hal_common,+hal_stm32"
+    assert (workspace / ".ready").exists()
+    assert (workspace / ".west_projects").read_text().split() == [
+        "hal_common",
+        "hal_stm32",
+    ]
+    assert framework_path == workspace
+    assert west_env["ZEPHYR_BASE"] == str(workspace / "zephyr")
+    assert west_env["PATH"].startswith(str(python_bin.parent))
+
+
+def test_finished_workspace_only_checks_the_names(tmp_path: Path) -> None:
+    _install(tmp_path)
+    calls, _ = _install(tmp_path)
+
+    assert [c[2:4] for c in calls] == [["west", "list"]]
+
+
+def test_rebuilt_venv_keeps_the_workspace(tmp_path: Path) -> None:
+    """A rebuilt venv (its interpreter was removed) only gets Zephyr's requirements."""
+    _install(tmp_path)
+    get_python_env_executable_path(
+        tmp_path / "zephyr" / "penvs" / "v4.4.1", "python"
+    ).unlink()
+
+    calls, _ = _install(tmp_path)
+
+    assert not _west(calls, "init")
+    assert not _west(calls, "update")
+    assert calls[-1][-2:] == [
+        "-r",
+        str(_workspace(tmp_path) / "zephyr" / "scripts" / "requirements.txt"),
+    ]
+
+
+def test_git_source_clones_the_fork_and_pins_its_commit(tmp_path: Path) -> None:
+    """`west init --mr` can't take a commit: the default branch is cloned, then the
+    manifest repository is moved to the commit resolve_sdk_source_version() chose."""
+    calls, _ = _install(tmp_path, _git_source())
+
+    workspace = _workspace(tmp_path, _git_source())
+    (init,) = _west(calls, "init")
+    assert "https://example.invalid/fork.git" in init
+    assert "--mr" not in init
+    assert _git(calls) == [
+        ["git", "fetch", "--depth=1", "--", "origin", _SHA],
         ["git", "reset", "--hard", "FETCH_HEAD"],
     ]
-    framework = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
-    assert (framework / ".resolved_ref").read_text() == resolved_sha
+    assert (workspace / ".resolved_ref").read_text() == _SHA
+    assert (workspace / ".ready").exists()
 
 
-def test_git_source_pins_manifest_repo_where_west_put_it(tmp_path: Path) -> None:
-    """The manifest repository isn't always framework/zephyr: NCS's manifest declares
-    `self: path: nrf`, and west records wherever it put it in .west/config."""
-    resolved_sha = "a" * 40
-    calls, _ = _run_check_and_install(
-        tmp_path, _git_source(resolved_sha), manifest_path="nrf"
-    )
+def test_git_source_pins_where_west_put_the_manifest(tmp_path: Path) -> None:
+    """The manifest repository isn't always zephyr/: NCS's declares `self: path: nrf`."""
+    calls, _ = _install(tmp_path, _git_source(), manifest_path="nrf")
 
-    framework = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
-    fetch = ["git", "fetch", "--depth=1", "--", "origin", resolved_sha]
-    assert calls.cwds[calls.index(fetch)] == str(framework / "nrf")
-    reset = ["git", "reset", "--hard", "FETCH_HEAD"]
-    assert calls.cwds[calls.index(reset)] == str(framework / "nrf")
+    nrf = _workspace(tmp_path, _git_source()) / "nrf"
+    assert calls.cwds[calls.index(_git(calls)[0])] == nrf
 
 
-def test_git_source_moved_ref_repins_manifest_repo_without_reinit(
-    tmp_path: Path,
-) -> None:
-    """A branch that moved since the workspace was initialized is updated in place."""
-    _run_check_and_install(tmp_path, _git_source("a" * 40))
+def test_git_source_moved_branch_is_updated_in_place(tmp_path: Path) -> None:
+    _install(tmp_path, _git_source())
     new_sha = "b" * 40
-    calls, mock_run = _run_check_and_install(tmp_path, _git_source(new_sha))
 
-    assert not [c for c in calls if c[2:4] == ["west", "init"]]
-    assert _git_calls(calls)[0] == [
-        "git",
-        "fetch",
-        "--depth=1",
-        "--",
-        "origin",
-        new_sha,
-    ]
-    assert mock_run.call_args.args[0][2:4] == ["west", "update"]
-    framework = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
-    assert (framework / ".resolved_ref").read_text() == new_sha
+    calls, _ = _install(tmp_path, _git_source(new_sha))
+
+    workspace = _workspace(tmp_path, _git_source())
+    assert not _west(calls, "init")
+    assert _git(calls)[0] == ["git", "fetch", "--depth=1", "--", "origin", new_sha]
+    assert _west(calls, "update")
+    assert (workspace / ".resolved_ref").read_text() == new_sha
+    assert (workspace / ".ready").exists()
 
 
-def test_git_source_unchanged_ref_skips_update(tmp_path: Path) -> None:
-    _run_check_and_install(tmp_path, _git_source("a" * 40))
-    calls, mock_run = _run_check_and_install(tmp_path, _git_source("a" * 40))
+def test_git_source_unchanged_branch_only_checks_the_names(tmp_path: Path) -> None:
+    _install(tmp_path, _git_source())
+    calls, _ = _install(tmp_path, _git_source())
 
-    assert not calls
-    mock_run.assert_not_called()
-
-
-def test_missing_ready_sentinel_reruns_update_without_reinit(tmp_path: Path) -> None:
-    """A workspace whose last `west update` never finished has .west/ but no .ready."""
-    _run_check_and_install(tmp_path, None)
-    framework = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
-    (framework / ".ready").unlink()
-
-    calls, mock_run = _run_check_and_install(tmp_path, None)
-
-    assert not [c for c in calls if c[2:4] == ["west", "init"]]
-    assert mock_run.call_args.args[0][2:4] == ["west", "update"]
-    assert (framework / ".ready").is_file()
+    assert [c[2:4] for c in calls] == [["west", "list"]]
 
 
-def test_failed_update_leaves_no_ready_sentinel_and_is_retried(
+def test_git_source_without_a_resolved_commit_inits_at_the_ref(
     tmp_path: Path,
 ) -> None:
-    with pytest.raises(EsphomeError, match="Can't update Zephyr SDK"):
-        _run_check_and_install(tmp_path, None, update_returncode=1)
-    framework = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
-    assert (framework / ".west").is_dir()
-    assert not (framework / ".ready").exists()
+    """Defensive: a source dict that bypassed resolve_sdk_source_version()."""
+    calls, _ = _install(tmp_path, _git_source(sha=None))
 
-    calls, mock_run = _run_check_and_install(tmp_path, None)
-
-    assert not [c for c in calls if c[2:4] == ["west", "init"]]
-    assert mock_run.call_args.args[0][2:4] == ["west", "update"]
-    assert (framework / ".ready").is_file()
+    (init,) = _west(calls, "init")
+    assert init[init.index("--mr") + 1] == "my-branch"
+    assert not _git(calls)
 
 
-def test_second_failed_update_in_a_row_starts_over(tmp_path: Path) -> None:
-    """One failure resumes; a second in a row removes the workspace, so the
-    next build initializes it anew."""
-    framework = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
-    with pytest.raises(EsphomeError, match="retries it"):
-        _run_check_and_install(tmp_path, None, update_returncode=1)
-    assert (framework / ".update_failed").is_file()
-
-    with pytest.raises(EsphomeError, match="twice in a row"):
-        _run_check_and_install(tmp_path, None, update_returncode=1)
-    assert not framework.exists()
-
-    calls, _ = _run_check_and_install(tmp_path, None)
-    assert [c for c in calls if c[2:4] == ["west", "init"]]
-    assert not (framework / ".update_failed").exists()
-
-
-def test_successful_update_clears_the_failure_marker(tmp_path: Path) -> None:
-    framework = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
-    with pytest.raises(EsphomeError):
-        _run_check_and_install(tmp_path, None, update_returncode=1)
-
-    _run_check_and_install(tmp_path, None)
-
-    assert not (framework / ".update_failed").exists()
-    assert (framework / ".ready").is_file()
-
-
-def test_rebuilt_venv_updates_workspace_without_reclone(tmp_path: Path) -> None:
-    """A missing venv (e.g. its interpreter was removed) must not wipe the workspace."""
-    _run_check_and_install(tmp_path, None)
-    framework = tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
-    (framework / "keep").touch()
-    python = get_python_env_executable_path(
-        tmp_path / "zephyr" / "penvs" / "v4.4.1", "python"
-    )
-    python.unlink()
-
-    calls, mock_run = _run_check_and_install(tmp_path, None)
-
-    assert not [c for c in calls if c[2:4] == ["west", "init"]]
-    assert mock_run.call_args.args[0][2:4] == ["west", "update"]
-    assert (framework / "keep").exists()
-
-
-def test_complete_official_install_skips_update(tmp_path: Path) -> None:
-    _run_check_and_install(tmp_path, None)
-    calls, mock_run = _run_check_and_install(tmp_path, None)
-
-    assert not calls
-    mock_run.assert_not_called()
-
-
-_FILTER_CMD = ("west", "config", "manifest.project-filter")
-_SILABS = frozenset({"hal_silabs"})
-_NORDIC = frozenset({"hal_nordic"})
-_SILABS_FILTER = "-hal_.*,-nrf_hw_models,+hal_afbr,+hal_ethos_u,+hal_infineon,+hal_silabs,+hal_st,+hal_tdk,+hal_wurthelektronik,+hal_xtensa"
-
-
-def _stamp(*hals: str) -> str:
-    return "\n".join(sorted(_NEUTRAL_HALS | set(hals)))
-
-
-def _filters(calls: list[list[str]]) -> list[str]:
-    return [c[-1] for c in calls if c[2:5] == list(_FILTER_CMD)]
-
-
-def _framework(tmp_path: Path) -> Path:
-    return tmp_path / "zephyr" / "frameworks" / _CACHE_KEY
-
-
-def test_fresh_install_fetches_only_the_family_hals(tmp_path: Path) -> None:
-    calls, _ = _run_check_and_install(tmp_path, None, hals=_SILABS)
-
-    assert _filters(calls) == [_SILABS_FILTER]
-    assert [c[2:] for c in calls if c[2:4] == ["west", "list"]] == [
-        ["west", "list", "-f", "{name}", "hal_silabs"]
-    ]
-    assert (_framework(tmp_path) / ".west_hals").read_text() == _stamp("hal_silabs")
-
-
-def test_installed_hals_skip_update(tmp_path: Path) -> None:
-    _run_check_and_install(tmp_path, None, hals=_SILABS)
-    calls, mock_run = _run_check_and_install(tmp_path, None, hals=_SILABS)
-
-    assert not calls
-    mock_run.assert_not_called()
-
-
-def test_new_family_grows_the_filter_and_leaves_zephyr_alone(tmp_path: Path) -> None:
-    """A build may be running from zephyr/, so its gen_defines.py is not restored."""
-    _run_check_and_install(tmp_path, None, hals=_SILABS)
-    framework = _framework(tmp_path)
-    gen_defines = framework / "zephyr" / "scripts" / "dts" / "gen_defines.py"
-    gen_defines.parent.mkdir(parents=True)
-    gen_defines.touch()
-
-    calls, mock_run = _run_check_and_install(tmp_path, None, hals=_NORDIC)
-
-    assert _filters(calls) == [
-        "-hal_.*,-nrf_hw_models,+hal_afbr,+hal_ethos_u,+hal_infineon,+hal_nordic,+hal_silabs,+hal_st,+hal_tdk,+hal_wurthelektronik,+hal_xtensa"
-    ]
-    assert [c.args[0][2:4] for c in mock_run.call_args_list] == [["west", "update"]]
-    assert mock_run.call_args.args[0][-1:] == ["hal_nordic"]
-    assert (framework / ".west_hals").read_text() == _stamp("hal_nordic", "hal_silabs")
-
-
-def test_new_common_hal_grows_an_older_workspace(tmp_path: Path) -> None:
-    _run_check_and_install(tmp_path, None, hals=_SILABS)
-    framework = _framework(tmp_path)
-    (framework / ".west_hals").write_text("hal_silabs")
-
-    calls, mock_run = _run_check_and_install(tmp_path, None, hals=_SILABS)
-
-    assert _filters(calls) == [_SILABS_FILTER]
-    assert mock_run.call_args.args[0][-len(_NEUTRAL_HALS) :] == sorted(_NEUTRAL_HALS)
-    assert (framework / ".west_hals").read_text() == _stamp("hal_silabs")
-
-
-def test_failed_grow_puts_the_filter_back(tmp_path: Path) -> None:
-    _run_check_and_install(tmp_path, None, hals=_SILABS)
-    with pytest.raises(EsphomeError):
-        _run_check_and_install(tmp_path, None, hals=_NORDIC, update_returncode=1)
-
-    framework = _framework(tmp_path)
-    config = configparser.ConfigParser()
-    config.read(framework / ".west" / "config")
-    assert config["manifest"]["project-filter"] == _SILABS_FILTER
-    assert (framework / ".west_hals").read_text() == _stamp("hal_silabs")
-    assert (framework / ".ready").exists()
-    assert not (framework / ".update_failed").exists()
-
-
-def test_two_failed_grows_keep_the_workspace(tmp_path: Path) -> None:
-    """Other families build from the shared workspace; a missing HAL never removes it."""
-    _run_check_and_install(tmp_path, None, hals=_SILABS)
-    for _ in range(2):
-        with pytest.raises(EsphomeError, match="retries it"):
-            _run_check_and_install(tmp_path, None, hals=_NORDIC, update_returncode=1)
-
-    framework = _framework(tmp_path)
-    assert (framework / ".ready").exists()
-    assert (framework / ".west_hals").read_text() == _stamp("hal_silabs")
-
-
-def test_unknown_hal_fails_before_update(tmp_path: Path) -> None:
-    """A failing update would raise its own error, so this one shows west list ran first."""
-    with pytest.raises(EsphomeError, match="west list failed"):
-        _run_check_and_install(
-            tmp_path, None, hals=_SILABS, fail_list=True, update_returncode=1
-        )
-
-    framework = _framework(tmp_path)
-    assert not (framework / ".update_failed").exists()
-    assert not (framework / ".west_hals").exists()
-
-
-def test_unfiltered_workspace_is_never_filtered(tmp_path: Path) -> None:
-    """A workspace fetched whole before the filter existed downloads nothing new."""
-    _run_check_and_install(tmp_path, None)
-    calls, mock_run = _run_check_and_install(tmp_path, None, hals=_SILABS)
-
-    assert not calls
-    mock_run.assert_not_called()
-
-
-def test_unfinished_unfiltered_workspace_gets_the_filter(tmp_path: Path) -> None:
-    _run_check_and_install(tmp_path, None)
-    (_framework(tmp_path) / ".ready").unlink()
-
-    calls, _ = _run_check_and_install(tmp_path, None, hals=_SILABS)
-
-    assert _filters(calls) == [_SILABS_FILTER]
-
-
-def test_local_source_is_never_filtered(tmp_path: Path) -> None:
-    checkout = tmp_path / "ws" / "zephyr"
-    checkout.mkdir(parents=True)
+def test_local_source_uses_the_checkout_where_it_is(tmp_path: Path) -> None:
+    """The checkout's parent is the workspace; nothing is filtered or patched there."""
+    checkout = tmp_path / "ws" / "my-zephyr"
+    (checkout / "scripts").mkdir(parents=True)
     (checkout / "west.yml").touch()
+    (checkout / "scripts" / "requirements.txt").write_text("pyelftools\n")
+    source = {"type": "local", "path": checkout}
 
-    calls, _ = _run_check_and_install(
-        tmp_path, {"type": "local", "path": checkout}, hals=_SILABS
+    calls, (_, framework_path, west_env) = _install(tmp_path, source)
+
+    assert framework_path == checkout.parent
+    assert west_env["ZEPHYR_BASE"] == str(checkout)
+    assert [c[2:4] for c in calls if "west" in c] == [
+        ["west", "init"],
+        ["west", "update"],
+    ]
+    assert calls[-1][-1] == str(checkout / "scripts" / "requirements.txt")
+    assert not (checkout.parent / ".ready").exists()
+
+
+def test_local_source_without_a_manifest_raises(tmp_path: Path) -> None:
+    checkout = tmp_path / "ws" / "my-zephyr"
+    checkout.mkdir(parents=True)
+
+    with pytest.raises(EsphomeError, match="does not look like a Zephyr manifest"):
+        _install(tmp_path, {"type": "local", "path": checkout})
+
+
+def test_sdk_without_optional_projects_filters_nothing(tmp_path: Path) -> None:
+    """Silicon Labs' manifest already limits its projects itself."""
+    sdk = ZephyrSDK(
+        source=FrameworkSource(
+            name="Silicon Labs SDK",
+            url="https://example.invalid/zephyr-silabs",
+            optional=(),
+            required=frozenset(),
+        ),
+        workspace_prefix="zephyr-silabs",
     )
 
-    assert not _filters(calls)
+    calls, _ = _install(tmp_path, projects=frozenset(), sdk=sdk)
 
-
-def test_git_source_west_init_falls_back_to_raw_ref_when_unresolved(
-    tmp_path: Path,
-) -> None:
-    """Defensive fallback: a source dict without KEY_SDK_SOURCE_RESOLVED_REF (e.g.
-    constructed directly, bypassing resolve_sdk_source_version()) still works,
-    using the raw ref as before."""
-    source = {
-        "type": "git",
-        "url": "https://example.invalid/fork.git",
-        "ref": "my-branch",
-    }
-    calls, fake_run_command_ok = _make_fake_run_command_ok(tmp_path)
-
-    with (
-        patch(
-            "esphome.components.zephyr.framework.get_zephyr_tools_path",
-            return_value=tmp_path / "zephyr",
-        ),
-        patch(
-            "esphome.components.zephyr.framework._source_cache_key",
-            return_value=_CACHE_KEY,
-        ),
-        patch(
-            "esphome.components.zephyr.framework.run_command_ok",
-            side_effect=fake_run_command_ok,
-        ),
-        # The venv build lives in the shared Zephyr framework helpers
-        patch(
-            "esphome.components.zephyr.framework_helpers.run_command_ok",
-            side_effect=fake_run_command_ok,
-        ),
-        patch(
-            "esphome.components.zephyr.framework_helpers.create_venv",
-            side_effect=lambda root, msg=None: Path(root).mkdir(
-                parents=True, exist_ok=True
-            ),
-        ),
-        patch("subprocess.run") as mock_subprocess_run,
-    ):
-        mock_subprocess_run.return_value.returncode = 0
-        check_and_install(sdk=_FAKE_SDK, version="4.4.1", source=source)
-
-    init_calls = [c for c in calls if c[2:4] == ["west", "init"]]
-    assert len(init_calls) == 1
-    assert init_calls[0][init_calls[0].index("--mr") + 1] == "my-branch"
+    assert _west(calls, "config")[0][-1] == ""
 
 
 # ---------------------------------------------------------------------------
@@ -498,12 +299,26 @@ def test_git_source_west_init_falls_back_to_raw_ref_when_unresolved(
 
 
 def test_source_cache_key_differs_across_sdk_variants() -> None:
-    # MAINLINE/NCS/SILABS share one machine-global cache root; a matching version:
+    # ZEPHYR_MAINLINE/NCS/SILABS share one machine-global cache root; a matching version:
     # string must not resolve to the same directory for different SDKs.
     mainline = ZephyrSDK(
-        manifest_url="https://example.invalid/zephyr", workspace_prefix="a"
+        source=FrameworkSource(
+            name="Test",
+            url="https://example.invalid/zephyr",
+            optional=(),
+            required=frozenset(),
+        ),
+        workspace_prefix="a",
     )
-    ncs = ZephyrSDK(manifest_url="https://example.invalid/nrf", workspace_prefix="b")
+    ncs = ZephyrSDK(
+        source=FrameworkSource(
+            name="Test",
+            url="https://example.invalid/nrf",
+            optional=(),
+            required=frozenset(),
+        ),
+        workspace_prefix="b",
+    )
 
     assert _source_cache_key(mainline, "v1.0.0", None) != _source_cache_key(
         ncs, "v1.0.0", None
@@ -828,8 +643,8 @@ def test_new_venv_gets_the_windows_rmtree_fix(tmp_path: Path) -> None:
     with patch(
         "esphome.components.zephyr.framework_helpers.install_sitecustomize"
     ) as install_sitecustomize:
-        _run_check_and_install(tmp_path, None)
-        _run_check_and_install(tmp_path, None)
+        _install(tmp_path)
+        _install(tmp_path)
     install_sitecustomize.assert_called_once_with(
         tmp_path / "zephyr" / "penvs" / "v4.4.1"
     )

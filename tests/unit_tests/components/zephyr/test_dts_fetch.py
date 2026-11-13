@@ -31,7 +31,8 @@ from esphome.components.zephyr.dts_fetch import (
     fetch_board_dts,
     resolve_sdk_source_version,
 )
-from esphome.components.zephyr.variants import MAINLINE, NCS, SILABS, ZephyrSDK
+from esphome.components.zephyr.framework_helpers import FrameworkSource
+from esphome.components.zephyr.variants import NCS, SILABS, ZEPHYR_MAINLINE, ZephyrSDK
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_PATH,
@@ -256,10 +257,19 @@ def test_resolve_sdk_source_version_failed_clone_leaves_no_partial_dir(
 
 
 def test_native_dts_path_none_when_tools_subdir_unset() -> None:
-    assert _native_dts_path(ZephyrSDK(manifest_url="x")) is None
+    assert (
+        _native_dts_path(
+            ZephyrSDK(
+                source=FrameworkSource(
+                    name="Test", url="x", optional=(), required=frozenset()
+                )
+            )
+        )
+        is None
+    )
 
 
-@pytest.mark.parametrize("sdk", [MAINLINE, NCS, SILABS])
+@pytest.mark.parametrize("sdk", [ZEPHYR_MAINLINE, NCS, SILABS])
 def test_native_dts_path_matches_the_machine_global_cache_key(
     sdk: ZephyrSDK, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -280,7 +290,7 @@ def test_native_dts_path_keeps_release_candidate_suffix(
     _set_framework_version(4, 5, 0, "rc1")
     expected = tmp_path / "frameworks" / "zephyr-v4.5.0-rc1" / "zephyr"
     expected.mkdir(parents=True)
-    assert _native_dts_path(MAINLINE) == expected
+    assert _native_dts_path(ZEPHYR_MAINLINE) == expected
 
 
 def test_native_dts_path_none_when_not_on_disk(
@@ -288,7 +298,7 @@ def test_native_dts_path_none_when_not_on_disk(
 ) -> None:
     monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path))
     _set_framework_version(4, 4, 1)
-    assert _native_dts_path(MAINLINE) is None
+    assert _native_dts_path(ZEPHYR_MAINLINE) is None
 
 
 def test_native_dts_path_none_without_the_family_hal(
@@ -299,10 +309,10 @@ def test_native_dts_path_none_without_the_family_hal(
     _set_framework_version(4, 4, 1)
     framework = tmp_path / "frameworks" / "zephyr-v4.4.1"
     (framework / "zephyr").mkdir(parents=True)
-    assert _native_dts_path(MAINLINE, "stm32") is None
+    assert _native_dts_path(ZEPHYR_MAINLINE, "stm32") is None
 
     (framework / "modules" / "hal" / "stm32").mkdir(parents=True)
-    assert _native_dts_path(MAINLINE, "stm32") == framework / "zephyr"
+    assert _native_dts_path(ZEPHYR_MAINLINE, "stm32") == framework / "zephyr"
 
 
 # ---------------------------------------------------------------------------
@@ -346,7 +356,7 @@ def test_manifest_revision_cache_root_nests_under_zephyr_prefix(
 
 
 def test_resolve_boards_ref_prefixes_v_for_mainline_shaped_sdk() -> None:
-    assert _resolve_boards_ref(MAINLINE, "4.4.1") == "v4.4.1"
+    assert _resolve_boards_ref(ZEPHYR_MAINLINE, "4.4.1") == "v4.4.1"
 
 
 def test_resolve_boards_ref_reads_manifest_revision_for_manifest_resolved_sdk(
@@ -380,7 +390,7 @@ def test_resolve_boards_ref_reads_manifest_revision_for_manifest_resolved_sdk(
 
 
 def test_resolve_boards_ref_keeps_release_candidate_suffix() -> None:
-    assert _resolve_boards_ref(MAINLINE, "4.5.0-rc1") == "v4.5.0-rc1"
+    assert _resolve_boards_ref(ZEPHYR_MAINLINE, "4.5.0-rc1") == "v4.5.0-rc1"
 
 
 def test_resolve_boards_ref_clones_manifest_at_release_candidate_tag(
@@ -432,7 +442,7 @@ def test_resolve_boards_ref_returns_cached_value_without_reinvoking_git(
 ) -> None:
     cache_dir = tmp_path / "zephyr_manifest_revision_cache"
     cache_dir.mkdir(parents=True)
-    cache_key = hashlib.sha1(f"{NCS.manifest_url}@v3.4.0".encode()).hexdigest()[:16]
+    cache_key = hashlib.sha1(f"{NCS.source.url}@v3.4.0".encode()).hexdigest()[:16]
     (cache_dir / cache_key).write_text("ncs-v3.4.0")
 
     with (
@@ -482,7 +492,7 @@ def test_sparse_clone_dts_sparse_checkout_never_lists_version_file(
         ),
         patch("subprocess.run", side_effect=fake_run),
     ):
-        result = _sparse_clone_dts("zephyr", MAINLINE)
+        result = _sparse_clone_dts("zephyr", ZEPHYR_MAINLINE)
 
     sparse_checkout_calls = [c for c in calls if "sparse-checkout" in c]
     assert len(sparse_checkout_calls) == 1
@@ -506,7 +516,7 @@ def test_sparse_clone_dts_returns_none_and_cleans_up_on_git_failure(
         ),
         patch("subprocess.run", side_effect=fake_run),
     ):
-        result = _sparse_clone_dts("zephyr", MAINLINE)
+        result = _sparse_clone_dts("zephyr", ZEPHYR_MAINLINE)
 
     assert result is None
     assert not dest.exists()  # cleaned up, not left in a half-cloned state
@@ -519,7 +529,7 @@ def test_sparse_clone_dts_returns_cached_path_without_reinvoking_git(
     dest = tmp_path / "zephyr_dts_cache" / "zephyr" / "4.4.1" / "zephyr"
     (dest / "boards").mkdir(parents=True)
     (dest / ".resolved_ref").write_text(
-        f"{_resolve_boards_ref(MAINLINE, '4.4.1')}#{_SPARSE_CHECKOUT_SCHEMA}"
+        f"{_resolve_boards_ref(ZEPHYR_MAINLINE, '4.4.1')}#{_SPARSE_CHECKOUT_SCHEMA}"
     )
 
     with (
@@ -529,7 +539,7 @@ def test_sparse_clone_dts_returns_cached_path_without_reinvoking_git(
         ),
         patch("subprocess.run") as mock_run,
     ):
-        result = _sparse_clone_dts("zephyr", MAINLINE)
+        result = _sparse_clone_dts("zephyr", ZEPHYR_MAINLINE)
 
     mock_run.assert_not_called()
     assert result == dest
@@ -550,7 +560,7 @@ def test_sparse_clone_dts_caches_release_candidate_separately(
         ),
         patch("subprocess.run") as mock_run,
     ):
-        result = _sparse_clone_dts("zephyr", MAINLINE)
+        result = _sparse_clone_dts("zephyr", ZEPHYR_MAINLINE)
 
     mock_run.assert_not_called()
     assert result == dest
@@ -584,14 +594,14 @@ def test_sparse_clone_dts_self_heals_when_resolved_ref_changed(
         ),
         patch("subprocess.run", side_effect=fake_run) as mock_run,
     ):
-        result = _sparse_clone_dts("zephyr", MAINLINE)
+        result = _sparse_clone_dts("zephyr", ZEPHYR_MAINLINE)
 
     assert mock_run.call_args_list  # re-fetched instead of trusting the stale cache
     assert not (dest / "stale-marker-file").exists()  # old checkout wiped, not merged
     assert result == dest
     assert (
         (dest / ".resolved_ref").read_text()
-        == f"{_resolve_boards_ref(MAINLINE, '4.4.1')}#{_SPARSE_CHECKOUT_SCHEMA}"
+        == f"{_resolve_boards_ref(ZEPHYR_MAINLINE, '4.4.1')}#{_SPARSE_CHECKOUT_SCHEMA}"
     )
 
 
@@ -603,7 +613,7 @@ def test_sparse_clone_dts_is_shared_by_every_family(
     dest = tmp_path / "zephyr_dts_cache" / "zephyr" / "4.4.1" / "zephyr"
     (dest / "boards").mkdir(parents=True)
     (dest / ".resolved_ref").write_text(
-        f"{_resolve_boards_ref(MAINLINE, '4.4.1')}#{_SPARSE_CHECKOUT_SCHEMA}"
+        f"{_resolve_boards_ref(ZEPHYR_MAINLINE, '4.4.1')}#{_SPARSE_CHECKOUT_SCHEMA}"
     )
 
     with (
@@ -614,8 +624,8 @@ def test_sparse_clone_dts_is_shared_by_every_family(
         patch("subprocess.run") as mock_run,
         patch("esphome.components.zephyr.dts_fetch._sparse_clone_hal_modules") as hal,
     ):
-        assert _sparse_clone_dts("zephyr", MAINLINE, "rp2") == dest
-        assert _sparse_clone_dts("zephyr", MAINLINE, "stm32") == dest
+        assert _sparse_clone_dts("zephyr", ZEPHYR_MAINLINE, "rp2") == dest
+        assert _sparse_clone_dts("zephyr", ZEPHYR_MAINLINE, "stm32") == dest
 
     mock_run.assert_not_called()
     assert [c.args for c in hal.call_args_list] == [(dest, "rp2"), (dest, "stm32")]
@@ -882,7 +892,7 @@ async def test_fetch_board_dts_is_a_no_op_once_resolved(
 ) -> None:
     native, clone, source = fetch_mocks
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data(dts_base_path="/already/there")
-    await fetch_board_dts("ESP32H2", "zephyr", MAINLINE, None)
+    await fetch_board_dts("ESP32H2", "zephyr", ZEPHYR_MAINLINE, None)
     assert CORE.data[KEY_ZEPHYR]["dts_base_path"] == "/already/there"
     native.assert_not_called()
     clone.assert_not_called()
@@ -896,7 +906,7 @@ async def test_fetch_board_dts_uses_local_source_directly(
     native, clone, source = fetch_mocks
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
     local = {CONF_TYPE: TYPE_LOCAL, CONF_PATH: tmp_path}
-    await fetch_board_dts("ESP32H2", "zephyr", MAINLINE, local)
+    await fetch_board_dts("ESP32H2", "zephyr", ZEPHYR_MAINLINE, local)
     assert CORE.data[KEY_ZEPHYR]["dts_base_path"] == str(tmp_path)
     native.assert_not_called()
     clone.assert_not_called()
@@ -911,7 +921,7 @@ async def test_fetch_board_dts_clones_git_source(
     source.return_value = tmp_path
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
     git = {CONF_TYPE: TYPE_GIT, CONF_URL: "https://example.invalid/z", CONF_REF: "x"}
-    await fetch_board_dts("ESP32H2", "zephyr", MAINLINE, git, "esp32")
+    await fetch_board_dts("ESP32H2", "zephyr", ZEPHYR_MAINLINE, git, "esp32")
     assert CORE.data[KEY_ZEPHYR]["dts_base_path"] == str(tmp_path)
     source.assert_called_once_with(git, "esp32")
     native.assert_not_called()
@@ -925,7 +935,7 @@ async def test_fetch_board_dts_warns_when_git_source_clone_fails(
     native, clone, _source = fetch_mocks
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
     git = {CONF_TYPE: TYPE_GIT, CONF_URL: "https://example.invalid/z"}
-    await fetch_board_dts("ESP32H2", "zephyr", MAINLINE, git)
+    await fetch_board_dts("ESP32H2", "zephyr", ZEPHYR_MAINLINE, git)
     assert CORE.data[KEY_ZEPHYR]["dts_base_path"] is None
     assert "Board DTS files unavailable for sdk_source" in caplog.text
     assert "default branch" in caplog.text
@@ -941,7 +951,7 @@ async def test_fetch_board_dts_prefers_native_sdk_install(
     native, clone, _source = fetch_mocks
     native.return_value = tmp_path
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
-    await fetch_board_dts("ESP32H2", "zephyr", MAINLINE, None)
+    await fetch_board_dts("ESP32H2", "zephyr", ZEPHYR_MAINLINE, None)
     assert CORE.data[KEY_ZEPHYR]["dts_base_path"] == str(tmp_path)
     clone.assert_not_called()
 
@@ -953,9 +963,9 @@ async def test_fetch_board_dts_falls_back_to_sparse_clone(
     _native, clone, _source = fetch_mocks
     clone.return_value = tmp_path
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
-    await fetch_board_dts("ESP32H2", "zephyr", MAINLINE, None, "esp32")
+    await fetch_board_dts("ESP32H2", "zephyr", ZEPHYR_MAINLINE, None, "esp32")
     assert CORE.data[KEY_ZEPHYR]["dts_base_path"] == str(tmp_path)
-    clone.assert_called_once_with("zephyr", MAINLINE, "esp32")
+    clone.assert_called_once_with("zephyr", ZEPHYR_MAINLINE, "esp32")
 
 
 @pytest.mark.asyncio
@@ -964,6 +974,6 @@ async def test_fetch_board_dts_warns_when_nothing_found(
 ) -> None:
     _set_framework_version(4, 4, 2)
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
-    await fetch_board_dts("ESP32H2", "zephyr", MAINLINE, None)
+    await fetch_board_dts("ESP32H2", "zephyr", ZEPHYR_MAINLINE, None)
     assert CORE.data[KEY_ZEPHYR]["dts_base_path"] is None
     assert "Board DTS files unavailable for ESP32H2 zephyr 4.4.2" in caplog.text

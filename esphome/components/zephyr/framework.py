@@ -1,4 +1,4 @@
-import configparser
+from dataclasses import replace
 import hashlib
 import logging
 import os
@@ -23,8 +23,13 @@ from esphome.types import ConfigType
 from .const import COMMIT_SHA_RE, KEY_SDK_SOURCE_RESOLVED_REF
 from .framework_helpers import (
     ensure_venv,
+    ensure_zephyr_requirements,
+    fetch_missing_west_projects,
+    install_framework,
+    install_local_framework,
     patch_gen_defines_dts_path,
     patch_west_build_source_dir_relpath,
+    refresh_framework,
 )
 from .sdk_install import ensure_sdk
 from .variants import ZephyrModule, ZephyrSDK
@@ -66,7 +71,7 @@ def _source_cache_key(
     """Distinguish a custom framework: source: from the official ver_tag-keyed cache dir,
     and from other framework: source: configs sharing the same version: value.
 
-    sdk.workspace_prefix prefixes the key so MAINLINE/NCS/SILABS -- which now share one
+    sdk.workspace_prefix prefixes the key so ZEPHYR_MAINLINE/NCS/SILABS -- which now share one
     machine-global cache root -- can't collide on a matching version: string (e.g. NCS's
     bundled Zephyr fork tracks close to mainline's own numbering)."""
     if source is None:
@@ -100,100 +105,6 @@ def _effective_requirements(overrides: dict[str, str | None]) -> str:
 
 def _is_commit_sha(rev: str | None) -> bool:
     return rev is not None and COMMIT_SHA_RE.fullmatch(rev) is not None
-
-
-# Projects in Zephyr's hal group that match "hal_.*" but belong to no SoC family:
-# Xtensa, the Arm Ethos-U NPU, and the external chip libraries any board can carry
-_NEUTRAL_HALS = frozenset(
-    {
-        "hal_afbr",
-        "hal_ethos_u",
-        "hal_infineon",
-        "hal_st",
-        "hal_tdk",
-        "hal_wurthelektronik",
-        "hal_xtensa",
-    }
-)
-# BabbleSim's nRF models; their module needs hal_nordic, and no variant builds for BabbleSim
-_EXCLUDED_PROJECTS = ("nrf_hw_models",)
-# The vendor HALs a finished `west update` fetched
-_WEST_HALS_FILE = ".west_hals"
-
-
-def _set_hal_filter(python_bin: Path, framework: Path, hals: set[str]) -> bool:
-    """Make every vendor HAL inactive except `hals`; other projects keep their groups."""
-    value = ",".join(
-        [
-            "-hal_.*",
-            *(f"-{p}" for p in _EXCLUDED_PROJECTS),
-            *(f"+{h}" for h in sorted(hals | _NEUTRAL_HALS)),
-        ]
-    )
-    # "--" keeps west from reading the leading "-" as an option
-    cmd = [str(python_bin), "-m", "west", "config", "manifest.project-filter"]
-    return run_command_ok([*cmd, "--", value], cwd=str(framework))
-
-
-def _check_hals(python_bin: Path, framework: Path, hals: set[str]) -> None:
-    """Raise when the manifest lacks one of `hals`; west update skips an unknown
-    name quietly."""
-    names = sorted(hals)
-    cmd = [str(python_bin), "-m", "west", "list", "-f", "{name}", *names]
-    if not run_command_ok(cmd, cwd=str(framework)):
-        raise EsphomeError(
-            f"west list failed for the Zephyr HALs {', '.join(names)}; a HAL the "
-            "manifest does not have is the usual cause, see west's output above"
-        )
-
-
-def _installed_hals(framework: Path) -> set[str] | None:
-    """The vendor HALs a finished install fetched; None when it has every HAL."""
-    try:
-        stamp = (framework / _WEST_HALS_FILE).read_text(encoding="utf-8")
-    except FileNotFoundError:
-        pass
-    else:
-        return set(stamp.split())
-    # No stamp: a finished install from before the filter has every HAL; a filtered
-    # or unfinished one fetches again
-    config = configparser.ConfigParser()
-    config.read(framework / ".west" / "config", encoding="utf-8")
-    if (
-        config.has_option("manifest", "project-filter")
-        or not (framework / ".ready").exists()
-    ):
-        return set()
-    return None
-
-
-def _manifest_repo_dir(framework: Path) -> Path:
-    """The manifest repository's directory, as recorded by `west init` in .west/config.
-
-    It is the manifest's own `self: path:` (Zephyr: "zephyr", NCS: "nrf"), else the URL's
-    basename -- not always framework/zephyr.
-    """
-    config = configparser.ConfigParser()
-    config.read(framework / ".west" / "config")
-    return framework / config.get("manifest", "path")
-
-
-def _pin_manifest_repo(manifest_dir: Path, sha: str, label: str) -> None:
-    """Point the manifest repository at `sha`.
-
-    `west init --mr` can't take a commit SHA (it uses `git clone --branch`), and `west
-    update` never alters the manifest repository, so this is done with git before
-    `west update` reads the manifest from it.
-    """
-    _LOGGER.info("Pinning Zephyr manifest repository to %s ...", label)
-    if not run_command_ok(
-        ["git", "fetch", "--depth=1", "--", "origin", sha], cwd=str(manifest_dir)
-    ):
-        raise EsphomeError(f"Can't fetch Zephyr manifest repository ({label})")
-    if not run_command_ok(
-        ["git", "reset", "--hard", "FETCH_HEAD"], cwd=str(manifest_dir)
-    ):
-        raise EsphomeError(f"Can't update Zephyr manifest repository ({label})")
 
 
 def _extra_projects(path: Path, sdk_url: str) -> list[str]:
@@ -320,15 +231,15 @@ def check_and_install(
     west_version: str | None = None,
     ninja_version: str | None = None,
     source: ConfigType | None = None,
-    hals: frozenset[str] | None = None,
+    projects: frozenset[str] = frozenset(),
 ) -> tuple[Path, Path, dict[str, str]]:
-    """Install west and Zephyr SDK, serialized against other builds installing
+    """Install west and the Zephyr SDK, serialized against other builds installing
     the same workspace at once (see install_lock)."""
     ver_tag = f"v{version}" if not version.startswith("v") else version
     # Named after the workspace folder, so other workspaces of this version don't wait
     with install_lock(get_zephyr_tools_path(), _source_cache_key(sdk, ver_tag, source)):
         return _check_and_install(
-            sdk, version, west_version, ninja_version, source, hals
+            sdk, version, west_version, ninja_version, source, projects
         )
 
 
@@ -338,67 +249,29 @@ def _check_and_install(
     west_version: str | None,
     ninja_version: str | None,
     source: ConfigType | None,
-    hals: frozenset[str] | None,
+    projects: frozenset[str],
 ) -> tuple[Path, Path, dict[str, str]]:
-    """Install west and Zephyr SDK.
+    """Install west and the Zephyr SDK.
 
     west_version/ninja_version override zephyr/requirements.txt's pinned versions
-    (CONF_WEST_VERSION/CONF_NINJA_VERSION). source, if given (framework: source:), overrides
-    which Zephyr gets fetched -- a git fork/branch/ref (cloned into ESPHome's own managed
-    cache, same as the official source), or a `local:` path to a manifest repo (e.g. a Zephyr
-    fork checked out for local development). `local:` deliberately does NOT copy or symlink
-    the checkout into ESPHome's cache -- west resolves symlinks when computing a workspace's
-    topdir, so a symlink doesn't actually keep writes out of the real directory, and a copy
-    would silently go stale against the user's live edits. Instead `west init -l` / `west
-    update` run directly against the given path's own parent directory, which becomes the
-    workspace topdir; `modules/`, `bootloader/`, etc. land there as siblings of the checkout,
-    not inside ESPHome's own `.esphome/` tree. See project_zephyr_local_sdk_source_docs_todo
-    for the write-up this needs once real docs exist (recommend a dedicated directory per
-    checkout, not reusing an existing unrelated working tree).
+    (CONF_WEST_VERSION/CONF_NINJA_VERSION). source, if given (framework: source:),
+    overrides which Zephyr gets fetched: a git fork/branch/ref, cloned into ESPHome's
+    cache like the official source and pinned to the commit
+    dts_fetch.resolve_sdk_source_version() resolved (KEY_SDK_SOURCE_RESOLVED_REF), or a
+    `local:` checkout used where it is (its parent folder becomes the workspace).
 
-    A git source is pinned to one resolved commit SHA before this function runs (see
-    dts_fetch.resolve_sdk_source_version(), which stashes it onto source under
-    KEY_SDK_SOURCE_RESOLVED_REF). The workspace is keyed by ref name, so when a moved ref
-    resolves to a new SHA the manifest repository is re-pointed and `west update` re-run
-    in place. `local:` always re-runs `west update` (cheap/no-op if nothing changed,
-    since the user's checkout can move between builds); the official source is pinned
-    to an immutable tag and never refreshes.
-
-    hals: the vendor HAL projects this build needs; the other vendor HALs are not
-    fetched. A workspace only gains HALs, since variants of one version share it.
-    None (NCS, Silicon Labs' SDK) leaves the project filter alone.
+    projects: the projects this build needs beyond the SDK's required ones (a
+    family's vendor HALs, the projects NCS components ask for). A workspace only
+    gains projects, since the builds of one version share it.
 
     Returns (python_bin, framework_path, west_env) where:
-      - python_bin      — Python executable inside the managed venv
-      - framework_path  — west workspace root (contains zephyr/, modules/, …)
-      - west_env        — environment dict with ZEPHYR_BASE and PATH set
+      - python_bin      -- Python executable inside the managed venv
+      - framework_path  -- west workspace root (contains zephyr/, modules/, ...)
+      - west_env        -- environment dict with ZEPHYR_BASE and PATH set
     """
     ver_tag = f"v{version}" if not version.startswith("v") else version
     python_env = _get_python_env_path(ver_tag)
     python_bin = get_python_env_executable_path(python_env, "python")
-
-    is_local = source is not None and source[CONF_TYPE] == TYPE_LOCAL
-    if is_local:
-        local_path = source[
-            CONF_PATH
-        ]  # already a resolved Path -- cv.directory's return type
-        if not (local_path / "west.yml").is_file():
-            raise EsphomeError(
-                f"'{local_path}' does not look like a Zephyr manifest repo (no west.yml) -- "
-                "sdk_source: local: expects a path to a Zephyr checkout, e.g. a fork you're "
-                "developing on."
-            )
-        framework = local_path.parent
-        zephyr_dir = local_path
-    else:
-        framework = _framework_path(_source_cache_key(sdk, ver_tag, source))
-        zephyr_dir = framework / "zephyr"
-
-    west_env = {
-        **os.environ,
-        "ZEPHYR_BASE": str(zephyr_dir),
-        "PATH": f"{python_bin.parent}{os.pathsep}{os.environ.get('PATH', '')}",
-    }
 
     # Every workspace of this version shares the venv. It only changes when the west
     # requirements or overrides do, so builds that use it are not locked against that.
@@ -410,177 +283,76 @@ def _check_and_install(
         requirements.write_text(_effective_requirements(overrides))
         install_venv = ensure_venv(python_env, requirements, ver_tag)
 
-    manifest_url = (
-        source[CONF_URL] if (source is not None and not is_local) else sdk.manifest_url
-    )
-    manifest_rev = (
-        source.get(KEY_SDK_SOURCE_RESOLVED_REF, source.get(CONF_REF))
-        if (source is not None and not is_local)
-        else ver_tag
-    )
-    label = str(source[CONF_PATH]) if is_local else (manifest_rev or "default branch")
-
-    sentinel = framework / ".ready"
-    needs_init = not (framework / ".west").is_dir()
-    # .ready is only written after a complete `west update`; without it a previous
-    # update was interrupted and the workspace may be half-fetched.
-    incomplete = not needs_init and not sentinel.exists()
-    # local: (a user-edited checkout) can change between builds, so always re-run
-    # `west update` -- cheap/no-op if unchanged. The official source is pinned to an
-    # immutable tag and never needs this.
-    # A rebuilt venv only needs an update, not a fresh clone of the workspace.
-    needs_refresh = is_local or incomplete or install_venv
-
-    # A git source: is pinned to one commit per run (dts_fetch.resolve_sdk_source_version()),
-    # but the workspace directory is keyed by ref name, so a moved branch must be
-    # re-pointed in place. The commit last fetched is recorded in a marker file.
-    pinned = source is not None and not is_local and _is_commit_sha(manifest_rev)
-    resolved_marker = framework / ".resolved_ref"
-    if (
-        pinned
-        and not needs_init
-        and (
-            not resolved_marker.is_file() or resolved_marker.read_text() != manifest_rev
-        )
-    ):
-        needs_refresh = True
-
-    hal_filter: set[str] | None = None
-    installed_hals: set[str] | None = None
-    if hals is not None and not is_local:
-        wanted = hals | _NEUTRAL_HALS
-        installed_hals = set() if needs_init else _installed_hals(framework)
-        if installed_hals is not None and not wanted <= installed_hals:
-            hal_filter = installed_hals | wanted
-    # Only new HALs: they alone are updated, so a build running from zephyr is left alone
-    grow_only = hal_filter is not None and not (needs_init or needs_refresh)
-
-    if needs_init:
-        if is_local:
-            # install_venv alone (framework/.west already present) doesn't need a re-init --
-            # `west init` refuses to run against an already-initialized workspace.
-            if not (framework / ".west").is_dir():
-                _LOGGER.info("Initializing Zephyr SDK workspace for %s ...", label)
-                cmd = [str(python_bin), "-m", "west", "init", "-l", local_path.name]
-                if not run_command_ok(cmd, cwd=str(framework)):
-                    raise EsphomeError(
-                        f"Can't initialize Zephyr SDK workspace ({label})"
-                    )
-        else:
-            _LOGGER.info("Initializing Zephyr SDK %s (%s) ...", ver_tag, label)
-            rmdir(framework, msg=f"Clean up {ver_tag} framework")
-            cmd = [
-                str(python_bin),
-                "-m",
-                "west",
-                "init",
-                "-o=--depth=1",
-                "-m",
-                manifest_url,
-            ]
-            # A pinned SHA can't be a --mr value; init at the source's ref, then pin.
-            init_rev = source.get(CONF_REF) if pinned else manifest_rev
-            if init_rev:
-                cmd += ["--mr", init_rev]
-            cmd.append(str(framework))
-            if not run_command_ok(cmd):
-                raise EsphomeError(f"Can't initialize Zephyr SDK {ver_tag} ({label})")
-
-    if pinned and (needs_init or needs_refresh):
-        _pin_manifest_repo(_manifest_repo_dir(framework), manifest_rev, label)
-
-    if needs_init or needs_refresh or grow_only:
-        if incomplete:
-            _LOGGER.info("Previous Zephyr SDK update did not finish; retrying")
-        _LOGGER.info(
-            "Updating Zephyr SDK %s (%s) (this may take a while) ...", ver_tag, label
-        )
-        # Cleared first so an interrupted update is retried on the next build; a grow
-        # keeps it, since its HALs are missing from the stamp until the grow succeeds
-        if not grow_only:
-            sentinel.unlink(missing_ok=True)
-        if not is_local and not grow_only:
-            # A patched tracked file can block west update's checkout.
-            _restore_patched_scripts(zephyr_dir)
-        if hal_filter is not None:
-            _check_hals(python_bin, framework, hals)
-            _LOGGER.info("Zephyr HALs: %s", ", ".join(sorted(hal_filter)))
-            if not _set_hal_filter(python_bin, framework, hal_filter):
-                raise EsphomeError(f"Can't set the Zephyr SDK {ver_tag} project filter")
-        cmd = [
-            str(python_bin),
-            "-m",
-            "west",
-            "update",
-            "--narrow",
-            "--fetch-opt=--depth=1",
-        ]
-        if grow_only:
-            cmd += sorted(hal_filter - installed_hals)
-        env = os.environ.copy()
-        env.update(west_env)
-        result = subprocess.run(cmd, env=env, cwd=str(framework), check=False)
-        update_failed = framework / ".update_failed"
-        if result.returncode != 0:
-            # Back to the HALs on disk, so a later build of those alone fetches nothing
-            if (
-                hal_filter is not None
-                and installed_hals
-                and not _set_hal_filter(python_bin, framework, installed_hals)
-            ):
-                _LOGGER.warning(
-                    "Couldn't put the Zephyr SDK %s project filter back", ver_tag
-                )
-            if grow_only:
-                # The workspace is still complete; never start over for a missing HAL
-                raise EsphomeError(
-                    f"Can't fetch the Zephyr SDK {ver_tag} HALs ({label}); "
-                    "the next build retries it"
-                )
-            # As nrf52: one failure is likely a flaky network and resumes;
-            # a second in a row means a broken workspace, so start over.
-            if is_local or not update_failed.exists():
-                if not is_local:
-                    update_failed.touch()
-                raise EsphomeError(
-                    f"Can't update Zephyr SDK {ver_tag} ({label}); the next build retries it"
-                )
-            rmdir(framework, msg=f"Clean up {ver_tag} framework")
+    if source is not None and source[CONF_TYPE] == TYPE_LOCAL:
+        zephyr_dir = source[CONF_PATH]  # already a resolved Path
+        if not (zephyr_dir / "west.yml").is_file():
             raise EsphomeError(
-                f"Can't update Zephyr SDK {ver_tag} ({label}) twice in a row; "
-                "the workspace was removed and the next build downloads it anew"
+                f"'{zephyr_dir}' does not look like a Zephyr manifest repo (no west.yml) -- "
+                "sdk_source: local: expects a path to a Zephyr checkout, e.g. a fork you're "
+                "developing on."
             )
-        update_failed.unlink(missing_ok=True)
-        if hal_filter is not None:
-            (framework / _WEST_HALS_FILE).write_text(
-                "\n".join(sorted(hal_filter)), encoding="utf-8"
-            )
+        framework = install_local_framework(python_bin, zephyr_dir, sdk.source.name)
+    else:
+        framework = _framework_path(_source_cache_key(sdk, ver_tag, source))
+        zephyr_dir = framework / "zephyr"
+        _install_workspace(python_bin, framework, sdk, ver_tag, source, projects)
 
-        if needs_init or pinned or incomplete or install_venv:
-            zephyr_reqs = zephyr_dir / "scripts" / "requirements.txt"
-            if zephyr_reqs.exists():
-                _LOGGER.info("Installing Zephyr Python requirements ...")
-                req_cmd = [
-                    str(python_bin),
-                    "-m",
-                    "pip",
-                    "install",
-                    "-r",
-                    str(zephyr_reqs),
-                ]
-                with install_lock(get_zephyr_tools_path(), f"penv-{ver_tag}"):
-                    if not run_command_ok(req_cmd):
-                        raise EsphomeError("Can't install Zephyr Python requirements")
+    with install_lock(get_zephyr_tools_path(), f"penv-{ver_tag}"):
+        ensure_zephyr_requirements(
+            python_env, framework, install_venv, ver_tag, zephyr_dir=zephyr_dir
+        )
 
-        if pinned:
-            resolved_marker.write_text(manifest_rev)
-        sentinel.touch()
-
-    if not is_local:
-        # Never edit a sdk_source: local checkout; it is the user's own tree.
-        patch_gen_defines_dts_path(framework)
-        patch_west_build_source_dir_relpath(framework)
+    west_env = {
+        **os.environ,
+        "ZEPHYR_BASE": str(zephyr_dir),
+        "PATH": f"{python_bin.parent}{os.pathsep}{os.environ.get('PATH', '')}",
+    }
     return python_bin, framework, west_env
+
+
+def _install_workspace(
+    python_bin: Path,
+    framework: Path,
+    sdk: ZephyrSDK,
+    ver_tag: str,
+    source: ConfigType | None,
+    projects: frozenset[str],
+) -> None:
+    """The official source, or a git source pinned to its resolved commit."""
+    framework_source = sdk.source
+    label = ver_tag
+    pin: str | None = None
+    if source is not None:
+        framework_source = replace(sdk.source, url=source[CONF_URL])
+        rev = source.get(KEY_SDK_SOURCE_RESOLVED_REF, source.get(CONF_REF))
+        label = source.get(CONF_REF) or "default branch"
+        if _is_commit_sha(rev):
+            pin = rev
+        elif rev is not None:
+            label = rev
+    wanted = set(projects | framework_source.required)
+    sentinel = framework / ".ready"
+    resolved_marker = framework / ".resolved_ref"
+    zephyr_reqs = framework / "zephyr" / "scripts" / "requirements.txt"
+    if not sentinel.exists() or not zephyr_reqs.exists():
+        install_framework(
+            python_bin, framework, framework_source, label, wanted, pin=pin
+        )
+    elif pin is not None and (
+        not resolved_marker.is_file() or resolved_marker.read_text() != pin
+    ):
+        refresh_framework(python_bin, framework, framework_source, label, wanted, pin)
+    else:
+        fetch_missing_west_projects(
+            python_bin, framework, framework_source, label, wanted
+        )
+    if not sentinel.exists():
+        if pin is not None:
+            resolved_marker.write_text(pin)
+        sentinel.touch()
+    # Every run: existing installs need these too, and they are no-ops once applied
+    patch_gen_defines_dts_path(framework)
+    patch_west_build_source_dir_relpath(framework)
 
 
 def _read_sdk_version(framework_path: Path) -> str:
@@ -609,17 +381,3 @@ def install_toolchain(framework_path: Path, toolchain: str) -> Path:
         lock_root=get_zephyr_tools_path(),
     )
     return sdk_path
-
-
-_GEN_DEFINES = Path("scripts") / "dts" / "gen_defines.py"
-_WEST_BUILD = Path("scripts") / "west_commands" / "build.py"
-
-
-def _restore_patched_scripts(zephyr_dir: Path) -> None:
-    for script in (_GEN_DEFINES, _WEST_BUILD):
-        if (zephyr_dir / script).is_file():
-            subprocess.run(
-                ["git", "-C", str(zephyr_dir), "checkout", "--", script.as_posix()],
-                check=False,
-                capture_output=True,
-            )

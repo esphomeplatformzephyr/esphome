@@ -21,8 +21,8 @@ from esphome.components.zephyr.usb_baud_rate import (
     declare_component_id,
 )
 from esphome.components.zephyr.variants import (
-    MAINLINE,
     NCS,
+    ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
     resolve_framework_version,
@@ -182,7 +182,7 @@ VARIANT = ZephyrVariant(
     # regression only present on one side.
     sdk=NCS,
     sdk_name="ncs",
-    alt_sdks={"zephyr": MAINLINE},
+    alt_sdks={"zephyr": ZEPHYR_MAINLINE},
     family="nordic",
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
@@ -478,7 +478,11 @@ def upload_serial_dfu(host: str) -> bool:
     import serial  # noqa: PLC0415
 
     from esphome.__main__ import check_permissions  # noqa: PLC0415
-    from esphome.components.zephyr import zephyr_data, zephyr_variant, zephyr_west_hals  # noqa: PLC0415
+    from esphome.components.zephyr import (  # noqa: PLC0415
+        zephyr_data,
+        zephyr_variant,
+        zephyr_west_projects,
+    )
     from esphome.components.zephyr.const import KEY_FRAMEWORK_TYPE  # noqa: PLC0415
     from esphome.components.zephyr.framework import check_and_install as west_install  # noqa: PLC0415
     from esphome.components.zephyr.variants import VARIANTS, resolve_sdk  # noqa: PLC0415
@@ -495,7 +499,7 @@ def upload_serial_dfu(host: str) -> bool:
         zephyr_data()["west_version"],
         zephyr_data()["ninja_version"],
         zephyr_data()["sdk_source"],
-        hals=zephyr_west_hals(sdk),
+        projects=zephyr_west_projects(sdk),
     )
     if zephyr_data()[KEY_BOOTLOADER] == BOOTLOADER_NRF:
         return _upload_open_dfu(host, package, env)

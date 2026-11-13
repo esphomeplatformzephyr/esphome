@@ -9,7 +9,7 @@ from esphome.components.zephyr.const import (
 )
 from esphome.components.zephyr.partitions import BootLayout
 from esphome.components.zephyr.variants import (
-    MAINLINE,
+    ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
     resolve_framework_version,
@@ -46,7 +46,7 @@ VARIANT_NAME = VARIANT_MCXN236
 VARIANT = ZephyrVariant(
     # Resets from the start of flash (frdm_mcxn236.dts boot_partition@0).
     boot=BootLayout(0x0),
-    sdk=MAINLINE,
+    sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
     family="nxp",
     valid_toolchains=(Toolchain.ZEPHYR,),

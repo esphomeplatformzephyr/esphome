@@ -6,7 +6,7 @@ from esphome.components.zephyr.const import (
 )
 from esphome.components.zephyr.partitions import BootLayout
 from esphome.components.zephyr.variants import (
-    MAINLINE,
+    ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
     resolve_framework_version,
@@ -40,7 +40,7 @@ VARIANT = ZephyrVariant(
     mcumgr_ota=True,
     # ROM loads the first image at 0x2000 (espressif/partitions_0x2000_*.dtsi).
     boot=BootLayout(0x2000),
-    sdk=MAINLINE,
+    sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
     family="esp32",
     valid_toolchains=(Toolchain.ZEPHYR,),

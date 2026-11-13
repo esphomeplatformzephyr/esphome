@@ -9,7 +9,7 @@ from esphome.components.zephyr.const import (
 )
 from esphome.components.zephyr.partitions import BootLayout
 from esphome.components.zephyr.variants import (
-    MAINLINE,
+    ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
     resolve_framework_version,
@@ -55,7 +55,7 @@ VARIANT_NAME = VARIANT_STM32F1
 VARIANT = ZephyrVariant(
     # Resets from the start of flash (nucleo_f103rb.dts boot_partition@0).
     boot=BootLayout(0x0),
-    sdk=MAINLINE,
+    sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
     family="stm32",
     valid_toolchains=(Toolchain.ZEPHYR,),

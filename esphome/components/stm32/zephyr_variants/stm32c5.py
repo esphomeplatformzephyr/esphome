@@ -21,7 +21,7 @@ from esphome.components.zephyr.usb_baud_rate import (
     declare_component_id,
 )
 from esphome.components.zephyr.variants import (
-    MAINLINE,
+    ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
     resolve_framework_version,
@@ -55,7 +55,7 @@ VARIANT = ZephyrVariant(
     board_boot={
         "xiao_stm32c5": BootLayout(0x8000, ((0x0, 0x8000),)),
     },
-    sdk=MAINLINE,
+    sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
     family="stm32",
     valid_toolchains=(Toolchain.ZEPHYR,),

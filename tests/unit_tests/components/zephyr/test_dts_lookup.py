@@ -40,6 +40,7 @@ from esphome.components.zephyr.dts_lookup import (
     resolve_zephyr_bus,
     validate_board_revision,
 )
+from esphome.components.zephyr.framework_helpers import FrameworkSource
 from esphome.components.zephyr.variants import ZephyrSDK, ZephyrVariant
 from esphome.core import CORE, EsphomeError
 from tests.unit_tests.components.zephyr.zephyr_state import empty_zephyr_data
@@ -883,7 +884,14 @@ def test_format_size_falls_back_to_bytes_when_not_k_aligned() -> None:
     assert _format_size(1000) == "1000B"
 
 
-_FAKE_SDK = ZephyrSDK(manifest_url="https://example.invalid/zephyr")
+_FAKE_SDK = ZephyrSDK(
+    source=FrameworkSource(
+        name="Test",
+        url="https://example.invalid/zephyr",
+        optional=(),
+        required=frozenset(),
+    )
+)
 
 _BOARD_QUERIES = (
     "get_board_yaml_supported",

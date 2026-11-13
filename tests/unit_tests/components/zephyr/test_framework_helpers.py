@@ -3,6 +3,7 @@
 from collections.abc import Iterator
 import os
 from pathlib import Path
+import re
 import sys
 from typing import Any
 from unittest.mock import ANY, MagicMock, patch
@@ -16,10 +17,12 @@ from esphome.components.zephyr.framework_helpers import (
     ensure_zephyr_requirements,
     fetch_missing_west_projects,
     install_framework,
+    install_local_framework,
     install_sitecustomize,
     needs_venv_rebuild,
     patch_gen_defines_dts_path,
     patch_west_build_source_dir_relpath,
+    refresh_framework,
 )
 from esphome.core import EsphomeError
 from esphome.framework_helpers import get_python_env_executable_path
@@ -222,6 +225,8 @@ def _mark_finished(workspace: Path, stamp: str | None) -> None:
 
 def _subcommands(run: MagicMock) -> list[str]:
     def _sub(cmd: list[str]) -> str:
+        if cmd[0] == "git":
+            return f"git {cmd[1]}"
         return cmd[cmd.index("west" if "west" in cmd else "pip") + 1]
 
     return [_sub(c.args[0]) for c in run.call_args_list]
@@ -545,3 +550,158 @@ def test_ensure_zephyr_requirements_raises_when_pip_fails(
         _ensure_zephyr_requirements(tmp_path)
 
     assert not (tmp_path / "penv" / ".zephyr_reqs_ready").exists()
+
+
+PIN: str = "0123456789abcdef0123456789abcdef01234567"
+
+
+def test_pinned_install_clones_the_default_branch_then_pins(
+    workspace: Path, west: MagicMock
+) -> None:
+    """--mr can't take a commit: the default branch is cloned, then the manifest
+    repository is moved to the pin before west update reads it."""
+    install_framework(ENV_PYTHON, workspace, SOURCE, "main", {"zephyr"}, pin=PIN)
+
+    assert _subcommands(west) == ["init", "git fetch", "git reset", "config", "update"]
+    assert "--mr" not in _west_call(west, "init").args[0]
+    fetch = _west_call(west, "fetch")
+    assert fetch.args[0] == ["git", "fetch", "--depth=1", "--", "origin", PIN]
+    assert fetch.kwargs["cwd"] == workspace / "zephyr"
+
+
+def test_pinned_install_raises_when_the_pin_fails(
+    workspace: Path, west: MagicMock
+) -> None:
+    run = west.side_effect
+    west.side_effect = lambda cmd, **kw: cmd[0] != "git" and run(cmd, **kw)
+
+    with pytest.raises(EsphomeError, match=f"Can't pin Test SDK main to {PIN}"):
+        install_framework(ENV_PYTHON, workspace, SOURCE, "main", {"zephyr"}, pin=PIN)
+
+    assert "update" not in _subcommands(west)
+
+
+def test_pinned_resume_pins_again_first(workspace: Path, west: MagicMock) -> None:
+    """The download may have stopped between init and the pin."""
+    _mark_initialized(workspace)
+
+    install_framework(ENV_PYTHON, workspace, SOURCE, "main", {"zephyr"}, pin=PIN)
+
+    assert _subcommands(west) == ["git fetch", "git reset", "config", "update"]
+
+
+def test_pinned_resume_failing_to_pin_keeps_the_download_once(
+    workspace: Path, west: MagicMock
+) -> None:
+    _mark_initialized(workspace)
+    west.side_effect = None
+    west.return_value = False
+
+    with pytest.raises(EsphomeError, match="Can't resume"):
+        install_framework(ENV_PYTHON, workspace, SOURCE, "main", {"zephyr"}, pin=PIN)
+
+    assert (workspace / ".resume_failed").exists()
+
+
+def test_refresh_moves_a_finished_workspace_to_the_pin(
+    workspace: Path, west: MagicMock
+) -> None:
+    """The patched scripts are put back so west can check out the new commit;
+    every project is updated and checked, and the stamp written."""
+    _mark_finished(workspace, "zephyr")
+    scripts = workspace / "zephyr" / "scripts"
+    for script in ("dts/gen_defines.py", "west_commands/build.py"):
+        (scripts / script).parent.mkdir(parents=True, exist_ok=True)
+        (scripts / script).touch()
+
+    refresh_framework(ENV_PYTHON, workspace, SOURCE, "main", {"zephyr", "hal_a"}, PIN)
+
+    assert _subcommands(west) == [
+        "git checkout",
+        "git checkout",
+        "git fetch",
+        "git reset",
+        "config",
+        "update",
+        "list",
+    ]
+    assert _west_call(west, "checkout").kwargs["cwd"] == workspace / "zephyr"
+    assert not (workspace / ".ready").exists()
+    assert (workspace / ".west_projects").read_text(encoding="utf-8").split() == [
+        "hal_a",
+        "zephyr",
+    ]
+
+
+def test_failed_refresh_leaves_an_unfinished_install(
+    workspace: Path, west: MagicMock
+) -> None:
+    """Without .ready the next build resumes, which pins again."""
+    _mark_finished(workspace, "zephyr")
+    run = west.side_effect
+    west.side_effect = lambda cmd, **kw: "update" not in cmd and run(cmd, **kw)
+
+    with pytest.raises(EsphomeError, match="the next build retries it"):
+        refresh_framework(ENV_PYTHON, workspace, SOURCE, "main", {"zephyr"}, PIN)
+
+    assert not (workspace / ".ready").exists()
+    assert (workspace / ".west" / "config").is_file()
+
+
+@pytest.fixture
+def checkout(tmp_path: Path) -> Path:
+    path = tmp_path / "src" / "my-zephyr"
+    path.mkdir(parents=True)
+    return path
+
+
+def test_local_install_initializes_once_and_updates_every_time(
+    checkout: Path, west: MagicMock
+) -> None:
+    run = west.side_effect
+
+    def _run(cmd: list[str], **kwargs: Any) -> bool:
+        if "init" in cmd:
+            (checkout.parent / ".west").mkdir()
+        return run(cmd, **kwargs)
+
+    west.side_effect = _run
+
+    assert install_local_framework(ENV_PYTHON, checkout, "Zephyr") == checkout.parent
+    assert install_local_framework(ENV_PYTHON, checkout, "Zephyr") == checkout.parent
+
+    assert _subcommands(west) == ["init", "update", "update"]
+    init = _west_call(west, "init", 0)
+    assert init.args[0][-2:] == ["-l", "my-zephyr"]
+    assert init.kwargs["cwd"] == checkout.parent
+    # The user's tree: no filter, nothing deleted
+    assert "config" not in _subcommands(west)
+    west.rmdir.assert_not_called()
+
+
+@pytest.mark.parametrize("failing", ["init", "update"])
+def test_local_install_failure_raises(
+    checkout: Path, west: MagicMock, failing: str
+) -> None:
+    run = west.side_effect
+    west.side_effect = lambda cmd, **kw: failing not in cmd and run(cmd, **kw)
+
+    with pytest.raises(EsphomeError, match=re.escape(str(checkout))):
+        install_local_framework(ENV_PYTHON, checkout, "Zephyr")
+
+    west.rmdir.assert_not_called()
+
+
+def test_ensure_zephyr_requirements_of_a_local_checkout(tmp_path: Path) -> None:
+    """A local checkout's folder needn't be named zephyr."""
+    checkout = tmp_path / "my-zephyr"
+    (checkout / "scripts").mkdir(parents=True)
+    (checkout / "scripts" / "requirements.txt").write_text("pyelftools\n")
+    (tmp_path / "penv").mkdir()
+
+    with patch.object(framework_helpers, "run_command_ok", return_value=True) as pip:
+        ensure_zephyr_requirements(
+            tmp_path / "penv", tmp_path, False, "v1", zephyr_dir=checkout
+        )
+
+    assert pip.call_args.args[0][-1] == str(checkout / "scripts" / "requirements.txt")

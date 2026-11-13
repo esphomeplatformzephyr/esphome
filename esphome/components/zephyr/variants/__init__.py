@@ -42,6 +42,7 @@ from ..const import (
     KEY_ZEPHYR,
     VERSION_RECOMMENDED,
 )
+from ..framework_helpers import FrameworkSource
 from ..partitions import BootLayout
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,10 +54,10 @@ FAMILY_DEFAULT: Final = "family default"
 
 @dataclass
 class ZephyrSDK:
-    manifest_url: str
+    source: FrameworkSource
     manifest_rev: str = "recommended"
     boards_repo_url: str | None = (
-        None  # repo containing boards/; defaults to manifest_url when None
+        None  # repo containing boards/; defaults to source.url when None
     )
     # Prefix of the workspace folder, so SDKs with the same version string don't share one
     workspace_prefix: str | None = None
@@ -67,7 +68,7 @@ class ZephyrSDK:
     min_version: cv.Version = cv.Version(4, 4, 1)
     # False: boards_repo_url is checked out directly at tag f"v{version}" (mainline's own
     # tag scheme). True: boards_repo_url's *checkout ref* isn't derivable from version at
-    # all -- it must be read from manifest_url's own west.yml (at tag f"v{version}"), which
+    # all -- it must be read from source.url's own west.yml (at tag f"v{version}"), which
     # states the exact revision it pins for the boards_repo_url project. NCS needs this:
     # its bundled sdk-zephyr fork's tag scheme isn't a stable function of the nrf release
     # version (confirmed: NCS 2.9.2 pins zephyr at "v3.7.99-ncs2-2", NCS 3.4.0 pins it at
@@ -157,7 +158,7 @@ class ZephyrVariant:
     # `type:` against.
     sdk_name: str = "zephyr"
     # Additional selectable `framework: type:` values, keyed by name -- e.g. nrf52's
-    # {"zephyr": MAINLINE} lets mainline Zephyr be chosen as an alternate to its NCS
+    # {"zephyr": ZEPHYR_MAINLINE} lets mainline Zephyr be chosen as an alternate to its NCS
     # default. Empty for single-SDK variants.
     alt_sdks: dict[str, "ZephyrSDK"] = field(default_factory=dict)
     # Groups sibling variants sharing the same silicon vendor (e.g. "esp32" for
@@ -370,7 +371,7 @@ def resolve_sdk(
 def _sdk_default_version(variant: ZephyrVariant, sdk_name: str, sdk: ZephyrSDK) -> str:
     # default_version_override only applies to the variant's own default sdk -- an alt
     # sdk's version window is entirely its own (e.g. nrf52's alt "zephyr" sdk is just
-    # MAINLINE, unmodified).
+    # ZEPHYR_MAINLINE, unmodified).
     if sdk_name == variant.sdk_name:
         return variant.default_version_override or sdk.default_version
     return sdk.default_version
@@ -465,7 +466,7 @@ def resolve_framework_version(
         )
 
         if source[CONF_TYPE] == TYPE_GIT and CONF_URL not in source:
-            source[CONF_URL] = sdk.manifest_url
+            source[CONF_URL] = sdk.source.url
         with cv.prepend_path([CONF_FRAMEWORK, CONF_SOURCE]):
             version_str = resolve_sdk_source_version(source, framework[CONF_REFRESH])
     else:
@@ -584,8 +585,29 @@ def set_core_data(
     )
 
 
-MAINLINE: ZephyrSDK = ZephyrSDK(
-    manifest_url="https://github.com/zephyrproject-rtos/zephyr",
+ZEPHYR_MAINLINE: ZephyrSDK = ZephyrSDK(
+    source=FrameworkSource(
+        name="Zephyr",
+        url="https://github.com/zephyrproject-rtos/zephyr",
+        # Every vendor HAL is fetched only when a build needs it. nrf_hw_models are
+        # BabbleSim's nRF models; their module needs hal_nordic, and no variant
+        # builds for BabbleSim
+        optional=("hal_.*", "nrf_hw_models"),
+        # Projects in Zephyr's hal group that match "hal_.*" but belong to no SoC
+        # family: Xtensa, the Arm Ethos-U NPU, and the external chip libraries any
+        # board can carry
+        required=frozenset(
+            {
+                "hal_afbr",
+                "hal_ethos_u",
+                "hal_infineon",
+                "hal_st",
+                "hal_tdk",
+                "hal_wurthelektronik",
+                "hal_xtensa",
+            }
+        ),
+    ),
     workspace_prefix="zephyr",
 )
 
@@ -608,10 +630,18 @@ NCS_ZIGBEE_TEMPLATE: ZephyrModuleTemplate = ZephyrModuleTemplate(
 # itself, and the fork's own checkout ref isn't a stable function of the nrf release
 # version -- see resolve_boards_ref_via_manifest on ZephyrSDK. 3.4.0: Nordic's stated
 # minimum for this integration; its bundled zephyr fork reports 4.4.0 (close to
-# MAINLINE's own 4.4.1 baseline), though NCS cherry-picks fixes independently of
+# ZEPHYR_MAINLINE's own 4.4.1 baseline), though NCS cherry-picks fixes independently of
 # upstream release numbers, so that number is not a reliable cross-SDK gating signal.
+NRF_CONNECT_SDK: FrameworkSource = FrameworkSource(
+    name="nRF Connect SDK",
+    url="https://github.com/nrfconnect/sdk-nrf",
+    optional=(".*",),
+    # Projects every build needs; components add others with include_west_project()
+    required=frozenset({"cmsis", "hal_nordic", "nrfxlib", "zephyr"}),
+)
+
 NCS: ZephyrSDK = ZephyrSDK(
-    manifest_url="https://github.com/nrfconnect/sdk-nrf",
+    source=NRF_CONNECT_SDK,
     boards_repo_url="https://github.com/nrfconnect/sdk-zephyr",
     workspace_prefix="sdk-nrf",
     default_version="3.4.1",
@@ -627,7 +657,13 @@ NCS: ZephyrSDK = ZephyrSDK(
 # reasoning as NCS's resolve_boards_ref_via_manifest. Real board/DTS support for chips
 # not yet upstreamed to mainline Zephyr lives in that bundled fork.
 SILABS: ZephyrSDK = ZephyrSDK(
-    manifest_url="https://github.com/SiliconLabsSoftware/zephyr-silabs",
+    # Nothing left out: the manifest's own name-allowlist already limits the projects
+    source=FrameworkSource(
+        name="Silicon Labs SDK",
+        url="https://github.com/SiliconLabsSoftware/zephyr-silabs",
+        optional=(),
+        required=frozenset(),
+    ),
     boards_repo_url="https://github.com/SiliconLabsSoftware/zephyr",
     workspace_prefix="zephyr-silabs",
     default_version="2026.6.0",

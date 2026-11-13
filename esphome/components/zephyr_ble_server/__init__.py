@@ -10,7 +10,12 @@ from esphome.components.nrf52.framework import (
     bluetooth_west_projects,
     include_west_project,
 )
-from esphome.components.zephyr import VARIANTS, zephyr_add_prj_conf, zephyr_variant
+from esphome.components.zephyr import (
+    VARIANTS,
+    zephyr_add_prj_conf,
+    zephyr_framework_type,
+    zephyr_variant,
+)
 import esphome.config_validation as cv
 from esphome.const import CONF_ID, Framework
 from esphome.core import CORE, CoroPriority, coroutine_with_priority
@@ -98,7 +103,7 @@ _CALLBACK_AUTOMATIONS = (
 async def to_code(config: ConfigType) -> None:
     var = cg.new_Pvariable(config[CONF_ID])
     zephyr_add_prj_conf("BT", True)
-    if CORE.is_nrf52:
+    if CORE.is_nrf52 or zephyr_framework_type() == "ncs":
         for project in bluetooth_west_projects():
             include_west_project(project)
     zephyr_add_prj_conf("BT_PERIPHERAL", True)

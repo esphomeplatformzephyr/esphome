@@ -331,12 +331,29 @@ def fetch_missing_west_projects(
         raise EsphomeError(f"Can't update {source.name} {version}")
 
 
+def _pin_manifest_repo(framework_path: Path, pin: str) -> bool:
+    """Point the manifest repository at commit ``pin``; False when git fails.
+
+    ``west init --mr`` can't take a commit and ``west update`` never moves the
+    manifest repository, so this is done with git before ``west update`` reads it.
+    """
+    config = configparser.ConfigParser()
+    config.read(framework_path / ".west" / "config", encoding="utf-8")
+    manifest_dir = framework_path / config.get("manifest", "path", fallback="zephyr")
+    _LOGGER.info("Pinning the manifest repository to %s ...", pin[:12])
+    return run_command_ok(
+        ["git", "fetch", "--depth=1", "--", "origin", pin], cwd=manifest_dir
+    ) and run_command_ok(["git", "reset", "--hard", "FETCH_HEAD"], cwd=manifest_dir)
+
+
 def install_framework(
     env_python_path: Path,
     framework_path: Path,
     source: FrameworkSource,
     version: str,
     projects: set[str],
+    *,
+    pin: str | None = None,
 ) -> None:
     """Clone the SDK into ``framework_path`` with west, fetching ``projects``.
 
@@ -346,6 +363,9 @@ def install_framework(
     flaky network is the likely cause) and is retried on the next build; only
     a second failure in a row starts over clean. Call under the workspace's
     install lock.
+
+    With ``pin`` (a commit), the default branch is cloned and the manifest
+    repository moved to ``pin`` before every update; ``version`` is then only a label.
     """
     name = source.name
     resume_failed = framework_path / ".resume_failed"
@@ -355,7 +375,10 @@ def install_framework(
     initialized = (framework_path / ".west" / "config").is_file()
     if initialized and not (framework_path / ".ready").exists():
         _LOGGER.info("Resuming the %s %s download ...", name, version)
-        if _west_update(env_python_path, framework_path, source, version, projects):
+        # Pinned again: the download may have stopped between init and the pin
+        if (pin is None or _pin_manifest_repo(framework_path, pin)) and _west_update(
+            env_python_path, framework_path, source, version, projects
+        ):
             resume_failed.unlink(missing_ok=True)
             return
         if not resume_failed.exists():
@@ -366,30 +389,104 @@ def install_framework(
         _LOGGER.warning("Resuming failed again; downloading %s %s anew", name, version)
     rmdir(framework_path, msg=f"Clean up {version} framework environment")
     _LOGGER.info("Initializing %s %s ...", name, version)
-    cmd = [
-        str(env_python_path),
-        "-m",
-        "west",
-        "init",
-        "-m",
-        source.url,
-        "-o=--depth=1",
-        "--mr",
-        version,
-        str(framework_path),
-    ]
+    cmd = [str(env_python_path), "-m", "west", "init", "-m", source.url, "-o=--depth=1"]
+    if pin is None:
+        cmd += ["--mr", version]
+    cmd.append(str(framework_path))
     if not run_command_ok(cmd, stream_output=True):
         raise EsphomeError(f"Can't initialize {name} {version}")
+    if pin is not None and not _pin_manifest_repo(framework_path, pin):
+        raise EsphomeError(f"Can't pin {name} {version} to {pin}")
     _LOGGER.info("Updating %s %s (this may take a while) ...", name, version)
     if not _west_update(env_python_path, framework_path, source, version, projects):
         raise EsphomeError(f"Can't update {name} {version}")
 
 
-def ensure_zephyr_requirements(
-    python_env_path: Path, framework_path: Path, venv_rebuilt: bool, label: str
+_PATCHED_SCRIPTS: tuple[Path, ...] = (
+    Path("scripts") / "dts" / "gen_defines.py",
+    Path("scripts") / "west_commands" / "build.py",
+)
+
+
+def _restore_patched_scripts(framework_path: Path) -> None:
+    """Undo the script patches; a modified tracked file can block west's checkout."""
+    zephyr_dir = framework_path / "zephyr"
+    for script in _PATCHED_SCRIPTS:
+        if (zephyr_dir / script).is_file():
+            run_command_ok(["git", "checkout", "--", script.as_posix()], cwd=zephyr_dir)
+
+
+def refresh_framework(
+    env_python_path: Path,
+    framework_path: Path,
+    source: FrameworkSource,
+    version: str,
+    projects: set[str],
+    pin: str,
 ) -> None:
-    """Install the workspace's Zephyr Python requirements into the penv unless current."""
-    zephyr_reqs = framework_path / "zephyr" / "scripts" / "requirements.txt"
+    """Move a finished workspace to commit ``pin`` and update every project.
+
+    ``.ready`` goes first, so a failure leaves an unfinished install that the
+    next build resumes (and pins again). The caller writes ``.ready`` after.
+    Call under the workspace's install lock.
+    """
+    (framework_path / ".ready").unlink(missing_ok=True)
+    _restore_patched_scripts(framework_path)
+    _LOGGER.info("Updating %s %s to %s ...", source.name, version, pin[:12])
+    if not _pin_manifest_repo(framework_path, pin) or not _west_update(
+        env_python_path, framework_path, source, version, projects
+    ):
+        raise EsphomeError(
+            f"Can't update {source.name} {version} to {pin}; the next build retries it"
+        )
+
+
+def install_local_framework(env_python_path: Path, checkout: Path, name: str) -> Path:
+    """Use the user's own checkout; its folder's parent is the workspace, returned.
+
+    ``west update`` runs every time, since the checkout may change between
+    builds. Nothing is ever deleted or patched there and no project filter is
+    set: it is the user's tree. A failure raises and the next build retries.
+    """
+    workspace = checkout.parent
+    label = str(checkout)
+    if not (workspace / ".west").is_dir():
+        _LOGGER.info("Initializing the %s workspace for %s ...", name, label)
+        cmd = [str(env_python_path), "-m", "west", "init", "-l", checkout.name]
+        if not run_command_ok(cmd, cwd=workspace):
+            raise EsphomeError(f"Can't initialize the {name} workspace for {label}")
+    _LOGGER.info("Updating the %s workspace for %s ...", name, label)
+    cmd = [
+        str(env_python_path),
+        "-m",
+        "west",
+        "update",
+        "--narrow",
+        "--fetch-opt=--depth=1",
+    ]
+    if not run_command_ok(cmd, cwd=workspace, stream_output=True):
+        raise EsphomeError(
+            f"Can't update the {name} workspace for {label}; the next build retries it"
+        )
+    return workspace
+
+
+def ensure_zephyr_requirements(
+    python_env_path: Path,
+    framework_path: Path,
+    venv_rebuilt: bool,
+    label: str,
+    *,
+    zephyr_dir: Path | None = None,
+) -> None:
+    """Install the workspace's Zephyr Python requirements into the penv unless current.
+
+    ``zephyr_dir`` is the Zephyr tree when it isn't ``framework_path/zephyr``
+    (a local checkout).
+    """
+    zephyr_reqs = (
+        (zephyr_dir or framework_path / "zephyr") / "scripts" / "requirements.txt"
+    )
     # Inside the penv, so a rebuild removes it
     sentinel = python_env_path / ".zephyr_reqs_ready"
     if (

@@ -11,7 +11,7 @@ from esphome.components.zephyr.const import (
 )
 from esphome.components.zephyr.partitions import BootLayout
 from esphome.components.zephyr.variants import (
-    MAINLINE,
+    ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
     resolve_framework_version,
@@ -56,7 +56,7 @@ VARIANT = ZephyrVariant(
     mcumgr_ota=True,
     # ROM boots from the start of flash (rpi_pico2, partitions_4M_sysbuild.dtsi).
     boot=BootLayout(0x0),
-    sdk=MAINLINE,
+    sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
     family="rpi_pico",
     valid_toolchains=(Toolchain.ZEPHYR,),

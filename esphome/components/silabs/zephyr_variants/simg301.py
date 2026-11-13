@@ -6,7 +6,7 @@ from esphome.components.zephyr.const import (
 )
 from esphome.components.zephyr.partitions import BootLayout
 from esphome.components.zephyr.variants import (
-    MAINLINE,
+    ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
     resolve_framework_version,
@@ -39,7 +39,7 @@ VARIANT_NAME = VARIANT_SIMG301
 VARIANT = ZephyrVariant(
     # Resets from the start of flash (simg301_ek2719a.dts boot_partition@0).
     boot=BootLayout(0x0),
-    sdk=MAINLINE,
+    sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
     # six301 SoC support first shipped in 4.5.0.
     min_version_override=cv.Version(4, 5, 0),

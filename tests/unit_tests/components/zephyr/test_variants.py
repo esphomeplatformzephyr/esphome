@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from esphome.components.zephyr.const import VERSION_RECOMMENDED
+from esphome.components.zephyr.framework_helpers import FrameworkSource
 from esphome.components.zephyr.variants import (
     VARIANTS,
     ZephyrModule,
@@ -30,12 +31,16 @@ from esphome.const import (
 from esphome.core import EsphomeError
 
 _DEFAULT_SDK = ZephyrSDK(
-    manifest_url="http://dummy-default",
+    source=FrameworkSource(
+        name="Test", url="http://dummy-default", optional=(), required=frozenset()
+    ),
     default_version="1.0.0",
     min_version=cv.Version(1, 0, 0),
 )
 _ALT_SDK = ZephyrSDK(
-    manifest_url="http://dummy-alt",
+    source=FrameworkSource(
+        name="Test", url="http://dummy-alt", optional=(), required=frozenset()
+    ),
     default_version="2.0.0",
     min_version=cv.Version(2, 0, 0),
 )

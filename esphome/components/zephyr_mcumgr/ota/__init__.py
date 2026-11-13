@@ -234,7 +234,7 @@ async def to_code(config: ConfigType) -> None:
 
     zephyr_add_prj_conf("NET_BUF", True)
     zephyr_add_prj_conf("ZCBOR", True)
-    if CORE.is_nrf52:
+    if CORE.is_nrf52 or zephyr_framework_type() == "ncs":
         include_west_project("zcbor")
         # The image manager includes MCUboot headers with any bootloader
         include_west_project("mcuboot")

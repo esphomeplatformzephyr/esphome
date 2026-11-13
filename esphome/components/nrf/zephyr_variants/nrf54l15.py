@@ -10,8 +10,8 @@ from esphome.components.zephyr.const import (
 )
 from esphome.components.zephyr.partitions import BootLayout
 from esphome.components.zephyr.variants import (
-    MAINLINE,
     NCS,
+    ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
     resolve_framework_version,
@@ -90,7 +90,7 @@ VARIANT = ZephyrVariant(
     # this board's definition too) stays available as an alternate.
     sdk=NCS,
     sdk_name="ncs",
-    alt_sdks={"zephyr": MAINLINE},
+    alt_sdks={"zephyr": ZEPHYR_MAINLINE},
     family="nordic",
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",

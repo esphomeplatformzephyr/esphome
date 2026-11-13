@@ -11,7 +11,7 @@ from esphome.components.zephyr.const import (
 )
 from esphome.components.zephyr.partitions import BootLayout
 from esphome.components.zephyr.variants import (
-    MAINLINE,
+    ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
     resolve_framework_version,
@@ -64,7 +64,7 @@ VARIANT = ZephyrVariant(
     # The first 256 bytes hold boot2, built into the first image; that image starts
     # after it (rpi_pico-common.dtsi second_stage_bootloader@0, code_partition@100).
     boot=BootLayout(0x100),
-    sdk=MAINLINE,
+    sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
     family="rpi_pico",
     valid_toolchains=(Toolchain.ZEPHYR,),

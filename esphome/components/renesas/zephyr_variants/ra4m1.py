@@ -9,7 +9,7 @@ from esphome.components.zephyr.const import (
 )
 from esphome.components.zephyr.partitions import BootLayout
 from esphome.components.zephyr.variants import (
-    MAINLINE,
+    ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
     resolve_framework_version,
@@ -90,7 +90,7 @@ VARIANT = ZephyrVariant(
         "arduino_uno_r4": BootLayout(0x4000, ((0x0, 0x4000),)),
         "arduino_nano_r4": BootLayout(0x4000, ((0x0, 0x4000),)),
     },
-    sdk=MAINLINE,
+    sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
     family="renesas",
     valid_toolchains=(Toolchain.ZEPHYR,),

@@ -619,7 +619,7 @@ async def to_code(config: ConfigType) -> None:
     elif CORE.using_zephyr:
         device_type = config.get(CONF_DEVICE_TYPE)
         zephyr_add_prj_conf("NET_L2_OPENTHREAD", True)
-        if CORE.is_nrf52:
+        if CORE.is_nrf52 or zephyr_framework_type() == "ncs":
             # Crypto through PSA: mbedtls, plus Oberon from SDK 2.7
             include_west_project("mbedtls")
             include_west_project("openthread")

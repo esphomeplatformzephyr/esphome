@@ -129,8 +129,9 @@ from .rtt import (  # noqa: F401
 )
 from .usb_baud_rate import CONF_USB_BAUD_RATE
 from .variants import (
-    MAINLINE,
+    NCS,
     VARIANTS,
+    ZEPHYR_MAINLINE,
     ZephyrModule,
     ZephyrModuleTemplate,
     ZephyrSDK,
@@ -805,12 +806,17 @@ def zephyr_family_uart_drivers() -> frozenset[str]:
     return get_family_module(family).UART_DRIVERS
 
 
-def zephyr_west_hals(sdk: ZephyrSDK) -> frozenset[str] | None:
-    """Vendor HALs to fetch for the active family; None leaves the workspace
-    unfiltered (NCS, Silicon Labs' SDK, no family)."""
-    if sdk is not MAINLINE or (family := zephyr_variant_family()) is None:
-        return None
-    return get_family_module(family).WEST_HALS
+def zephyr_west_projects(sdk: ZephyrSDK) -> frozenset[str]:
+    """The west projects this build needs beyond the SDK's required ones: the
+    family's vendor HALs on mainline, the projects components ask for on NCS."""
+    if sdk is NCS:
+        # The same list as nrf52's: components add to it with include_west_project()
+        from esphome.components.nrf52.framework import wanted_west_projects  # noqa: PLC0415
+
+        return frozenset(wanted_west_projects())
+    if sdk is ZEPHYR_MAINLINE and (family := zephyr_variant_family()) is not None:
+        return get_family_module(family).WEST_HALS
+    return frozenset()
 
 
 def _base_to_code(config: ConfigType) -> None:
@@ -2032,7 +2038,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
             zephyr_data()["west_version"],
             zephyr_data()["ninja_version"],
             zephyr_data()["sdk_source"],
-            hals=zephyr_west_hals(sdk),
+            projects=zephyr_west_projects(sdk),
         )
         build_dir = CORE.relative_build_path(".west_build")
         if not run_west_flash_pyocd(python_bin, framework_path, west_env, build_dir):
@@ -2071,7 +2077,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
         zephyr_data()["west_version"],
         zephyr_data()["ninja_version"],
         zephyr_data()["sdk_source"],
-        hals=zephyr_west_hals(sdk),
+        projects=zephyr_west_projects(sdk),
     )
     build_dir = CORE.relative_build_path(".west_build")
     configured_runner = zephyr_data().get(KEY_RUNNER)
@@ -2122,14 +2128,14 @@ def run_compile(args, config: ConfigType) -> bool:
     modules = resolve_zephyr_modules()
     # Modules join the build like a converted PlatformIO library, not the workspace
     extra_modules.extend(m.local_path for m in modules if m.local_path is not None)
-    extra_modules.extend(install_git_modules(modules, sdk.manifest_url))
+    extra_modules.extend(install_git_modules(modules, sdk.source.url))
     python_bin, framework_path, west_env = west_install(
         sdk,
         version,
         zephyr_data()["west_version"],
         zephyr_data()["ninja_version"],
         zephyr_data()["sdk_source"],
-        hals=zephyr_west_hals(sdk),
+        projects=zephyr_west_projects(sdk),
     )
     if sdk_name == "silabs":
         from .commander_setup import check_and_install as commander_install

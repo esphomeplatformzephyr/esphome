@@ -287,7 +287,11 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
         return False
 
     from esphome.__main__ import check_permissions  # noqa: PLC0415
-    from esphome.components.zephyr import zephyr_data, zephyr_variant, zephyr_west_hals  # noqa: PLC0415
+    from esphome.components.zephyr import (  # noqa: PLC0415
+        zephyr_data,
+        zephyr_variant,
+        zephyr_west_projects,
+    )
     from esphome.components.zephyr.build_zephyr import run_west_flash  # noqa: PLC0415
     from esphome.components.zephyr.const import KEY_FRAMEWORK_TYPE, KEY_RUNNER  # noqa: PLC0415
     from esphome.components.zephyr.framework import check_and_install as west_install  # noqa: PLC0415
@@ -306,7 +310,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
         zephyr_data()["west_version"],
         zephyr_data()["ninja_version"],
         zephyr_data()["sdk_source"],
-        hals=zephyr_west_hals(sdk),
+        projects=zephyr_west_projects(sdk),
     )
 
     build_dir = CORE.relative_build_path(".west_build")

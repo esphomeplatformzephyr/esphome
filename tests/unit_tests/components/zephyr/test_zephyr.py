@@ -53,8 +53,10 @@ from esphome.components.zephyr import (
     zephyr_setup_uart_pinctrl,
     zephyr_variant,
     zephyr_variant_family,
+    zephyr_west_projects,
 )
 from esphome.components.zephyr.const import CONF_BOARD_SOURCE, KEY_PRJ_CONF, KEY_ZEPHYR
+from esphome.components.zephyr.framework_helpers import FrameworkSource
 from esphome.components.zephyr.mcuboot import zephyr_skip_bootloader_supported
 from esphome.components.zephyr.pinctrl import (
     _build_i2c_pinctrl_states_overlay,
@@ -65,7 +67,10 @@ from esphome.components.zephyr.pinctrl import (
     _resolve_uart_pinctrl_states,
 )
 from esphome.components.zephyr.variants import (
+    NCS,
+    SILABS,
     VARIANTS,
+    ZEPHYR_MAINLINE,
     ZephyrModule,
     ZephyrModuleTemplate,
     ZephyrSDK,
@@ -1810,7 +1815,13 @@ def test_variant_config_schema_raises_for_unregistered_variant(
     import esphome.components.zephyr as zephyr_module
 
     _init_variant_schema_core()
-    fake_variant = ZephyrVariant(sdk=ZephyrSDK(manifest_url="http://dummy"))
+    fake_variant = ZephyrVariant(
+        sdk=ZephyrSDK(
+            source=FrameworkSource(
+                name="Test", url="http://dummy", optional=(), required=frozenset()
+            )
+        )
+    )
     monkeypatch.setitem(_variants_instance._variants, "FAKE_VARIANT", fake_variant)
     framework = zephyr_module._FRAMEWORK_SCHEMA({})
     monkeypatch.setattr(
@@ -2620,3 +2631,24 @@ def test_zephyr_toolchain_store() -> None:
     rtos_store = {"board": "nucleo_c5a3zg"}
     CORE.data[KEY_ZEPHYR] = rtos_store
     assert zephyr_data() is rtos_store
+
+
+def test_zephyr_west_projects_mainline_takes_the_family_hals() -> None:
+
+    with patch("esphome.components.zephyr.zephyr_variant_family", return_value="stm32"):
+        assert zephyr_west_projects(ZEPHYR_MAINLINE) == frozenset({"hal_stm32"})
+
+
+def test_zephyr_west_projects_ncs_takes_nrf52s_list() -> None:
+    """The projects NCS components ask for with include_west_project()."""
+
+    with patch(
+        "esphome.components.nrf52.framework.wanted_west_projects",
+        return_value={"zephyr", "openthread"},
+    ):
+        assert zephyr_west_projects(NCS) == frozenset({"zephyr", "openthread"})
+
+
+def test_zephyr_west_projects_silabs_adds_nothing() -> None:
+
+    assert zephyr_west_projects(SILABS) == frozenset()

@@ -61,10 +61,21 @@ def enable_rtt_node(channel: int, owner: str) -> str:
     Declares the node, or enables it when the board's devicetree already has one, since
     a second node with the same label fails the devicetree build.
     """
-    from . import KEY_BOARD, zephyr_add_overlay, zephyr_add_prj_conf, zephyr_data
+    from . import (
+        KEY_BOARD,
+        zephyr_add_overlay,
+        zephyr_add_prj_conf,
+        zephyr_data,
+        zephyr_framework_type,
+    )
     from .dts_lookup import dts_node_label_exists
 
     claim_rtt_channel(channel, owner)
+    if zephyr_framework_type() == "ncs":
+        # RTT sources live in the segger project, which NCS fetches only on request
+        from esphome.components.nrf52.framework import include_west_project
+
+        include_west_project("segger")
 
     zephyr_add_prj_conf("USE_SEGGER_RTT", True)
     # Zephyr's own RTT backend would write native lines to RTT channel 0 as well,

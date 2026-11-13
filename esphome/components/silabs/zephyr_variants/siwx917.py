@@ -6,8 +6,8 @@ from esphome.components.zephyr.const import (
 )
 from esphome.components.zephyr.partitions import BootLayout
 from esphome.components.zephyr.variants import (
-    MAINLINE,
     SILABS,
+    ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
     resolve_framework_version,
@@ -76,7 +76,7 @@ VARIANT = ZephyrVariant(
     boot=BootLayout(0x202000, ((0x0, 0x202000),)),
     # Mainline stays default; Silicon Labs' vendor SDK (SILABS) is available as an
     # alt, same reasoning as efr32mg24 -- pending real hardware testing either way.
-    sdk=MAINLINE,
+    sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
     alt_sdks={"silabs": SILABS},
     min_version_override=cv.Version(4, 5, 0),

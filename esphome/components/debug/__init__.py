@@ -6,6 +6,7 @@ from esphome.components.zephyr import (
     claim_rtt_channel,
     zephyr_add_prj_conf,
     zephyr_family_uart_drivers,
+    zephyr_framework_type,
 )
 from esphome.components.zephyr.const import SEGGER_RTT_UART
 from esphome.config_helpers import filter_source_files_from_platform
@@ -118,6 +119,8 @@ async def to_code(config: ConfigType) -> None:
             if config[CONF_ENABLE_RTT_CONSOLE]:
                 # Same RTT console as nrf52 above, for reading a crash in full: blocking
                 # mode drops nothing while a probe reads, and stops the device when none does.
+                if zephyr_framework_type() == "ncs":
+                    include_west_project("segger")
                 claim_rtt_channel(0, DEBUG_OWNER)
                 zephyr_add_prj_conf("USE_SEGGER_RTT", True)
                 # RTT_CONSOLE only exists with CONSOLE, which Zephyr RTOS turns off
