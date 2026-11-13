@@ -432,7 +432,8 @@ def fetch_missing_west_projects(
         source,
         version,
         installed | projects,
-        only=missing,
+        # west update fails on a name the manifest lacks; a full update skips it
+        only=None if missing & source.required else missing,
     ):
         _restore_project_filter(
             env_python_path, framework_path, source, version, installed
@@ -597,8 +598,8 @@ def ensure_zephyr_requirements(
     zephyr_reqs = (
         (zephyr_dir or framework_path / "zephyr") / "scripts" / "requirements.txt"
     )
-    # Inside the penv, so a rebuild removes it
-    sentinel = python_env_path / ".zephyr_reqs_ready"
+    # Inside the penv, so a rebuild removes it; one per workspace sharing the penv
+    sentinel = python_env_path / f".zephyr_reqs_ready-{framework_path.name}"
     if (
         venv_rebuilt
         or not sentinel.exists()

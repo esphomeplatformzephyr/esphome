@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 from importlib import import_module
+import sys
+from types import ModuleType
 from typing import Any
 
 import pytest
 
+from esphome.components.zephyr import variants
 from esphome.components.zephyr.const import VERSION_RECOMMENDED
 from esphome.components.zephyr.framework_helpers import FrameworkSource
 from esphome.components.zephyr.variants import (
@@ -324,3 +327,22 @@ def test_every_family_names_its_vendor_hals() -> None:
         hals = get_family_module(family).ADDITIONAL_FRAMEWORK_PROJECTS
         assert hals
         assert all(h.startswith("hal_") for h in hals)
+
+
+def test_registry_read_while_loading_is_rejected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    package = "esphome.components.fakeplatform.zephyr_variants"
+    registry = variants._LazyVariants()
+    # VARIANT_NAME is missing, so reading it calls __getattr__, which reads the registry
+    chip = ModuleType(f"{package}.chip1")
+    chip.__getattr__ = lambda name: registry.get("chip1")
+    platform = ModuleType(package)
+    platform.VARIANT_MODULES = ["chip1"]
+    monkeypatch.setitem(sys.modules, package, platform)
+    monkeypatch.setitem(sys.modules, chip.__name__, chip)
+    monkeypatch.setattr(variants, "_ZEPHYR_PLATFORMS", ("fakeplatform",))
+
+    for _ in range(2):
+        with pytest.raises(RuntimeError, match="read VARIANTS while it loaded"):
+            registry.get("chip1")
