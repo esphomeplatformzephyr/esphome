@@ -222,6 +222,42 @@ def test_zephyr_maps_ipv4_only_when_both_families_are_on(
 
 
 @pytest.mark.parametrize(
+    ("tcp", "wifi", "window", "tx_bufs"),
+    [
+        (False, False, None, None),
+        (False, True, None, 128),  # Wi-Fi traffic needs the pools without TCP too
+        (True, False, 2280, 48),
+        (True, True, 5760, 128),
+    ],
+)
+def test_zephyr_tcp_only_with_a_tcp_user(
+    set_core_config: SetCoreConfigCallable,
+    tcp: bool,
+    wifi: bool,
+    window: int | None,
+    tx_bufs: int | None,
+) -> None:
+    """Zephyr's TCP stack comes only with a registered TCP socket; Wi-Fi keeps the larger pools."""
+    set_core_config(PlatformFramework.ESP32_ZEPHYR)
+    CORE.config = {"wifi": {}} if wifi else {}
+    config = {
+        CONF_ENABLE_IPV4: True,
+        CONF_ENABLE_IPV6: False,
+        CONF_MIN_IPV6_ADDR_COUNT: 0,
+    }
+    with (
+        patch("esphome.components.network.needs_tcp", return_value=tcp),
+        patch("esphome.components.network.zephyr_add_prj_conf") as mock_conf,
+        patch("esphome.components.network.zephyr_configure_net_contexts"),
+    ):
+        asyncio.run(to_code(config))
+    conf = {call.args[0]: call.args[1] for call in mock_conf.call_args_list}
+    assert conf["NET_TCP"] is tcp
+    assert conf.get("NET_TCP_MAX_SEND_WINDOW_SIZE") == window
+    assert conf.get("NET_BUF_TX_COUNT") == tx_bufs
+
+
+@pytest.mark.parametrize(
     ("config_file", "tcp"),
     [
         ("nrf52_network_no_openthread.yaml", True),

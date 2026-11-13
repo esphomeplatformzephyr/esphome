@@ -672,24 +672,27 @@ async def to_code(config: ConfigType) -> None:
         zephyr_add_prj_conf("NET_IPV6", enable_ipv6)
         # For inet_ntop()/inet_pton(); POSIX_NETWORKING cannot be set on its own.
         zephyr_add_prj_conf("POSIX_API", True)
-        zephyr_add_prj_conf("NET_TCP", True)
+        tcp = needs_tcp()
+        if not tcp:
+            _LOGGER.info(
+                "No component registered a TCP socket, so the Zephyr TCP stack is left "
+                "out; a component that opens TCP sockets must register them with "
+                "socket.consume_sockets"
+            )
+        zephyr_add_prj_conf("NET_TCP", tcp)
         zephyr_add_prj_conf("NET_UDP", True)
-        # Zephyr's default buffers are too small for the API's first burst of entities.
+        wifi = CONF_WIFI in CORE.config
+        # Zephyr's default buffers are too small for the API's first burst of entities, and
+        # a Wi-Fi network's own traffic (ARP, DHCP, mDNS, broadcasts) needs room without TCP too.
         # TODO: enable_high_performance has no effect on Zephyr yet.
-        if CONF_WIFI in CORE.config:
-            zephyr_add_prj_conf("NET_PKT_RX_COUNT", 64)
-            zephyr_add_prj_conf("NET_PKT_TX_COUNT", 64)
-            zephyr_add_prj_conf("NET_BUF_RX_COUNT", 128)
-            zephyr_add_prj_conf("NET_BUF_TX_COUNT", 128)
-            zephyr_add_prj_conf("NET_TCP_MAX_RECV_WINDOW_SIZE", 5760)
-            zephyr_add_prj_conf("NET_TCP_MAX_SEND_WINDOW_SIZE", 5760)
-        else:
-            zephyr_add_prj_conf("NET_PKT_RX_COUNT", 24)
-            zephyr_add_prj_conf("NET_PKT_TX_COUNT", 24)
-            zephyr_add_prj_conf("NET_BUF_RX_COUNT", 48)
-            zephyr_add_prj_conf("NET_BUF_TX_COUNT", 48)
-            zephyr_add_prj_conf("NET_TCP_MAX_RECV_WINDOW_SIZE", 2280)
-            zephyr_add_prj_conf("NET_TCP_MAX_SEND_WINDOW_SIZE", 2280)
+        if tcp or wifi:
+            zephyr_add_prj_conf("NET_PKT_RX_COUNT", 64 if wifi else 24)
+            zephyr_add_prj_conf("NET_PKT_TX_COUNT", 64 if wifi else 24)
+            zephyr_add_prj_conf("NET_BUF_RX_COUNT", 128 if wifi else 48)
+            zephyr_add_prj_conf("NET_BUF_TX_COUNT", 128 if wifi else 48)
+        if tcp:
+            zephyr_add_prj_conf("NET_TCP_MAX_RECV_WINDOW_SIZE", 5760 if wifi else 2280)
+            zephyr_add_prj_conf("NET_TCP_MAX_SEND_WINDOW_SIZE", 5760 if wifi else 2280)
         zephyr_configure_net_contexts()
         # Sum of ESP-IDF's three separate lwIP limits (16 TCP, 16 listen, 16 UDP).
         zephyr_add_prj_conf("NET_MAX_CONN", 48)
