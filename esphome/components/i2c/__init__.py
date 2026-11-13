@@ -145,6 +145,34 @@ def _i2c_pin_number(value: Any) -> Any:
     return pins.internal_gpio_pin_number(value)
 
 
+def _validate_pins_in_bus_domain(config: ConfigType) -> None:
+    """Reject nRF54L bus pins outside its power domain, or on two different ports.
+
+    The datasheet lets a peripheral use only the GPIO ports of its own power domain, and all its pins
+    must be on one port.
+    """
+    from esphome.components.nrf52.const import VARIANT_I2C
+    from esphome.components.nrf52.framework import get_nrf52_variant
+
+    if (bus := VARIANT_I2C.get(get_nrf52_variant())) is None:
+        return
+    port_pins = {key: divmod(config[key], 32) for key in (CONF_SDA, CONF_SCL)}
+    for key, (port, pin) in port_pins.items():
+        if port not in bus.ports:
+            ports = " or ".join(f"P{p}" for p in bus.ports)
+            raise cv.Invalid(
+                f"P{port}.{pin:02d} is not in the power domain of the I2C bus; "
+                f"use a pin on {ports}",
+                [key],
+            )
+    (sda_port, sda_pin), (scl_port, scl_pin) = port_pins.values()
+    if sda_port != scl_port:
+        raise cv.Invalid(
+            f"SDA P{sda_port}.{sda_pin:02d} and SCL P{scl_port}.{scl_pin:02d} must be on the same GPIO port",
+            [CONF_SCL],
+        )
+
+
 def validate_config(config: ConfigType) -> ConfigType:
     if CORE.is_libretiny:
         if int(config[CONF_FREQUENCY]) < 1:
@@ -163,6 +191,8 @@ def validate_config(config: ConfigType) -> ConfigType:
         return cv.require_framework_version(
             esp_idf=cv.Version(5, 4, 2), esp32_arduino=cv.Version(3, 2, 1)
         )(config)
+    if CORE.is_nrf52:
+        _validate_pins_in_bus_domain(config)
     if CORE.is_rp2:
         sda_controller = _rp2040_i2c_controller(config[CONF_SDA])
         scl_controller = _rp2040_i2c_controller(config[CONF_SCL])
@@ -361,9 +391,13 @@ async def to_code(config: ConfigType) -> None:
 
         board = zephyr_data()[KEY_BOARD]
         if CORE.is_nrf52:
-            i2c = "i2c0"
-            if board == "xiao_ble":
-                i2c = "i2c1"
+            from esphome.components.nrf52.const import VARIANT_I2C
+            from esphome.components.nrf52.framework import get_nrf52_variant
+
+            if (variant_bus := VARIANT_I2C.get(get_nrf52_variant())) is not None:
+                i2c = variant_bus.label
+            else:
+                i2c = "i2c1" if board == "xiao_ble" else "i2c0"
             zephyr_add_overlay(
                 f"""
                     &pinctrl {{
@@ -383,6 +417,18 @@ async def to_code(config: ConfigType) -> None:
                     }};
                 """
             )
+            if variant_bus is not None:
+                # VariantI2C: the board leaves this bus disabled and without pins
+                zephyr_add_overlay(
+                    f"""
+                        &{i2c} {{
+                            status = "okay";
+                            pinctrl-0 = <&{i2c}_default>;
+                            pinctrl-1 = <&{i2c}_sleep>;
+                            pinctrl-names = "default", "sleep";
+                        }};
+                    """
+                )
             sda, scl = config[CONF_SDA], config[CONF_SCL]
         else:
             i2c = resolve_zephyr_bus(

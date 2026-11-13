@@ -15,7 +15,9 @@ from esphome.components.zephyr import (
     zephyr_add_prj_conf,
     zephyr_cdc_acm_label,
     zephyr_claim_cdc_acm,
+    zephyr_enable_cdc_acm_rate_callback,
     zephyr_usb_uart_type,
+    zephyr_use_usb_device_next,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -144,10 +146,7 @@ async def to_code(config: ConfigType) -> None:
             )
         elif CORE.using_toolchain_zephyr:
             label = zephyr_cdc_acm_label(index)
-            args = (
-                MockObj(f"DEVICE_DT_GET_OR_NULL(DT_NODELABEL({label}))"),
-                MockObj(f"DT_PROP(DT_NODELABEL({label}), tx_fifo_size)"),
-            )
+            args = (MockObj(f"DEVICE_DT_GET_OR_NULL(DT_NODELABEL({label}))"),)
         else:
             args = ()
         interface = cg.new_Pvariable(conf[CONF_ID], *args)
@@ -158,12 +157,11 @@ async def to_code(config: ConfigType) -> None:
             cg.add_global(uart_ns.using)
             await debug_to_code(debug, interface)
     if CORE.using_zephyr:
-        zephyr_add_prj_conf("UART_LINE_CTRL", True)
         if CORE.using_toolchain_zephyr:
             # Zephyr 4.5 keeps the ring_buf claim/finish API only with this option
             zephyr_add_prj_conf("RING_BUFFER", True)
-        if CORE.is_nrf52:
-            zephyr_add_prj_conf("CDC_ACM_DTE_RATE_CALLBACK_SUPPORT", True)
+        zephyr_enable_cdc_acm_rate_callback()
+        if not zephyr_use_usb_device_next():
             # Every CDC ACM instance (the logger's and any the board tree adds) holds a transfer
             # slot per endpoint; the default of 4 leaves a third instance without any
             zephyr_add_prj_conf("USB_MAX_NUM_TRANSFERS", 8)

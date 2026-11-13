@@ -2559,7 +2559,7 @@ def test_usb_cdc_acm_only_on_zephyr_usb(variant: str, ok: bool) -> None:
 def test_usb_cdc_acm_zephyr_interface_uses_port_label(
     board_label: str | None, port: int, label: str
 ) -> None:
-    """The device and the TX FIFO size come from the node the port actually uses."""
+    """The device comes from the node the port actually uses."""
     from esphome.components.usb_cdc_acm import to_code
 
     interfaces = [{CONF_ID: ID(f"itf{i}", is_declaration=True)} for i in range(2)]
@@ -2582,10 +2582,7 @@ def test_usb_cdc_acm_zephyr_interface_uses_port_label(
     ):
         asyncio.run(to_code(config))
     args = [str(a) for a in new_var.call_args_list[1].args[1:]]
-    assert args == [
-        f"DEVICE_DT_GET_OR_NULL(DT_NODELABEL({label}))",
-        f"DT_PROP(DT_NODELABEL({label}), tx_fifo_size)",
-    ]
+    assert args == [f"DEVICE_DT_GET_OR_NULL(DT_NODELABEL({label}))"]
     prj_conf = CORE.data[KEY_ZEPHYR]["prj_conf"][""]
     assert "CONFIG_CDC_ACM_DTE_RATE_CALLBACK_SUPPORT" not in prj_conf
 

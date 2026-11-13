@@ -556,6 +556,7 @@ def set_core_data(
         overlay=overlay if overlay is not None else {"": ""},
         overlay_builder=overlay_builder if overlay_builder is not None else [],
         cdc_acm_users={},
+        cdc_acm_required=False,
         extra_build_files=extra_build_files if extra_build_files is not None else {},
         pm_static=pm_static if pm_static is not None else [],
         partition_requirements=[],

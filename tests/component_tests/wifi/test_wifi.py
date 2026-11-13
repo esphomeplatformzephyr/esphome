@@ -78,3 +78,13 @@ def test_ap_allowed_on_zephyr_esp32(set_core_config: SetCoreConfigCallable) -> N
     """'ap:' is accepted on Zephyr ESP32 variants."""
     _set_zephyr_with_ap(set_core_config, "ESP32C6")
     validate_variant(None)
+
+
+@pytest.mark.parametrize("key", ["on_ap_start", "on_ap_stop"])
+def test_ap_trigger_without_ap_rejected(
+    set_core_config: SetCoreConfigCallable, key: str
+) -> None:
+    """An AP trigger without an AP could never fire and is rejected."""
+    set_core_config(PlatformFramework.ESP8266_ARDUINO)
+    with pytest.raises(Invalid, match=f"'{key}' requires 'ap'"):
+        CONFIG_SCHEMA({CONF_NETWORKS: [{CONF_SSID: "test"}], key: []})

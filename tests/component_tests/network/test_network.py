@@ -18,6 +18,8 @@ from esphome.components.network import (
     require_ipv6,
     to_code,
 )
+from esphome.components.zephyr import zephyr_data
+from esphome.components.zephyr.const import KEY_PRJ_CONF
 from esphome.config import load_config
 from esphome.const import CONF_ENABLE_IPV6, KEY_FRAMEWORK_VERSION, PlatformFramework
 from esphome.core import CORE, Version
@@ -217,3 +219,25 @@ def test_zephyr_maps_ipv4_only_when_both_families_are_on(
         asyncio.run(to_code(config))
     names = [call.args[0] for call in mock_conf.call_args_list]
     assert ("NET_IPV4_MAPPING_TO_IPV6" in names) is mapped
+
+
+@pytest.mark.parametrize(
+    ("config_file", "tcp"),
+    [
+        ("nrf52_network_no_openthread.yaml", True),
+        ("nrf52_network_no_tcp_user.yaml", False),
+        ("nrf52_network_async_tcp.yaml", True),
+    ],
+)
+def test_nrf52_tcp_only_with_a_tcp_user(
+    generate_main: Callable[[str | Path], str],
+    component_config_path: Callable[[str], Path],
+    config_file: str,
+    tcp: bool,
+) -> None:
+    """Zephyr's TCP stack is built only when a component registered a TCP socket."""
+    generate_main(component_config_path(config_file))
+    prj_conf = zephyr_data()[KEY_PRJ_CONF][""]
+    assert prj_conf["CONFIG_NET_TCP"][0] is tcp
+    assert ("CONFIG_NET_TCP_MAX_SEND_WINDOW_SIZE" in prj_conf) is tcp
+    assert ("CONFIG_NET_BUF_TX_COUNT" in prj_conf) is tcp

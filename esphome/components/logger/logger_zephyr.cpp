@@ -14,21 +14,19 @@
 #ifdef CONFIG_RTT_CONSOLE
 #include <SEGGER_RTT.h>
 #endif
-#include <zephyr/usb/usb_device.h>
 #if __has_include(<zephyr/version.h>)
 #include <zephyr/version.h>
 #elif __has_include(<version.h>)
 #include <version.h>
 #endif
+#ifdef USE_LOGGER_USB_CDC
+#include "esphome/components/zephyr/usb_device.h"
+#endif
 #ifdef USE_LOGGER_EARLY_MESSAGE
 #include <esphome/components/zephyr/reset_reason.h>
 #endif
 #ifdef USE_BOOTLOADER_ADAFRUIT
-#ifdef USE_NRF52
-#include <nrf.h>
-#else
 #include <hal/nrf_timer.h>
-#endif
 #endif
 
 // platform: nrf52 claims CDC ACM port 0 with zephyr_claim_cdc_acm(), always named cdc_acm_uart0
@@ -114,13 +112,10 @@ void Logger::pre_setup() {
         // to_code() -- matches whatever devicetree label zephyr_add_cdc_acm() actually
         // used (either a board-provided node, or a newly declared cdc_acm_uart0).
         uart_dev = DEVICE_DT_GET_OR_NULL(DT_NODELABEL(LOGGER_CDC_ACM_UART_LABEL));
-#ifdef CONFIG_USB_DEVICE_STACK
-        // device_next's own cdc_acm_serial.c auto-enables the USB device itself
-        // (CDC_ACM_SERIAL_ENABLE_AT_BOOT) -- only the legacy stack needs this call.
         if (device_is_ready(uart_dev)) {
-          usb_enable(nullptr);
+          // Nothing can log this early, and the logger has no output without USB anyway
+          zephyr::usb_device_enable();
         }
-#endif
 #endif
         break;
 #endif
