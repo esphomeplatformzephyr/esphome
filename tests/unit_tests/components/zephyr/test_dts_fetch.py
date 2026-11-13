@@ -265,10 +265,10 @@ def test_native_dts_path_matches_the_machine_global_cache_key(
 ) -> None:
     # Must land at the same directory framework._source_cache_key() would
     # produce for the plain official-source (no sdk_source:, no modules) case --
-    # sdk.tools_subdir-prefixed, nested under the shared zephyr cache root.
+    # sdk.workspace_prefix-prefixed, nested under the shared zephyr cache root.
     monkeypatch.setenv("ESPHOME_ZEPHYR_PREFIX", str(tmp_path))
     _set_framework_version(4, 4, 1)
-    expected = tmp_path / "frameworks" / f"{sdk.tools_subdir}-v4.4.1" / "zephyr"
+    expected = tmp_path / "frameworks" / f"{sdk.workspace_prefix}-v4.4.1" / "zephyr"
     expected.mkdir(parents=True)
     assert _native_dts_path(sdk) == expected
 

@@ -66,20 +66,20 @@ def _source_cache_key(
     """Distinguish a custom framework: source: from the official ver_tag-keyed cache dir,
     and from other framework: source: configs sharing the same version: value.
 
-    sdk.tools_subdir prefixes the key so MAINLINE/NCS/SILABS -- which now share one
+    sdk.workspace_prefix prefixes the key so MAINLINE/NCS/SILABS -- which now share one
     machine-global cache root -- can't collide on a matching version: string (e.g. NCS's
     bundled Zephyr fork tracks close to mainline's own numbering)."""
     if source is None:
-        key = f"{sdk.tools_subdir}-{ver_tag}"
+        key = f"{sdk.workspace_prefix}-{ver_tag}"
     elif source[CONF_TYPE] == TYPE_LOCAL:
         path_hash = hashlib.sha1(str(source[CONF_PATH]).encode()).hexdigest()[:8]
-        key = f"{sdk.tools_subdir}-{ver_tag}-local-{path_hash}"
+        key = f"{sdk.workspace_prefix}-{ver_tag}-local-{path_hash}"
     else:
         # TYPE_GIT
         ref = source.get(CONF_REF) or "HEAD"
         safe_ref = re.sub(r"[^A-Za-z0-9_.-]", "_", ref)
         url_hash = hashlib.sha1(source[CONF_URL].encode()).hexdigest()[:8]
-        key = f"{sdk.tools_subdir}-{ver_tag}-{safe_ref}-{url_hash}"
+        key = f"{sdk.workspace_prefix}-{ver_tag}-{safe_ref}-{url_hash}"
     return key
 
 

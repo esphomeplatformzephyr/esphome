@@ -501,9 +501,9 @@ def test_source_cache_key_differs_across_sdk_variants() -> None:
     # MAINLINE/NCS/SILABS share one machine-global cache root; a matching version:
     # string must not resolve to the same directory for different SDKs.
     mainline = ZephyrSDK(
-        manifest_url="https://example.invalid/zephyr", tools_subdir="a"
+        manifest_url="https://example.invalid/zephyr", workspace_prefix="a"
     )
-    ncs = ZephyrSDK(manifest_url="https://example.invalid/nrf", tools_subdir="b")
+    ncs = ZephyrSDK(manifest_url="https://example.invalid/nrf", workspace_prefix="b")
 
     assert _source_cache_key(mainline, "v1.0.0", None) != _source_cache_key(
         ncs, "v1.0.0", None

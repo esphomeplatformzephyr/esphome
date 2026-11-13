@@ -58,9 +58,8 @@ class ZephyrSDK:
     boards_repo_url: str | None = (
         None  # repo containing boards/; defaults to manifest_url when None
     )
-    tools_subdir: str | None = (
-        None  # dir name under CORE.data_dir where native SDK is installed (e.g. "sdk-nrf")
-    )
+    # Prefix of the workspace folder, so SDKs with the same version string don't share one
+    workspace_prefix: str | None = None
     # Default/minimum supported Zephyr version; a variant overrides these via its own
     # *_version_override fields. 4.4.1: fixes a C++ compile error in ethernet.h that any
     # wifi_mgmt.h consumer hits.
@@ -587,7 +586,7 @@ def set_core_data(
 
 MAINLINE: ZephyrSDK = ZephyrSDK(
     manifest_url="https://github.com/zephyrproject-rtos/zephyr",
-    tools_subdir="zephyr",
+    workspace_prefix="zephyr",
 )
 
 # Nordic's ZBOSS Zigbee stack, split out of sdk-nrf into this separate add-on repo as of
@@ -614,7 +613,7 @@ NCS_ZIGBEE_TEMPLATE: ZephyrModuleTemplate = ZephyrModuleTemplate(
 NCS: ZephyrSDK = ZephyrSDK(
     manifest_url="https://github.com/nrfconnect/sdk-nrf",
     boards_repo_url="https://github.com/nrfconnect/sdk-zephyr",
-    tools_subdir="sdk-nrf",
+    workspace_prefix="sdk-nrf",
     default_version="3.4.1",
     min_version=cv.Version(3, 4, 0),
     resolve_boards_ref_via_manifest=True,
@@ -630,7 +629,7 @@ NCS: ZephyrSDK = ZephyrSDK(
 SILABS: ZephyrSDK = ZephyrSDK(
     manifest_url="https://github.com/SiliconLabsSoftware/zephyr-silabs",
     boards_repo_url="https://github.com/SiliconLabsSoftware/zephyr",
-    tools_subdir="zephyr-silabs",
+    workspace_prefix="zephyr-silabs",
     default_version="2026.6.0",
     min_version=cv.Version(2026, 6, 0),
     resolve_boards_ref_via_manifest=True,

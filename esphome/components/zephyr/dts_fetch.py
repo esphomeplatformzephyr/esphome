@@ -292,12 +292,12 @@ def _native_dts_path(sdk: ZephyrSDK, family: str | None = None) -> Path | None:
     here without the source info this function doesn't have; those cases just
     fall through to the caller's git-fetch fallback.
     """
-    if sdk.tools_subdir is None:
+    if sdk.workspace_prefix is None:
         return None
     candidate = (
         tools_cache_path(*ZEPHYR_TOOLS_CACHE)
         / "frameworks"
-        / f"{sdk.tools_subdir}-v{_framework_base_version()}"
+        / f"{sdk.workspace_prefix}-v{_framework_base_version()}"
         / "zephyr"
     )
     if not candidate.is_dir():
