@@ -8,7 +8,9 @@ import hashlib
 import logging
 import os
 from pathlib import Path
+import re
 import shutil
+import sys
 
 from esphome.core import EsphomeError
 from esphome.framework_helpers import (
@@ -130,6 +132,113 @@ def patch_gen_defines_dts_path(framework_path: Path) -> None:
             "gen_defines.py no longer matches; the devicetree header "
             "stays per device and ccache sharing between devices degrades"
         )
+
+
+# pyOCD 0.44 to 0.46 write the nRF54LM20A RRAM without its write buffer, which faults on the first
+# store (pyocd/pyOCD#2016), and the Seeed XIAO nRF54LM20A boards flash through pyOCD. This is the
+# flash algorithm of pyocd/pyOCD#2033, which fixes it, put in place until a release carries it.
+_PYOCD_NRF54LM20A_FLASH_ALGO = """\
+FLASH_ALGO = {
+    'load_address' : 0x20000000,
+
+    # Flash algorithm as a hex string
+    'instructions': [
+        0xe7fdbe00,
+        0xf8d24a02, 0x07db3400, 0x4770d5fb, 0x5004e000, 0xf7ffb508, 0x2000fff5, 0x2000bd08, 0x00004770,
+        0x49072001, 0xf8c1b508, 0xf7ff0500, 0xf8c1ffe9, 0x20000540, 0xffe4f7ff, 0x0500f8c1, 0xbf00bd08,
+        0x5004e000, 0xf242b508, 0x49080301, 0x3500f8c1, 0xffd6f7ff, 0x33fff04f, 0x23016003, 0x608b2000,
+        0xffcef7ff, 0x0500f8c1, 0xbf00bd08, 0x5004e000, 0xf242b538, 0x46140301, 0xf0214d0c, 0xf8c50103,
+        0xf7ff3500, 0x4622ffbd, 0x1b004421, 0xeb02428a, 0xd1070300, 0x20002301, 0xf7ff60ab, 0xf8c5ffb1,
+        0xbd380500, 0x4b04f852, 0xe7ef601c, 0x5004e000,
+    ],
+
+    # Relative function addresses
+    'pc_init': 0x20000015,
+    'pc_unInit': 0x2000001f,
+    'pc_program_page': 0x20000075,
+    'pc_erase_sector': 0x20000049,
+    'pc_eraseAll': 0x20000025,
+
+    'static_base' : 0x200000B8,
+    'begin_stack' : 0x20003000,
+    'page_size' : 0x1000,
+    'analyzer_supported' : False,
+    'analyzer_address' : 0x00000000,
+    'page_buffers' : [0x20000100,0x20001100],   # 4 KiB double buffers, 128-bit line aligned
+    'min_program_length' : 0x4,
+
+    # Relative region addresses and sizes
+    'ro_start': 0xb4,
+    'ro_size': 0x0,
+    'rw_start': 0xb4,
+    'rw_size': 0x0,
+    'zi_start': 0xb4,
+    'zi_size': 0x0,
+
+    # Flash information
+    'flash_start': 0x0,
+    'flash_size': 0x1fd000,
+    'sector_sizes': (
+        (0x0, 0x1fd000),
+        (0xffd000, 0x1000),
+    )
+}
+"""
+_PYOCD_FLASH_ALGO_RE = re.compile(r"^FLASH_ALGO = \{.*?^\}\n", re.MULTILINE | re.DOTALL)
+# An instruction word of the faulting algorithm only; an algorithm without it is left alone
+_PYOCD_NRF54LM20A_FAULTY_WORD = "0x68134a02"
+
+
+def penv_site_packages(penv_path: Path) -> Path:
+    if os.name == "nt":
+        return penv_path / "Lib" / "site-packages"
+    python_dir = f"python{sys.version_info.major}.{sys.version_info.minor}"
+    return penv_path / "lib" / python_dir / "site-packages"
+
+
+def pyocd_builtin_target(python_env_path: Path, target_file: str) -> Path:
+    """PyOCD's built-in target file in the penv, e.g. target_nRF54L15.py."""
+    site_packages = penv_site_packages(python_env_path)
+    if not site_packages.is_dir():
+        # An env kept across an ESPHome Python upgrade still has its own Python version
+        site_packages = next(
+            python_env_path.glob("lib/python3.*/site-packages"), site_packages
+        )
+    return site_packages / "pyocd" / "target" / "builtin" / target_file
+
+
+def _pyocd_nrf54lm20a_target(python_env_path: Path) -> Path:
+    return pyocd_builtin_target(python_env_path, "target_nRF54LM20A.py")
+
+
+def unpatched_pyocd_nrf54lm20a_target(python_env_path: Path) -> Path | None:
+    """PyOCD's nRF54LM20A target file when it has the faulting flash algorithm, else None."""
+    target = _pyocd_nrf54lm20a_target(python_env_path)
+    if target.is_file() and _PYOCD_NRF54LM20A_FAULTY_WORD in target.read_text(
+        encoding="utf-8"
+    ):
+        return target
+    return None
+
+
+def patch_pyocd_nrf54lm20a_flash_algo(python_env_path: Path) -> None:
+    target = _pyocd_nrf54lm20a_target(python_env_path)
+    if not target.is_file():
+        _LOGGER.debug(
+            "pyOCD has no nRF54LM20A target at %s; not patching its flash algorithm",
+            target,
+        )
+        return
+    content = target.read_text(encoding="utf-8")
+    if _PYOCD_NRF54LM20A_FAULTY_WORD not in content:
+        return
+    if (match := _PYOCD_FLASH_ALGO_RE.search(content)) is None:
+        _LOGGER.warning(
+            "Could not patch pyOCD's nRF54LM20A flash algorithm in %s", target
+        )
+        return
+    patch_framework_file(target, match.group(0), _PYOCD_NRF54LM20A_FLASH_ALGO)
+    _LOGGER.info("Patched pyOCD's nRF54LM20A flash algorithm in %s", target)
 
 
 def ensure_venv(python_env_path: Path, requirements: Path, label: str) -> bool:
@@ -479,7 +588,8 @@ def ensure_zephyr_requirements(
     *,
     zephyr_dir: Path | None = None,
 ) -> None:
-    """Install the workspace's Zephyr Python requirements into the penv unless current.
+    """Install the workspace's Zephyr Python requirements into the penv unless current,
+    then patch pyOCD's nRF54LM20A flash algorithm.
 
     ``zephyr_dir`` is the Zephyr tree when it isn't ``framework_path/zephyr``
     (a local checkout).
@@ -490,14 +600,15 @@ def ensure_zephyr_requirements(
     # Inside the penv, so a rebuild removes it
     sentinel = python_env_path / ".zephyr_reqs_ready"
     if (
-        not venv_rebuilt
-        and sentinel.exists()
-        and zephyr_reqs.stat().st_mtime <= sentinel.stat().st_mtime
+        venv_rebuilt
+        or not sentinel.exists()
+        or zephyr_reqs.stat().st_mtime > sentinel.stat().st_mtime
     ):
-        return
-    _LOGGER.info("Installing Zephyr requirements ...")
-    env_python_path = get_python_env_executable_path(python_env_path, "python")
-    cmd = [str(env_python_path), "-m", "pip", "install", "-r", str(zephyr_reqs)]
-    if not run_command_ok(cmd):
-        raise EsphomeError(f"Install Zephyr requirements for {label} failure")
-    sentinel.touch()
+        _LOGGER.info("Installing Zephyr requirements ...")
+        env_python_path = get_python_env_executable_path(python_env_path, "python")
+        cmd = [str(env_python_path), "-m", "pip", "install", "-r", str(zephyr_reqs)]
+        if not run_command_ok(cmd):
+            raise EsphomeError(f"Install Zephyr requirements for {label} failure")
+        sentinel.touch()
+    # Every build, as a pip install can put the faulting file back
+    patch_pyocd_nrf54lm20a_flash_algo(python_env_path)

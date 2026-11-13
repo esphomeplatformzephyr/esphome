@@ -3,7 +3,6 @@ import hashlib
 import logging
 import os
 from pathlib import Path
-import re
 import sys
 
 from esphome.build_helpers.ccache import ccache_env
@@ -18,6 +17,9 @@ from esphome.components.zephyr.framework_helpers import (
     patch_framework_file,
     patch_gen_defines_dts_path,
     patch_west_build_source_dir_relpath,
+    penv_site_packages,
+    pyocd_builtin_target,
+    unpatched_pyocd_nrf54lm20a_target as _unpatched_pyocd_nrf54lm20a_target,
 )
 from esphome.components.zephyr.sdk_install import (
     ARM_TOOLCHAIN,
@@ -163,13 +165,6 @@ def _get_platformio_penv_path() -> Path:
     return get_sdk_nrf_tools_path() / "penvs" / "platformio"
 
 
-def _get_penv_site_packages(penv_path: Path) -> Path:
-    if os.name == "nt":
-        return penv_path / "Lib" / "site-packages"
-    python_dir = f"python{sys.version_info.major}.{sys.version_info.minor}"
-    return penv_path / "lib" / python_dir / "site-packages"
-
-
 def _prepend_env_path(name: str, entry: str) -> None:
     """Prepend ``entry`` to the ``os.pathsep``-separated env var ``name``."""
     current = os.environ.get(name, "")
@@ -228,113 +223,19 @@ def setup_platformio_python_env() -> None:
         sentinel.write_text(requirements_hash, encoding="utf-8")
 
     os.environ["VIRTUAL_ENV"] = str(penv_path)
-    _prepend_env_path("PYTHONPATH", str(_get_penv_site_packages(penv_path)))
+    _prepend_env_path("PYTHONPATH", str(penv_site_packages(penv_path)))
     _prepend_env_path("PATH", str(env_python_path.parent))
-
-
-# pyOCD 0.44 to 0.46 write the nRF54LM20A RRAM without its write buffer, which faults on the first
-# store (pyocd/pyOCD#2016), and the Seeed XIAO nRF54LM20A boards flash through pyOCD. This is the
-# flash algorithm of pyocd/pyOCD#2033, which fixes it, put in place until a release carries it.
-_PYOCD_NRF54LM20A_FLASH_ALGO = """\
-FLASH_ALGO = {
-    'load_address' : 0x20000000,
-
-    # Flash algorithm as a hex string
-    'instructions': [
-        0xe7fdbe00,
-        0xf8d24a02, 0x07db3400, 0x4770d5fb, 0x5004e000, 0xf7ffb508, 0x2000fff5, 0x2000bd08, 0x00004770,
-        0x49072001, 0xf8c1b508, 0xf7ff0500, 0xf8c1ffe9, 0x20000540, 0xffe4f7ff, 0x0500f8c1, 0xbf00bd08,
-        0x5004e000, 0xf242b508, 0x49080301, 0x3500f8c1, 0xffd6f7ff, 0x33fff04f, 0x23016003, 0x608b2000,
-        0xffcef7ff, 0x0500f8c1, 0xbf00bd08, 0x5004e000, 0xf242b538, 0x46140301, 0xf0214d0c, 0xf8c50103,
-        0xf7ff3500, 0x4622ffbd, 0x1b004421, 0xeb02428a, 0xd1070300, 0x20002301, 0xf7ff60ab, 0xf8c5ffb1,
-        0xbd380500, 0x4b04f852, 0xe7ef601c, 0x5004e000,
-    ],
-
-    # Relative function addresses
-    'pc_init': 0x20000015,
-    'pc_unInit': 0x2000001f,
-    'pc_program_page': 0x20000075,
-    'pc_erase_sector': 0x20000049,
-    'pc_eraseAll': 0x20000025,
-
-    'static_base' : 0x200000B8,
-    'begin_stack' : 0x20003000,
-    'page_size' : 0x1000,
-    'analyzer_supported' : False,
-    'analyzer_address' : 0x00000000,
-    'page_buffers' : [0x20000100,0x20001100],   # 4 KiB double buffers, 128-bit line aligned
-    'min_program_length' : 0x4,
-
-    # Relative region addresses and sizes
-    'ro_start': 0xb4,
-    'ro_size': 0x0,
-    'rw_start': 0xb4,
-    'rw_size': 0x0,
-    'zi_start': 0xb4,
-    'zi_size': 0x0,
-
-    # Flash information
-    'flash_start': 0x0,
-    'flash_size': 0x1fd000,
-    'sector_sizes': (
-        (0x0, 0x1fd000),
-        (0xffd000, 0x1000),
-    )
-}
-"""
-_PYOCD_FLASH_ALGO_RE = re.compile(r"^FLASH_ALGO = \{.*?^\}\n", re.MULTILINE | re.DOTALL)
-# An instruction word of the faulting algorithm only; an algorithm without it is left alone
-_PYOCD_NRF54LM20A_FAULTY_WORD = "0x68134a02"
-
-
-def _pyocd_builtin_target(python_env_path: Path, target_file: str) -> Path:
-    site_packages = _get_penv_site_packages(python_env_path)
-    if not site_packages.is_dir():
-        # An env kept across an ESPHome Python upgrade still has its own Python version
-        site_packages = next(
-            python_env_path.glob("lib/python3.*/site-packages"), site_packages
-        )
-    return site_packages / "pyocd" / "target" / "builtin" / target_file
-
-
-def _pyocd_nrf54lm20a_target(python_env_path: Path) -> Path:
-    return _pyocd_builtin_target(python_env_path, "target_nRF54LM20A.py")
 
 
 def pyocd_has_builtin_target(target_file: str) -> bool:
     """True when the SDK's pyOCD has this target file, e.g. target_nRF54L15.py."""
     env_path = _get_python_env_path(_get_version_str())
-    return _pyocd_builtin_target(env_path, target_file).is_file()
+    return pyocd_builtin_target(env_path, target_file).is_file()
 
 
 def unpatched_pyocd_nrf54lm20a_target() -> Path | None:
     """PyOCD's nRF54LM20A target file when it has the faulting flash algorithm, else None."""
-    target = _pyocd_nrf54lm20a_target(_get_python_env_path(_get_version_str()))
-    if target.is_file() and _PYOCD_NRF54LM20A_FAULTY_WORD in target.read_text(
-        encoding="utf-8"
-    ):
-        return target
-    return None
-
-
-def _patch_pyocd_nrf54lm20a_flash_algo(python_env_path: Path) -> None:
-    target = _pyocd_nrf54lm20a_target(python_env_path)
-    if not target.is_file():
-        _LOGGER.debug(
-            "pyOCD has no nRF54LM20A target at %s; not patching its flash algorithm",
-            target,
-        )
-        return
-    content = target.read_text(encoding="utf-8")
-    if _PYOCD_NRF54LM20A_FAULTY_WORD not in content:
-        return
-    if (match := _PYOCD_FLASH_ALGO_RE.search(content)) is None:
-        _LOGGER.warning(
-            "Could not patch pyOCD's nRF54LM20A flash algorithm in %s", target
-        )
-        return
-    patch_framework_file(target, match.group(0), _PYOCD_NRF54LM20A_FLASH_ALGO)
-    _LOGGER.info("Patched pyOCD's nRF54LM20A flash algorithm in %s", target)
+    return _unpatched_pyocd_nrf54lm20a_target(_get_python_env_path(_get_version_str()))
 
 
 def _patch_uf2conv_escape_sequences(framework_path: Path) -> None:
@@ -438,7 +339,6 @@ def _check_and_install(version: str) -> None:
     patch_west_build_source_dir_relpath(framework_path)
 
     ensure_zephyr_requirements(python_env_path, framework_path, install_venv, version)
-    _patch_pyocd_nrf54lm20a_flash_algo(python_env_path)
 
     _install_toolchain()
 

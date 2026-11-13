@@ -18,7 +18,6 @@ from esphome.components.nrf52.framework import (
     _REQUIREMENTS,
     NRF_CONNECT_SDK,
     TOOLCHAIN_VERSION,
-    _get_penv_site_packages,
     _get_platformio_penv_path,
     _install_toolchain,
     check_and_install,
@@ -29,6 +28,7 @@ from esphome.components.nrf52.framework import (
     wanted_west_projects,
 )
 from esphome.components.zephyr.const import KEY_SYSBUILD, KEY_ZEPHYR
+from esphome.components.zephyr.framework_helpers import penv_site_packages
 import esphome.config_validation as cv
 from esphome.config_validation import Version
 from esphome.const import KEY_CORE, KEY_FRAMEWORK_VERSION, Toolchain
@@ -544,7 +544,7 @@ class TestSetupPlatformioPythonEnv:
             )
 
             assert os.environ["VIRTUAL_ENV"] == str(platformio_penv_dir)
-            site_packages = str(_get_penv_site_packages(platformio_penv_dir))
+            site_packages = str(penv_site_packages(platformio_penv_dir))
             assert os.environ["PYTHONPATH"] == site_packages
             bin_dir = str(
                 get_python_env_executable_path(platformio_penv_dir, "python").parent
@@ -631,7 +631,7 @@ class TestSetupPlatformioPythonEnv:
             _platformio_requirements_hash(), encoding="utf-8"
         )
         _touch_penv_python(platformio_penv_dir)
-        site_packages = str(_get_penv_site_packages(platformio_penv_dir))
+        site_packages = str(penv_site_packages(platformio_penv_dir))
         bin_dir = str(
             get_python_env_executable_path(platformio_penv_dir, "python").parent
         )
@@ -653,7 +653,7 @@ class TestSetupPlatformioPythonEnv:
             _platformio_requirements_hash(), encoding="utf-8"
         )
         _touch_penv_python(platformio_penv_dir)
-        site_packages = str(_get_penv_site_packages(platformio_penv_dir))
+        site_packages = str(penv_site_packages(platformio_penv_dir))
 
         with patch.dict(os.environ, {"PYTHONPATH": "/existing/path"}):
             setup_platformio_python_env()
@@ -661,28 +661,6 @@ class TestSetupPlatformioPythonEnv:
             assert os.environ["PYTHONPATH"] == os.pathsep.join(
                 [site_packages, "/existing/path"]
             )
-
-
-@pytest.mark.parametrize(
-    ("os_name", "expected_parts"),
-    [
-        (
-            "posix",
-            (
-                "lib",
-                f"python{sys.version_info.major}.{sys.version_info.minor}",
-                "site-packages",
-            ),
-        ),
-        ("nt", ("Lib", "site-packages")),
-    ],
-)
-def test_get_penv_site_packages(
-    tmp_path: Path, os_name: str, expected_parts: tuple[str, ...]
-) -> None:
-    penv_path = tmp_path / "penv"
-    with patch("os.name", os_name):
-        assert _get_penv_site_packages(penv_path) == penv_path.joinpath(*expected_parts)
 
 
 # ---------------------------------------------------------------------------
@@ -918,103 +896,19 @@ def test_resolve_toolchain_rejects_unsupported() -> None:
         _resolve_toolchain({})
 
 
-PYOCD_NRF54LM20A_BEFORE = """\
-from ..family.target_nRF54L import NRF54L
-
-FLASH_ALGO = {
-    'load_address' : 0x20000000,
-    'instructions': [
-    0xe7fdbe00,
-    0x68134a02, 0xd1fc2b01, 0x46c04770, 0x5004e400, 0x47702000, 0x47702000, 0x2501b570, 0x60254c05,
-    ],
-    'page_size' : 0x4,
-    'sector_sizes': (
-        (0x0, 0x1fd000),
-        (0xffd000, 0x1000),
-    )
-}
-
-class NRF54LM20A(NRF54L):
-    pass
-"""
-
-
-def test_patch_pyocd_nrf54lm20a_flash_algo(tmp_path: Path) -> None:
-    """PyOCD's faulting nRF54LM20A flash algorithm is replaced by the fixed one."""
-    target = (
-        framework._get_penv_site_packages(tmp_path)
-        / "pyocd"
-        / "target"
-        / "builtin"
-        / "target_nRF54LM20A.py"
-    )
-    target.parent.mkdir(parents=True)
-    target.write_text(PYOCD_NRF54LM20A_BEFORE)
-    framework._patch_pyocd_nrf54lm20a_flash_algo(tmp_path)
-    patched = target.read_text()
-    assert framework._PYOCD_NRF54LM20A_FLASH_ALGO in patched
-    assert "0x68134a02" not in patched
-    assert patched.startswith("from ..family.target_nRF54L import NRF54L\n\n")
-    assert patched.endswith("\nclass NRF54LM20A(NRF54L):\n    pass\n")
-    framework._patch_pyocd_nrf54lm20a_flash_algo(tmp_path)  # idempotent
-    assert target.read_text() == patched
-    framework._patch_pyocd_nrf54lm20a_flash_algo(tmp_path / "absent")  # tolerant
-
-
-def test_unpatched_pyocd_nrf54lm20a_target(tmp_path: Path) -> None:
-    """The upload error names pyOCD's target file until the fix is in it."""
-    target = framework._pyocd_nrf54lm20a_target(tmp_path)
+def test_pyocd_wrappers_use_the_sdk_env(tmp_path: Path) -> None:
+    """cmsis_dap's pyOCD checks look in the SDK version's own penv."""
+    target = tmp_path / "pyocd" / "target" / "builtin" / "target_nRF54LM20A.py"
     with (
         patch.object(framework, "_get_version_str", return_value="v3.4.0"),
-        patch.object(framework, "_get_python_env_path", return_value=tmp_path),
+        patch.object(framework, "_get_python_env_path", return_value=tmp_path) as env,
+        patch.object(framework, "pyocd_builtin_target", return_value=target) as find,
+        patch.object(
+            framework, "_unpatched_pyocd_nrf54lm20a_target", return_value=target
+        ) as unpatched,
     ):
-        assert framework.unpatched_pyocd_nrf54lm20a_target() is None  # absent
-        target.parent.mkdir(parents=True)
-        target.write_text(PYOCD_NRF54LM20A_BEFORE)
-        assert framework.unpatched_pyocd_nrf54lm20a_target() == target
-        framework._patch_pyocd_nrf54lm20a_flash_algo(tmp_path)
-        assert framework.unpatched_pyocd_nrf54lm20a_target() is None
-
-
-def test_patch_pyocd_nrf54lm20a_leaves_another_algorithm_alone(tmp_path: Path) -> None:
-    """A newer pyOCD's algorithm, without the faulting instructions, is not replaced."""
-    target = framework._pyocd_nrf54lm20a_target(tmp_path)
-    target.parent.mkdir(parents=True)
-    newer = PYOCD_NRF54LM20A_BEFORE.replace("0x68134a02", "0x12345678")
-    target.write_text(newer)
-    framework._patch_pyocd_nrf54lm20a_flash_algo(tmp_path)
-    assert target.read_text() == newer
-    with (
-        patch.object(framework, "_get_version_str", return_value="v3.4.0"),
-        patch.object(framework, "_get_python_env_path", return_value=tmp_path),
-    ):
-        assert framework.unpatched_pyocd_nrf54lm20a_target() is None
-
-
-def test_patch_pyocd_nrf54lm20a_warns_on_an_unknown_layout(
-    tmp_path: Path, caplog: pytest.LogCaptureFixture
-) -> None:
-    """The faulting algorithm in a layout the patch cannot find is left as it is."""
-    target = framework._pyocd_nrf54lm20a_target(tmp_path)
-    target.parent.mkdir(parents=True)
-    indented = PYOCD_NRF54LM20A_BEFORE.replace("FLASH_ALGO = {", "  FLASH_ALGO = {")
-    target.write_text(indented)
-    framework._patch_pyocd_nrf54lm20a_flash_algo(tmp_path)
-    assert target.read_text() == indented
-    assert "Could not patch pyOCD's nRF54LM20A flash algorithm" in caplog.text
-
-
-def test_pyocd_target_found_in_an_env_of_another_python_version(
-    tmp_path: Path,
-) -> None:
-    """An SDK env kept across a Python upgrade still has its packages under its own version."""
-    builtin = tmp_path / "lib" / "python3.9" / "site-packages" / "pyocd" / "target"
-    (builtin / "builtin").mkdir(parents=True)
-    (builtin / "builtin" / "target_nRF54L15.py").write_text("")
-    with (
-        patch.object(framework.sys, "version_info", SimpleNamespace(major=3, minor=99)),
-        patch.object(framework, "_get_version_str", return_value="v3.4.0"),
-        patch.object(framework, "_get_python_env_path", return_value=tmp_path),
-    ):
-        assert framework.pyocd_has_builtin_target("target_nRF54L15.py")
         assert not framework.pyocd_has_builtin_target("target_nRF54LM20A.py")
+        assert framework.unpatched_pyocd_nrf54lm20a_target() == target
+    env.assert_called_with("v3.4.0")
+    find.assert_called_once_with(tmp_path, "target_nRF54LM20A.py")
+    unpatched.assert_called_once_with(tmp_path)
