@@ -14,13 +14,13 @@ UART_DRIVERS: frozenset[str] = frozenset({SEGGER_RTT_UART})
 # vendor HALs are not fetched.
 ADDITIONAL_FRAMEWORK_PROJECTS: frozenset[str] = frozenset({"hal_nxp"})
 # CPU architecture (see ZephyrVariant.cpu_arch)
-CPU_ARCH = "arm"
+CPU_ARCH: str = "arm"
 # Kind of USB UART (see ZephyrVariant.usb_uart_type)
-USB_UART_TYPE = "cdc_acm"
+USB_UART_TYPE: str = "cdc_acm"
 # Pins are named P<port>_<pin>, e.g. P4_18 (see zephyr/gpio.py)
-PIN_NOTATION = "underscore"
+PIN_NOTATION: str = "underscore"
 # Board devicetrees #include from this HAL, so the devicetree fetch needs it
-DTS_HAL_MODULES = ("hal_nxp",)
+DTS_HAL_MODULES: tuple[str, ...] = ("hal_nxp",)
 
 
 def to_code(config: ConfigType) -> None:

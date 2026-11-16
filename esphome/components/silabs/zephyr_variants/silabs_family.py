@@ -7,7 +7,7 @@ from esphome.components.zephyr.const import BOOTLOADER_MCUBOOT, SEGGER_RTT_UART
 from esphome.types import ConfigType
 
 # Devicetree property silabs pinctrl groups pack all their signal macros into.
-PROPERTY_NAME = "pins"
+PROPERTY_NAME: str = "pins"
 
 # Software UART drivers (devicetree compatible strings) that work on this family,
 # on top of its hardware UARTs.
@@ -17,7 +17,7 @@ UART_DRIVERS: frozenset[str] = frozenset({SEGGER_RTT_UART})
 # vendor HALs are not fetched.
 ADDITIONAL_FRAMEWORK_PROJECTS: frozenset[str] = frozenset({"hal_silabs"})
 # CPU architecture (see ZephyrVariant.cpu_arch)
-CPU_ARCH = "arm"
+CPU_ARCH: str = "arm"
 
 
 def to_code(config: ConfigType) -> None:
@@ -43,23 +43,23 @@ def to_code(config: ConfigType) -> None:
 
 
 # I2C pinctrl group/state to assume when DTS resolution fails.
-I2C_FALLBACK_GROUP = "group0"
-I2C_FALLBACK_STATE_SUFFIXES = ("default",)
+I2C_FALLBACK_GROUP: str = "group0"
+I2C_FALLBACK_STATE_SUFFIXES: tuple[str, ...] = ("default",)
 
 # SILABS_DBUS's packed value layout (silabs-pinctrl-dbus.h): the en_bit field
 # identifies which peripheral signal a pin is routed to, fixed per signal across
 # every USART/EUSART instance/chip (verified xg22/xg24/xg26).
-_SILABS_DBUS_EN_BIT_SHIFT = 19
-_SILABS_DBUS_EN_BIT_MASK = 0x1F
+_SILABS_DBUS_EN_BIT_SHIFT: int = 19
+_SILABS_DBUS_EN_BIT_MASK: int = 0x1F
 
 # I2C0/I2C1 en_bit -- distinct from UART's/SPI's en_bits.
-_SILABS_I2C_SIGNAL_NAMES = {0: "scl", 1: "sda"}
+_SILABS_I2C_SIGNAL_NAMES: dict[int, str] = {0: "scl", 1: "sda"}
 
 # USART/EUSART en_bit: TX=4, RX=2, RTS=1, CTS=0.
-_SILABS_UART_SIGNAL_NAMES = {4: "tx", 2: "rx", 1: "rts", 0: "cts"}
+_SILABS_UART_SIGNAL_NAMES: dict[int, str] = {4: "tx", 2: "rx", 1: "rts", 0: "cts"}
 
 # USART SPI-mode en_bit -- same TX/RX macros UART uses, repurposed.
-_SILABS_SPI_SIGNAL_NAMES = {4: "mosi", 2: "miso", 3: "clk"}
+_SILABS_SPI_SIGNAL_NAMES: dict[int, str] = {4: "mosi", 2: "miso", 3: "clk"}
 
 
 def pin_macro(prefix: str, signal: str, pin: int | None, variant: str) -> str | None:

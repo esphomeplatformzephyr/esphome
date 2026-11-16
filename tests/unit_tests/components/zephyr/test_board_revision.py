@@ -231,3 +231,50 @@ def test_resolve_revision_missing_board_yml(tmp_path: Path) -> None:
     resolved, declares = resolve_revision(tmp_path, "1.0.0")
     assert declares is False
     assert resolved is None
+
+
+@pytest.mark.parametrize("board", ["", "@1.0.0"])
+def test_parse_board_string_without_a_name(board: str) -> None:
+    assert parse_board_string(board) == BoardParts(board, None, None)
+
+
+def test_resolve_revision_with_too_many_components(tmp_path: Path) -> None:
+    board_dir = _mmp_board_yml(tmp_path)
+    assert resolve_revision(board_dir, "1.2.3.4") == (None, True)
+
+
+def test_resolve_revision_skips_a_malformed_declared_revision(tmp_path: Path) -> None:
+    _write_board_yml(
+        tmp_path,
+        "  revision:\n    format: major.minor.patch\n    revisions:\n"
+        "      - name: 'beta'\n      - name: '1.0.0'\n",
+    )
+    assert resolve_revision(tmp_path, "1.5.0") == ("1.0.0", True)
+
+
+def test_resolve_revision_without_declared_revisions(tmp_path: Path) -> None:
+    _write_board_yml(tmp_path, "  revision:\n    format: number\n")
+    assert resolve_revision(tmp_path, "1") == (None, False)
+
+
+@pytest.mark.parametrize(
+    ("content", "revisions"),
+    [
+        # The newer schema, a list with one board
+        (
+            (
+                "boards:\n  - name: my_board\n    revision:\n      format: number\n"
+                "      revisions:\n        - name: '1'\n"
+            ),
+            ["1"],
+        ),
+        # Several boards in one file can't be told apart
+        ("boards:\n  - name: a\n  - name: b\n", []),
+        ("- not a mapping\n", []),
+    ],
+)
+def test_declared_revisions_of_other_board_yml_shapes(
+    tmp_path: Path, content: str, revisions: list[str]
+) -> None:
+    (tmp_path / "board.yml").write_text(content)
+    assert declared_revisions(tmp_path) == revisions

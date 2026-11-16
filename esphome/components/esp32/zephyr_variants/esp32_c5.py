@@ -26,17 +26,17 @@ from esphome.types import ConfigType
 from ..const import VARIANT_ESP32C5
 
 # qualify_board() expands this to "esp32c5_devkitc/esp32c5/hpcore" via soc=/qualifier= below.
-_DEFAULT_BOARD = "esp32c5_devkitc"
+_DEFAULT_BOARD: str = "esp32c5_devkitc"
 
-_ADVANCED_SCHEMA = ADVANCED_SCHEMA
+_ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA
 
 # https://github.com/zephyrproject-rtos/zephyr/blob/main/include/zephyr/dt-bindings/pinctrl/esp32c5-pinctrl.h
 # GPIO0-28 minus 16-22 (SPI flash); same set for every free-mux signal (UART, SPI).
-_GPIO_MATRIX_PINS = frozenset(range(29)) - frozenset(range(16, 23))
+_GPIO_MATRIX_PINS: frozenset[int] = frozenset(range(29)) - frozenset(range(16, 23))
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = VARIANT_ESP32C5
-VARIANT = ZephyrVariant(
+VARIANT_NAME: str = VARIANT_ESP32C5
+VARIANT: ZephyrVariant = ZephyrVariant(
     mcumgr_ota=True,
     # ROM loads the first image at 0x2000 (espressif/partitions_0x2000_*.dtsi).
     boot=BootLayout(0x2000),

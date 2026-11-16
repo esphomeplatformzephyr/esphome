@@ -38,14 +38,14 @@ from esphome.types import ConfigType
 from ..const import VARIANT_STM32C5
 
 # The largest C5 Nucleo (1M flash, 256K RAM).
-_DEFAULT_BOARD = "nucleo_c5a3zg"
+_DEFAULT_BOARD: str = "nucleo_c5a3zg"
 
 # MCUboot is opt-in: the C5 Nucleo boards have slot partitions but no zephyr,code-partition.
-_ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(BOOTLOADER_SCHEMA)
+_ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(BOOTLOADER_SCHEMA)
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = VARIANT_STM32C5
-VARIANT = ZephyrVariant(
+VARIANT_NAME: str = VARIANT_STM32C5
+VARIANT: ZephyrVariant = ZephyrVariant(
     boot=BootLayout(0x0),
     # Seeed's TinyUF2 bootloader keeps 0x0-0x8000.
     board_boot={
@@ -108,7 +108,7 @@ async def to_code(config: ConfigType) -> None:
 
     cg.add_build_flag("-DUSE_ZEPHYR_VARIANT_STM32C5")
     cg.add_define("ESPHOME_BOARD", config[CONF_BOARD])
-    cg.add_define("ESPHOME_VARIANT", "STM32C5")
+    cg.add_define("ESPHOME_VARIANT", VARIANT_NAME)
     cg.add_define(ThreadModel.MULTI_ATOMICS)
     zephyr_setup_preferences()
     zephyr_add_prj_conf("REBOOT", True)
@@ -132,20 +132,20 @@ async def to_code(config: ConfigType) -> None:
 
 
 # Seeed XIAO STM32C5; values read from its TinyUF2 bootloader and factory app.
-_XIAO_BOARD = "xiao_stm32c5"
+_XIAO_BOARD: str = "xiao_stm32c5"
 # Seeed's own; Zephyr's uf2families.json has no STM32C5.
-_XIAO_UF2_FAMILY_ID = 0x00C5C5C5
+_XIAO_UF2_FAMILY_ID: int = 0x00C5C5C5
 # TinyUF2's double-tap word, the last word of the 256K SRAM.
-_XIAO_DBL_TAP_ADDR = 0x2003FFFC
+_XIAO_DBL_TAP_ADDR: int = 0x2003FFFC
 # The bootloader's USB vendor and product IDs.
-_XIAO_UF2_USB_ID = ("2886", "00c5")
-_UF2_DISK_TIMEOUT = 15.0
+_XIAO_UF2_USB_ID: tuple[str, ...] = ("2886", "00c5")
+_UF2_DISK_TIMEOUT: float = 15.0
 
-TinyUf2Touch = zephyr_ns.class_("TinyUf2Touch", cg.Component)
-CONF_TINYUF2_TOUCH = "tinyuf2_touch"
+TinyUf2Touch: cg.MockObjClass = zephyr_ns.class_("TinyUf2Touch", cg.Component)
+CONF_TINYUF2_TOUCH: str = "tinyuf2_touch"
 
 # Internal keys, filled in by _xiao_config_schema().
-_ADVANCED_SCHEMA = _ADVANCED_SCHEMA.extend(
+_ADVANCED_SCHEMA: cv.Schema = _ADVANCED_SCHEMA.extend(
     {
         cv.Optional(CONF_TINYUF2_TOUCH): declare_component_id(TinyUf2Touch),
     }

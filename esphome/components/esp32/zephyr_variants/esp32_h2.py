@@ -26,20 +26,20 @@ from esphome.types import ConfigType
 from ..const import VARIANT_ESP32H2
 
 # Bare name; qualify_board() expands it to "esp32h2_devkitm/esp32h2" using soc= below.
-_DEFAULT_BOARD = "esp32h2_devkitm"
+_DEFAULT_BOARD: str = "esp32h2_devkitm"
 
-_ADVANCED_SCHEMA = ADVANCED_SCHEMA
+_ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA
 
 # https://github.com/zephyrproject-rtos/zephyr/blob/main/include/zephyr/dt-bindings/pinctrl/esp32h2-pinctrl.h
 # No GPIO 6, 7, 15-21 (reserved for flash/RF); same set for every free-mux
 # GPIO-matrix signal (UART, SPI).
-_GPIO_MATRIX_PINS = frozenset(
+_GPIO_MATRIX_PINS: frozenset[int] = frozenset(
     {0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 12, 13, 14, 22, 23, 24, 25, 26, 27}
 )
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = VARIANT_ESP32H2
-VARIANT = ZephyrVariant(
+VARIANT_NAME: str = VARIANT_ESP32H2
+VARIANT: ZephyrVariant = ZephyrVariant(
     mcumgr_ota=True,
     # ROM loads the first image at 0x0 (espressif/partitions_0x0_*.dtsi).
     boot=BootLayout(0x0),

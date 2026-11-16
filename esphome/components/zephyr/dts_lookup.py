@@ -1,4 +1,4 @@
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 import contextlib
 import importlib
 import logging
@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 from types import ModuleType
-from typing import Final
+from typing import Any, Final
 
 import yaml
 
@@ -537,7 +537,7 @@ def resolve_uart_node_label(
         raise EsphomeError(
             f"Board '{board}' has no '{hw_uart}' -- besides its console "
             f"({mapping['UART0']}), its DTS has {len(others)} other "
-            f"UART(s): {others or 'none'}."
+            f"UART(s): {', '.join(others) or 'none'}."
         )
     source = "board's zephyr,console, from DTS" if hw_uart == "UART0" else "from DTS"
     _LOGGER.info("[zephyr] %s for '%s': %s (%s)", hw_uart, board, label, source)
@@ -583,7 +583,7 @@ def _load_edtlib(zephyr_base: Path) -> ModuleType:
             sys.path.remove(str(bundled))
 
 
-def _get_edt(board: str):
+def _get_edt(board: str) -> Any | None:
     """Return a parsed, cached edtlib.EDT for board merged with its shields/
     snippets overlays, or None if unavailable -- cached per (board, shields,
     snippets) so cpp only runs once per unique combination per run."""
@@ -652,7 +652,9 @@ def _undeprecate_board(zephyr_base: Path, board: str) -> str:
     return new.name + (f"@{revision}" if revision else "") + (new.qualifiers or "")
 
 
-def _build_edt(board: str, zephyr_base: Path, shields: list[str], snippets: list[str]):
+def _build_edt(
+    board: str, zephyr_base: Path, shields: list[str], snippets: list[str]
+) -> Any:
     """Parse board's devicetree with its revision/shield/snippet overlays."""
     board = _undeprecate_board(zephyr_base, board)
     edtlib = _load_edtlib(zephyr_base)
@@ -1088,7 +1090,7 @@ def _get_dts_include_paths(zephyr_base: Path) -> list[str]:
     return zd[KEY_DTS_INCLUDE_PATHS]
 
 
-def _iter_nodes(edt):
+def _iter_nodes(edt: Any) -> Iterator[Any]:
     """Yield individual nodes from edtlib's scc_order (which is a list of SCCs)."""
     for scc in edt.scc_order:
         if isinstance(scc, list):

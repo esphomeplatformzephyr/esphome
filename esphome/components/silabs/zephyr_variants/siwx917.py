@@ -29,13 +29,13 @@ from ..const import VARIANT_SIWX917
 # SiWx917-DK2605A (BRD2605A), Silicon Labs' SiWx917 Wi-Fi 6 + BLE 5.4 dev kit. Bare
 # name; no SoC/qualifier segment needed -- upstream's board.yml declares a single
 # SoC for this board, same shape as efr32mg24's xg24_ek2703a.
-_DEFAULT_BOARD = "siwx917_dk2605a"
+_DEFAULT_BOARD: str = "siwx917_dk2605a"
 
 # This chip's real firmware-upgrade tooling also goes through Silicon Labs'
 # "commander" CLI (Kconfig SIWX91X_SIGN_KEY/SIWX91X_MIC_KEY are both passed
 # straight to `commander rps convert`; the same command connectedhomeip's SiWx917
 # OTA port uses, github.com/project-chip/connectedhomeip/pull/74060).
-_ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
+_ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(
     {
         cv.Optional(CONF_COMMANDER_VERSION): cv.string_strict,
     }
@@ -47,7 +47,7 @@ _ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
 # defines ULPn macros for pins on the separate ULP GPIO controller, outside this
 # variant's flat gpioa-d numbering (see gpio_port_width/gpio_port_labels below) --
 # not wired up here, same deferral as UART/I2C further down.
-_ADC_AIN_MAP = {
+_ADC_AIN_MAP: dict[int, str] = {
     25: "SIWX91X_ADC_INPUT_HP25",
     26: "SIWX91X_ADC_INPUT_HP26",
     27: "SIWX91X_ADC_INPUT_HP27",
@@ -64,13 +64,13 @@ _ADC_AIN_MAP = {
 # always reduces to nn for these macros, the same fact the ADC map above relies
 # on), so the macro name itself is still derivable, just not by formula -- hence
 # a lookup table (spi_pin_macros) rather than spi_valid_pins alone.
-_SPI_CLK_MACROS = {p: f"GSPI_CLK_HP{p}" for p in (8, 25, 46, 52)}
-_SPI_MOSI_MACROS = {p: f"GSPI_MOSI_HP{p}" for p in (6, 12, 27, 48, 57)}
-_SPI_MISO_MACROS = {p: f"GSPI_MISO_HP{p}" for p in (11, 26, 47, 56)}
+_SPI_CLK_MACROS: dict[int, str] = {p: f"GSPI_CLK_HP{p}" for p in (8, 25, 46, 52)}
+_SPI_MOSI_MACROS: dict[int, str] = {p: f"GSPI_MOSI_HP{p}" for p in (6, 12, 27, 48, 57)}
+_SPI_MISO_MACROS: dict[int, str] = {p: f"GSPI_MISO_HP{p}" for p in (11, 26, 47, 56)}
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = VARIANT_SIWX917
-VARIANT = ZephyrVariant(
+VARIANT_NAME: str = VARIANT_SIWX917
+VARIANT: ZephyrVariant = ZephyrVariant(
     # The ROM/TA bootloader and network processor firmware sit below 0x202000
     # (siwx917_dk2605a.dts code_partition@202000).
     boot=BootLayout(0x202000, ((0x0, 0x202000),)),

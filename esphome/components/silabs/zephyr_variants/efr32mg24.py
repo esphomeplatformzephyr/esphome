@@ -30,9 +30,9 @@ from ..const import VARIANT_EFR32MG24
 # xG24-EK2703A (PCB2703A), Silicon Labs' EFR32xG24 Explorer Kit. Bare name; no
 # SoC/qualifier segment needed -- upstream's board.yml declares a single SoC/core
 # for this board, so qualify_board() is a no-op here (soc= is left unset below).
-_DEFAULT_BOARD = "xg24_ek2703a"
+_DEFAULT_BOARD: str = "xg24_ek2703a"
 
-_ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
+_ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(
     {
         cv.Optional(CONF_COMMANDER_VERSION): cv.string_strict,
     }
@@ -42,18 +42,20 @@ _ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
 # silicon mapping (unlike nRF52's sparse datasheet AIN0-AIN7 table): every GPIO pin
 # PA0..PD15 has its own IADC_INPUT_P<port><pin> macro, confirmed against
 # zephyr/dt-bindings/adc/silabs-adc.h (e.g. IADC_INPUT_PC4 = 0xa4).
-_ADC_AIN_MAP = {p: f"IADC_INPUT_P{chr(ord('A') + p // 16)}{p % 16}" for p in range(64)}
+_ADC_AIN_MAP: dict[int, str] = {
+    p: f"IADC_INPUT_P{chr(ord('A') + p // 16)}{p % 16}" for p in range(64)
+}
 
 # https://github.com/zephyrproject-rtos/zephyr/blob/main/include/zephyr/dt-bindings/pinctrl/silabs/xg24-pinctrl.h
 # Macros exist only for the pins xG24 has: PA0-9, PB0-5, PC0-9, PD0-5. Shared by every
 # free-mux GPIO signal (UART, SPI).
-_GPIO_MATRIX_PINS = frozenset(
+_GPIO_MATRIX_PINS: frozenset[int] = frozenset(
     [*range(10), *range(16, 22), *range(32, 42), *range(48, 54)]
 )
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = VARIANT_EFR32MG24
-VARIANT = ZephyrVariant(
+VARIANT_NAME: str = VARIANT_EFR32MG24
+VARIANT: ZephyrVariant = ZephyrVariant(
     mcumgr_ota=True,
     # Resets from the start of flash (xg24_ek2703a.dts boot_partition@0).
     boot=BootLayout(0x0),

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 import sys
 from types import SimpleNamespace
@@ -12,7 +13,11 @@ import serial
 
 from esphome.components.stm32.zephyr_variants import stm32c5
 from esphome.components.zephyr import reset_over_usb, upload_program
-from esphome.components.zephyr.const import CONF_BOOTLOADER, KEY_ZEPHYR
+from esphome.components.zephyr.const import (
+    BOOTLOADER_MCUBOOT,
+    CONF_BOOTLOADER,
+    KEY_ZEPHYR,
+)
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ADVANCED,
@@ -249,3 +254,45 @@ def test_reset_over_usb_touches_the_xiao_at_2001_baud(
         assert mock_serial.call_args.kwargs["baudrate"] == 2001
     else:
         mock_serial.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    ("rng_label", "prj_conf", "overlays"),
+    [
+        ("rng", "ENTROPY_GENERATOR", ['&rng { status = "okay"; };']),
+        (None, "TEST_RANDOM_GENERATOR", []),
+    ],
+)
+@pytest.mark.parametrize("bootloader", ["", BOOTLOADER_MCUBOOT])
+def test_to_code(
+    tmp_path: Path,
+    rng_label: str | None,
+    prj_conf: str,
+    overlays: list[str],
+    bootloader: str,
+) -> None:
+    """The RNG is enabled when the board's SoC has one, else the test generator is
+    used; MCUboot builds also set the sysbuild options."""
+    _state(tmp_path, NUCLEO)
+    CORE.data[KEY_ZEPHYR]["bootloader"] = bootloader
+    with (
+        patch("esphome.components.zephyr.zephyr_add_prj_conf") as mock_conf,
+        patch("esphome.components.zephyr.zephyr_add_overlay") as mock_overlay,
+        patch("esphome.components.zephyr.zephyr_add_sysbuild_conf") as mock_sysbuild,
+        patch("esphome.components.zephyr.zephyr_setup_preferences") as mock_prefs,
+        patch(f"{_DTS}.get_rng_node_label", return_value=rng_label) as mock_rng,
+        patch.object(stm32c5.cg, "add_define") as mock_define,
+        patch.object(stm32c5.cg, "add_build_flag"),
+    ):
+        asyncio.run(stm32c5.to_code({CONF_BOARD: NUCLEO}))
+
+    mock_rng.assert_called_once_with(NUCLEO)
+    mock_prefs.assert_called_once_with()
+    mock_define.assert_any_call("ESPHOME_VARIANT", "STM32C5")
+    mock_conf.assert_any_call(prj_conf, True)
+    assert [c.args[0] for c in mock_overlay.call_args_list] == overlays
+    if bootloader == BOOTLOADER_MCUBOOT:
+        mock_sysbuild.assert_any_call("BOOTLOADER_MCUBOOT", True)
+        mock_sysbuild.assert_any_call("BOOT_SIGNATURE_TYPE_ECDSA_P256", True)
+    else:
+        mock_sysbuild.assert_not_called()

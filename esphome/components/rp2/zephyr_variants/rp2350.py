@@ -33,14 +33,14 @@ from .rpi_pico_family import BOOTSEL_TOUCH_SCHEMA, declare_bootsel_touch
 
 _LOGGER = logging.getLogger(__name__)
 
-_DEFAULT_BOARD = "rpi_pico2"
+_DEFAULT_BOARD: str = "rpi_pico2"
 
 # Same reasoning as RP2040 (see variants/rp2040.py): the RP2350 ROM's own USB (BOOTSEL)
 # bootloader can flash the chip without any software bootloader, so MCUboot is opt-in
 # rather than required. Only some boards (e.g. rpi_pico2) ship an upstream vendor
 # .../mcuboot DTS sibling -- xiao_rp2350 does not -- so anyone choosing mcuboot must
 # supply the fully qualified board themselves, e.g. board: rpi_pico2/rp2350a/m33/mcuboot.
-_ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(BOOTLOADER_SCHEMA).extend(
+_ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(BOOTLOADER_SCHEMA).extend(
     BOOTSEL_TOUCH_SCHEMA
 )
 
@@ -49,10 +49,10 @@ _ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(BOOTLOADER_SCHEMA).extend(
 # Confirmed against Zephyr's raspberrypi,pico-adc binding and
 # rpi-pico-rp2350a-pinctrl.h's ADC_CH0_P26..ADC_CH3_P29 macros (identical names to
 # RP2040's header).
-_ADC_CHANNEL_MAP = {26: 0, 27: 1, 28: 2, 29: 3}
+_ADC_CHANNEL_MAP: dict[int, int] = {26: 0, 27: 1, 28: 2, 29: 3}
 
-VARIANT_NAME = VARIANT_RP2350
-VARIANT = ZephyrVariant(
+VARIANT_NAME: str = VARIANT_RP2350
+VARIANT: ZephyrVariant = ZephyrVariant(
     mcumgr_ota=True,
     # ROM boots from the start of flash (rpi_pico2, partitions_4M_sysbuild.dtsi).
     boot=BootLayout(0x0),

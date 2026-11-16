@@ -31,9 +31,9 @@ from ..const import VARIANT_EFR32BG27
 # SoC/qualifier segment needed -- upstream's board.yml declares a single SoC
 # (efr32bg27c140f768im40) for this board, so qualify_board() is a no-op here
 # (soc= is left unset below).
-_DEFAULT_BOARD = "xg27_dk2602a"
+_DEFAULT_BOARD: str = "xg27_dk2602a"
 
-_ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
+_ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(
     {
         cv.Optional(CONF_COMMANDER_VERSION): cv.string_strict,
     }
@@ -42,8 +42,8 @@ _ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
 # GPIO -> Silicon Labs IADC analog-input macro. Built from this SoC's own bonded
 # pin counts (ngpios: A=9, B=5, C=8, D=4, confirmed against its dtsi) rather than
 # reused from EFR32MG24, which bonds out the full PA0-PD15 range.
-_BONDED_PINS_BY_PORT = {0: 9, 1: 5, 2: 8, 3: 4}  # port index -> ngpios
-_ADC_AIN_MAP = {
+_BONDED_PINS_BY_PORT: dict[int, int] = {0: 9, 1: 5, 2: 8, 3: 4}  # port index -> ngpios
+_ADC_AIN_MAP: dict[int, str] = {
     port * 16 + pin: f"IADC_INPUT_P{chr(ord('A') + port)}{pin}"
     for port, count in _BONDED_PINS_BY_PORT.items()
     for pin in range(count)
@@ -53,11 +53,11 @@ _ADC_AIN_MAP = {
 # Full crossbar within the bonded pin set above -- every USART/EUSART TX/RX/CLK signal
 # has a macro for each of PA0-8/PB0-4/PC0-7/PD0-3, no exclusions (unlike esp32). Shared
 # by every free-mux GPIO signal (UART, SPI).
-_GPIO_MATRIX_PINS = frozenset(_ADC_AIN_MAP)
+_GPIO_MATRIX_PINS: frozenset[int] = frozenset(_ADC_AIN_MAP)
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = VARIANT_EFR32BG27
-VARIANT = ZephyrVariant(
+VARIANT_NAME: str = VARIANT_EFR32BG27
+VARIANT: ZephyrVariant = ZephyrVariant(
     mcumgr_ota=True,
     # Resets from the start of flash (xg27_dk2602a.dts boot_partition@0).
     boot=BootLayout(0x0),

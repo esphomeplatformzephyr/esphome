@@ -31,6 +31,7 @@ from esphome.components.zephyr.dts_lookup import (
     get_board_partitions,
     get_board_yaml_supported,
     get_can_controller_labels,
+    get_console_uart_label,
     get_i2c_controller_labels,
     get_pinctrl_group_property,
     get_pinctrl_states,
@@ -39,6 +40,7 @@ from esphome.components.zephyr.dts_lookup import (
     get_watchdog_node_label,
     has_pinctrl_configured,
     log_board_capabilities,
+    resolve_uart_node_label,
     resolve_zephyr_bus,
     validate_board_revision,
 )
@@ -90,8 +92,14 @@ class _FakeProp:
 
 
 class _FakeEdt:
-    def __init__(self, nodes: list[_FakeNode]) -> None:
+    def __init__(
+        self, nodes: list[_FakeNode], console: _FakeNode | None = None
+    ) -> None:
         self.scc_order = list(nodes)
+        self._console = console
+
+    def chosen_node(self, name: str) -> _FakeNode | None:
+        return self._console if name == "zephyr,console" else None
 
 
 # ---------------------------------------------------------------------------
@@ -1852,3 +1860,125 @@ def test_resolve_uart_node_label_without_a_console(
     monkeypatch.setattr(dts_lookup, "get_console_uart_label", lambda board: None)
     with pytest.raises(EsphomeError, match="has no zephyr,console UART, or couldn't"):
         dts_lookup.resolve_uart_node_label("some_board", "UART1", {})
+
+
+def test_find_board_dir_without_a_boards_folder(tmp_path: Path) -> None:
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
+    assert _find_board_dir(tmp_path, "esp32h2_devkitm") is None
+
+
+def test_find_board_dir_falls_back_to_board_yml_names(tmp_path: Path) -> None:
+    """Folders named without the vendor prefix are found through board.yml, in
+    either of its two schemas; an unreadable file is skipped."""
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
+    boards = tmp_path / "boards" / "arduino"
+    (boards / "broken").mkdir(parents=True)
+    (boards / "broken" / "board.yml").write_text("board: [")
+    (boards / "listed").mkdir()
+    (boards / "listed" / "board.yml").write_text("- not a mapping\n")
+    (boards / "uno_r4").mkdir()
+    (boards / "uno_r4" / "board.yml").write_text("boards:\n  - name: arduino_uno_r4\n")
+    (boards / "giga_r1").mkdir()
+    (boards / "giga_r1" / "board.yml").write_text("board:\n  name: arduino_giga_r1\n")
+    (tmp_path / "boards" / "README.txt").write_text("not a vendor folder")
+
+    assert _find_board_dir(tmp_path, "arduino_uno_r4") == boards / "uno_r4"
+    assert _find_board_dir(tmp_path, "arduino_giga_r1/stm32h747xx/m7") == (
+        boards / "giga_r1"
+    )
+
+
+@pytest.mark.parametrize("board", ["esp32h2_devkitm", "no_such_board"])
+def test_find_board_dir_scans_once_per_board(
+    fake_zephyr_base: Path, board: str
+) -> None:
+    """A found folder and a miss are both remembered; the second call reads no disk."""
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
+    first = _find_board_dir(fake_zephyr_base, board)
+    shutil.rmtree(fake_zephyr_base / "boards")
+    assert _find_board_dir(fake_zephyr_base, board) == first
+
+
+def test_get_edt_warns_when_the_board_has_no_dts_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    (tmp_path / "boards" / "acme" / "my_board").mkdir(parents=True)
+    monkeypatch.setattr(dts_lookup, "_load_edtlib", _fake_edtlib(lambda *a, **k: 1))
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data(dts_base_path=str(tmp_path))
+
+    assert _get_edt("my_board") is None
+    assert "no .dts file named for it in" in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("stderr", "message"),
+    [
+        ("first\nboard.dts:3: error", "cpp failed: board.dts:3: error"),
+        ("", "no output"),
+    ],
+)
+def test_preprocess_dts_file_reports_the_cpp_error(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, stderr: str, message: str
+) -> None:
+    def _fail(cmd: list[str], **kwargs: Any) -> NoReturn:
+        raise subprocess.CalledProcessError(1, cmd, stderr=stderr)
+
+    monkeypatch.setattr(dts_lookup, "_find_cpp", lambda: "/usr/bin/cpp")
+    monkeypatch.setattr(dts_lookup, "_get_dts_include_paths", lambda base: [])
+    monkeypatch.setattr(dts_lookup.subprocess, "run", _fail)
+    with pytest.raises(dts_lookup._DtsReadError, match=message):
+        dts_lookup._preprocess_dts_file(tmp_path / "board.dts", tmp_path, [])
+
+
+def _uart(label: str, status: str = "okay") -> _FakeNode:
+    return _FakeNode([label], status, buses=["uart"])
+
+
+@pytest.fixture
+def board_edt(monkeypatch: pytest.MonkeyPatch) -> Callable[..., None]:
+    """Give every board the devicetree passed in, with ``console`` as zephyr,console."""
+
+    def _set(nodes: list[_FakeNode], console: _FakeNode | None = None) -> None:
+        edt = _FakeEdt(nodes, console)
+        monkeypatch.setattr(dts_lookup, "_get_edt", lambda board: edt)
+
+    return _set
+
+
+def test_console_uart_label_without_a_devicetree(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(dts_lookup, "_get_edt", lambda board: None)
+    assert get_console_uart_label("nucleo_c5a3zg") is None
+
+
+@pytest.mark.parametrize(
+    ("console", "expected"),
+    [(_uart("usart2"), "usart2"), (_FakeNode([]), None), (None, None)],
+)
+def test_console_uart_label(
+    board_edt: Callable[..., None], console: _FakeNode | None, expected: str | None
+) -> None:
+    board_edt([], console)
+    assert get_console_uart_label("nucleo_c5a3zg") == expected
+
+
+def test_resolve_uart_node_label_rejects_a_missing_uart(
+    board_edt: Callable[..., None],
+) -> None:
+    console = _uart("usart2")
+    board_edt([console, _uart("lpuart1"), _uart("usart1")], console)
+    with pytest.raises(
+        EsphomeError,
+        match=r"no 'UART3' -- .*\(usart2\), .* 2 other UART\(s\): lpuart1, usart1\.",
+    ):
+        resolve_uart_node_label("nucleo_c5a3zg", "UART3", {})
+
+
+def test_resolve_uart_node_label_on_a_board_with_only_the_console(
+    board_edt: Callable[..., None],
+) -> None:
+    console = _uart("usart2")
+    board_edt([console], console)
+    with pytest.raises(EsphomeError, match=r"0 other UART\(s\): none"):
+        resolve_uart_node_label("nucleo_c5a3zg", "UART1", {})

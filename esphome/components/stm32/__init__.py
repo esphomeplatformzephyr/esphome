@@ -13,7 +13,7 @@ CODEOWNERS = ["@rwrozelle"]
 DOMAIN = "stm32"
 IS_TARGET_PLATFORM = True
 # The variant families zephyr builds for this platform
-ZEPHYR_FAMILIES = frozenset({"stm32"})
+ZEPHYR_FAMILIES: frozenset[str] = frozenset({"stm32"})
 
 # Zephyr is the only framework so far. Another one is chosen in CONFIG_SCHEMA by
 # framework: type:, and the functions below branch on CORE.toolchain, as rp2 does.

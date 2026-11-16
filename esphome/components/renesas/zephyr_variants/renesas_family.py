@@ -15,11 +15,11 @@ UART_DRIVERS: frozenset[str] = frozenset({SEGGER_RTT_UART})
 # vendor HALs are not fetched.
 ADDITIONAL_FRAMEWORK_PROJECTS: frozenset[str] = frozenset({"hal_renesas"})
 # CPU architecture (see ZephyrVariant.cpu_arch)
-CPU_ARCH = "arm"
+CPU_ARCH: str = "arm"
 # Kind of USB UART (see ZephyrVariant.usb_uart_type)
-USB_UART_TYPE = "cdc_acm"
+USB_UART_TYPE: str = "cdc_acm"
 # Pins are named P<port><2-digit pin>, e.g. P106 (see zephyr/gpio.py)
-PIN_NOTATION = "concat"
+PIN_NOTATION: str = "concat"
 
 
 def to_code(config: ConfigType) -> None:

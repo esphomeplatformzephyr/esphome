@@ -27,17 +27,17 @@ from ..const import VARIANT_ESP32C3
 
 # Bare name; qualify_board() expands it to "esp32c3_devkitm/esp32c3" using soc= below.
 # No hp/lpcore qualifier -- unlike esp32_c6/esp32_c5, this chip is single-core.
-_DEFAULT_BOARD = "esp32c3_devkitm"
+_DEFAULT_BOARD: str = "esp32c3_devkitm"
 
-_ADVANCED_SCHEMA = ADVANCED_SCHEMA
+_ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA
 
 # https://github.com/zephyrproject-rtos/zephyr/blob/main/include/zephyr/dt-bindings/pinctrl/esp32c3-pinctrl.h
 # GPIO0-21 minus 12-17 (SPI flash); same set for every free-mux signal (UART, SPI).
-_GPIO_MATRIX_PINS = frozenset(range(22)) - frozenset(range(12, 18))
+_GPIO_MATRIX_PINS: frozenset[int] = frozenset(range(22)) - frozenset(range(12, 18))
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = VARIANT_ESP32C3
-VARIANT = ZephyrVariant(
+VARIANT_NAME: str = VARIANT_ESP32C3
+VARIANT: ZephyrVariant = ZephyrVariant(
     mcumgr_ota=True,
     # ROM loads the first image at 0x0 (espressif/partitions_0x0_*.dtsi).
     boot=BootLayout(0x0),

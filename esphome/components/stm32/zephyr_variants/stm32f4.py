@@ -34,13 +34,13 @@ from ..const import VARIANT_STM32F4
 # board tier as stm32l4.py's nucleo_l476rg. Its stock flash0 partition table is
 # MCUboot-shaped (boot/slot0/slot1/scratch) but has no storage_partition -- every
 # config on this variant is expected to add one via `overlays:`.
-_DEFAULT_BOARD = "nucleo_f401re"
+_DEFAULT_BOARD: str = "nucleo_f401re"
 
 # Unlike stm32l4/rp2040/ra4m1, bootloader: defaults to mcuboot here -- real MCUboot
 # (ECDSA-P256) fits the stock boot_partition with room to spare (measured 24-31K of
 # 32K), hardware-verified on nucleo_f401re/blackpill_f411ce. none stays selectable
 # for boards with their own resident bootloader (e.g. WeAct's HID bootloader).
-_ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
+_ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(
     {
         cv.Optional(CONF_BOOTLOADER, default=BOOTLOADER_MCUBOOT): cv.one_of(
             BOOTLOADER_NONE, BOOTLOADER_MCUBOOT, lower=True
@@ -49,8 +49,8 @@ _ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
 )
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = VARIANT_STM32F4
-VARIANT = ZephyrVariant(
+VARIANT_NAME: str = VARIANT_STM32F4
+VARIANT: ZephyrVariant = ZephyrVariant(
     # Resets from the start of flash (nucleo_f401re.dts boot_partition@0).
     boot=BootLayout(0x0),
     sdk=ZEPHYR_MAINLINE,

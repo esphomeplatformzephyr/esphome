@@ -32,14 +32,14 @@ from esphome.types import ConfigType
 
 from ..const import VARIANT_NRF54L15
 
-_DEFAULT_BOARD = "nrf54l15dk"
+_DEFAULT_BOARD: str = "nrf54l15dk"
 # qualify_board() expands this to "nrf54l15dk/nrf54l15/cpuapp" via soc=/qualifier= below --
 # the application core target confirmed in upstream Zephyr's own board.yml for this DK
 # (boards/nordic/nrf54l15dk/board.yml lists nrf54l15's cpuapp/cpuflpr cpuclusters). Only
 # the application core is supported here -- cpuflpr (the RISC-V co-processor core) is a
 # separate, much more specialized target this variant does not build for.
 
-_ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
+_ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(
     {
         cv.Optional(CONF_BOOTLOADER, default=BOOTLOADER_MCUBOOT): cv.one_of(
             BOOTLOADER_NONE, BOOTLOADER_MCUBOOT, lower=True
@@ -57,7 +57,7 @@ _ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
 # Unlike nrf52 (single GPIO port, so pin number == AIN's flat GPIO number directly),
 # these pins are all on P1 -- flat number is port * gpio_port_width(32) + pin, e.g.
 # P1.04 -> 36.
-_ADC_AIN_MAP = {
+_ADC_AIN_MAP: dict[int, str] = {
     36: "AIN0",  # P1.04
     37: "AIN1",  # P1.05
     38: "AIN2",  # P1.06
@@ -71,13 +71,13 @@ _ADC_AIN_MAP = {
 # nrf54l_05_10_15.dtsi: gpio0 (ngpios=<7>, flat 0-6), gpio1 (ngpios=<17>, flat
 # 32-48), gpio2 (ngpios=<11>, flat 64-74). Free-mux via NRF_PSEL, shared by
 # every free-mux GPIO signal (UART, SPI).
-_GPIO_MATRIX_PINS = (
+_GPIO_MATRIX_PINS: frozenset[int] = (
     frozenset(range(7)) | frozenset(range(32, 49)) | frozenset(range(64, 75))
 )
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = VARIANT_NRF54L15
-VARIANT = ZephyrVariant(
+VARIANT_NAME: str = VARIANT_NRF54L15
+VARIANT: ZephyrVariant = ZephyrVariant(
     # No USB controller; the XIAO's USB port is a SAMD11 bridge to uart20
     usb_uart_type=None,
     mcumgr_ota=True,

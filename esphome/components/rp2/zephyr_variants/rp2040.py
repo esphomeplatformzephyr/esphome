@@ -33,7 +33,7 @@ from .rpi_pico_family import BOOTSEL_TOUCH_SCHEMA, declare_bootsel_touch
 
 _LOGGER = logging.getLogger(__name__)
 
-_DEFAULT_BOARD = "rpi_pico"
+_DEFAULT_BOARD: str = "rpi_pico"
 
 # RP2040's ROM has its own USB (BOOTSEL) bootloader, so unlike every other mainline
 # variant, a software bootloader here is optional rather than required to flash at all.
@@ -48,7 +48,7 @@ _DEFAULT_BOARD = "rpi_pico"
 # fully qualified board themselves, e.g. board: rpi_pico/rp2040/mcuboot, same as they'd
 # supply their own MCUboot-shaped partitions via overlays: for a board without one.
 
-_ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(BOOTLOADER_SCHEMA).extend(
+_ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(BOOTLOADER_SCHEMA).extend(
     BOOTSEL_TOUCH_SCHEMA
 )
 
@@ -56,10 +56,10 @@ _ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(BOOTLOADER_SCHEMA).extend(
 # the ADC, channel = pin - 26 (Espressif-shaped: the devicetree channel@N address IS
 # the real silicon channel). Confirmed against Zephyr's raspberrypi,pico-adc binding
 # and rpi-pico-rp2040-pinctrl.h's ADC_CH0_P26..ADC_CH3_P29 macros.
-_ADC_CHANNEL_MAP = {26: 0, 27: 1, 28: 2, 29: 3}
+_ADC_CHANNEL_MAP: dict[int, int] = {26: 0, 27: 1, 28: 2, 29: 3}
 
-VARIANT_NAME = VARIANT_RP2040
-VARIANT = ZephyrVariant(
+VARIANT_NAME: str = VARIANT_RP2040
+VARIANT: ZephyrVariant = ZephyrVariant(
     mcumgr_ota=True,
     # The first 256 bytes hold boot2, built into the first image; that image starts
     # after it (rpi_pico-common.dtsi second_stage_bootloader@0, code_partition@100).

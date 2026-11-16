@@ -677,7 +677,7 @@ SILABS: ZephyrSDK = ZephyrSDK(
 
 # Platforms that keep Zephyr variants in a zephyr_variants package, which lists them
 # in VARIANT_MODULES. A family's module sits next to its variants as <family>_family.
-_ZEPHYR_PLATFORMS = (
+_ZEPHYR_PLATFORMS: tuple[str, ...] = (
     PLATFORM_ESP32,
     PLATFORM_NRF,
     PLATFORM_SILABS,

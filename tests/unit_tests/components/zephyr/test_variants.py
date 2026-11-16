@@ -346,3 +346,60 @@ def test_registry_read_while_loading_is_rejected(
     for _ in range(2):
         with pytest.raises(RuntimeError, match="read VARIANTS while it loaded"):
             registry.get("chip1")
+
+
+_PACKAGE: str = "esphome.components.fakeplatform.zephyr_variants"
+
+
+def _module(name: str, **attrs: object) -> ModuleType:
+    module = ModuleType(name)
+    module.__dict__.update(attrs)
+    return module
+
+
+@pytest.fixture
+def fake_platform(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
+    """A platform whose zephyr_variants package lists one chip of the chipfam family."""
+    variant = ZephyrVariant(sdk=_DEFAULT_SDK, sdk_name="default", family="chipfam")
+    chip = _module(f"{_PACKAGE}.chip1", VARIANT_NAME="chip1", VARIANT=variant)
+    family = _module(f"{_PACKAGE}.chipfam_family")
+    monkeypatch.setitem(
+        sys.modules, _PACKAGE, _module(_PACKAGE, VARIANT_MODULES=["chip1"])
+    )
+    monkeypatch.setitem(sys.modules, chip.__name__, chip)
+    monkeypatch.setitem(sys.modules, family.__name__, family)
+    monkeypatch.setattr(variants, "_ZEPHYR_PLATFORMS", ("fakeplatform",))
+    return chip
+
+
+def test_failed_variant_import_is_raised_on_every_lookup(
+    fake_platform: ModuleType,
+) -> None:
+    sys.modules[_PACKAGE].VARIANT_MODULES = ["chip1", "missing"]
+    registry = variants._LazyVariants()
+
+    for _ in range(2):
+        with pytest.raises(ModuleNotFoundError):
+            registry.get("chip1")
+    assert registry._variants == {}
+
+
+def test_duplicate_variant_name_is_rejected(fake_platform: ModuleType) -> None:
+    sys.modules[_PACKAGE].VARIANT_MODULES = ["chip1", "chip1"]
+    registry = variants._LazyVariants()
+
+    for _ in range(2):
+        with pytest.raises(ValueError, match="are both 'chip1'"):
+            registry.get("chip1")
+
+
+def test_registry_rejects_an_unknown_family(fake_platform: ModuleType) -> None:
+    with pytest.raises(ValueError, match="Unknown Zephyr family"):
+        variants._LazyVariants().family_module("other")
+
+
+def test_resolve_framework_version_rejects_a_version_that_is_not_a_number() -> None:
+    config = {CONF_FRAMEWORK: _framework_config(**{CONF_VERSION: "v1.0.0"})}
+    with pytest.raises(cv.Invalid, match="'v1.0.0' is not a version number") as err:
+        resolve_framework_version(_fake_variant(), "fake", config, "test")
+    assert err.value.path == [CONF_FRAMEWORK, CONF_VERSION]

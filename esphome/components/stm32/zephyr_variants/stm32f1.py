@@ -32,7 +32,7 @@ from ..const import VARIANT_STM32F1
 # SoC for this board (stm32f103xb), same as stm32f4.py/stm32l4.py. ST's own Nucleo-64
 # eval board for the STM32F1 line, the smallest MCU family ESPHome's Zephyr platform
 # targets: 128K flash/20K RAM total, versus 512K/96K on stm32f4's nucleo_f401re.
-_DEFAULT_BOARD = "nucleo_f103rb"
+_DEFAULT_BOARD: str = "nucleo_f103rb"
 
 # Like stm32f4/wb55, not stm32l4: nucleo_f103rb's stock flash0 layout is already
 # MCUboot-shaped (34K boot_partition, 45K/46K slot0/slot1, 3K storage, no
@@ -42,7 +42,7 @@ _DEFAULT_BOARD = "nucleo_f103rb"
 # always resets to address 0, so a `none`-built image linked for slot0_partition
 # (offset 0x8800) would never run. mcuboot has to stay the default here; `none` remains
 # selectable only for a different F1 board whose own DTS boots from offset 0.
-_ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
+_ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(
     {
         cv.Optional(CONF_BOOTLOADER, default=BOOTLOADER_MCUBOOT): cv.one_of(
             BOOTLOADER_NONE, BOOTLOADER_MCUBOOT, lower=True
@@ -51,8 +51,8 @@ _ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
 )
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = VARIANT_STM32F1
-VARIANT = ZephyrVariant(
+VARIANT_NAME: str = VARIANT_STM32F1
+VARIANT: ZephyrVariant = ZephyrVariant(
     # Resets from the start of flash (nucleo_f103rb.dts boot_partition@0).
     boot=BootLayout(0x0),
     sdk=ZEPHYR_MAINLINE,

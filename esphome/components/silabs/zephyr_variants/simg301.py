@@ -27,16 +27,16 @@ from ..const import VARIANT_SIMG301
 
 # SixG301 Explorer Kit (BRD2719A). Not in mainline Zephyr yet: set `board_source:` to
 # esphomeplatformzephyr/custom_zephyr_boards.
-_DEFAULT_BOARD = "simg301_ek2719a"
+_DEFAULT_BOARD: str = "simg301_ek2719a"
 
 # EUSART0, the only UART, reaches PA0-PA8 and PB0-PB3 only (six301-pinctrl.h).
-_EUSART0_PINS = frozenset([*range(9), *range(16, 20)])
+_EUSART0_PINS: frozenset[int] = frozenset([*range(9), *range(16, 20)])
 
-_ADVANCED_SCHEMA = ADVANCED_SCHEMA
+_ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = VARIANT_SIMG301
-VARIANT = ZephyrVariant(
+VARIANT_NAME: str = VARIANT_SIMG301
+VARIANT: ZephyrVariant = ZephyrVariant(
     # Resets from the start of flash (simg301_ek2719a.dts boot_partition@0).
     boot=BootLayout(0x0),
     sdk=ZEPHYR_MAINLINE,

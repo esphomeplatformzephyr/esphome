@@ -30,18 +30,18 @@ UART_DRIVERS: frozenset[str] = frozenset({SEGGER_RTT_UART})
 # vendor HALs are not fetched.
 ADDITIONAL_FRAMEWORK_PROJECTS: frozenset[str] = frozenset({"hal_rpi_pico"})
 # CPU architecture (see ZephyrVariant.cpu_arch)
-CPU_ARCH = "arm"
+CPU_ARCH: str = "arm"
 # Kind of USB UART (see ZephyrVariant.usb_uart_type)
-USB_UART_TYPE = "cdc_acm"
+USB_UART_TYPE: str = "cdc_acm"
 # See ZephyrVariant.mcumgr_cdc
-MCUMGR_CDC = True
-MAIN_STACK_SIZE = 8192
+MCUMGR_CDC: bool = True
+MAIN_STACK_SIZE: int = 8192
 
-BootselTouch = zephyr_ns.class_("BootselTouch", cg.Component)
-CONF_BOOTSEL_TOUCH = "bootsel_touch"
+BootselTouch: cg.MockObjClass = zephyr_ns.class_("BootselTouch", cg.Component)
+CONF_BOOTSEL_TOUCH: str = "bootsel_touch"
 
 # Internal keys of advanced:, filled in by declare_bootsel_touch().
-BOOTSEL_TOUCH_SCHEMA = cv.Schema(
+BOOTSEL_TOUCH_SCHEMA: cv.Schema = cv.Schema(
     {
         cv.Optional(CONF_BOOTSEL_TOUCH): declare_component_id(BootselTouch),
     }
@@ -55,16 +55,16 @@ def declare_bootsel_touch(advanced: ConfigType) -> None:
 
 
 # Devicetree property rpi_pico pinctrl groups pack all their signal macros into.
-PROPERTY_NAME = "pinmux"
+PROPERTY_NAME: str = "pinmux"
 
 # I2C pinctrl group/state to assume when DTS resolution fails.
-I2C_FALLBACK_GROUP = "group1"
-I2C_FALLBACK_STATE_SUFFIXES = ("default",)
+I2C_FALLBACK_GROUP: str = "group1"
+I2C_FALLBACK_STATE_SUFFIXES: tuple[str, ...] = ("default",)
 
 # RP2XXX_PINMUX(pin_num, alt_func) only encodes the pin and which peripheral owns
 # it, not which signal within it -- role is implied by which fixed GPIO it's on.
-_PIN_NUM_POS = 5
-_PIN_NUM_MASK = 0x3F
+_PIN_NUM_POS: int = 5
+_PIN_NUM_MASK: int = 0x3F
 
 
 def pin_macro(prefix: str, signal: str, pin: int | None, variant: str) -> str | None:

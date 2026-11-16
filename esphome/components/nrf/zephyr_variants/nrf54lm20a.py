@@ -32,14 +32,14 @@ from esphome.types import ConfigType
 
 from ..const import VARIANT_NRF54LM20A
 
-_DEFAULT_BOARD = "nrf54lm20dk"
+_DEFAULT_BOARD: str = "nrf54lm20dk"
 # qualify_board() expands this to "nrf54lm20dk/nrf54lm20a/cpuapp" via soc=/qualifier=
 # below -- the application core target confirmed in upstream Zephyr's own board.yml for
 # this DK. Only the application core is supported here -- cpuflpr (the RISC-V
 # co-processor core) is a separate, much more specialized target this variant does not
 # build for.
 
-_ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
+_ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(
     {
         cv.Optional(CONF_BOOTLOADER, default=BOOTLOADER_MCUBOOT): cv.one_of(
             BOOTLOADER_NONE, BOOTLOADER_MCUBOOT, lower=True
@@ -57,7 +57,7 @@ _ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
 # Unlike nrf52 (single GPIO port, so pin number == AIN's flat GPIO number directly),
 # these pins are all on P1 -- flat number is port * gpio_port_width(32) + pin, e.g.
 # P1.00 -> 32.
-_ADC_AIN_MAP = {
+_ADC_AIN_MAP: dict[int, str] = {
     32: "AIN0",  # P1.00
     63: "AIN1",  # P1.31
     62: "AIN2",  # P1.30
@@ -71,7 +71,7 @@ _ADC_AIN_MAP = {
 # nrf54lm20_a_b.dtsi: gpio0 (ngpios=<10>, flat 0-9), gpio1 (ngpios=<32>, flat
 # 32-63), gpio2 (ngpios=<11>, flat 64-74), gpio3 (ngpios=<13>, flat 96-108).
 # Free-mux via NRF_PSEL, shared by every free-mux GPIO signal (UART, SPI).
-_GPIO_MATRIX_PINS = (
+_GPIO_MATRIX_PINS: frozenset[int] = (
     frozenset(range(10))
     | frozenset(range(32, 64))
     | frozenset(range(64, 75))
@@ -79,8 +79,8 @@ _GPIO_MATRIX_PINS = (
 )
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = VARIANT_NRF54LM20A
-VARIANT = ZephyrVariant(
+VARIANT_NAME: str = VARIANT_NRF54LM20A
+VARIANT: ZephyrVariant = ZephyrVariant(
     mcumgr_ota=True,
     # Resets from the start of RRAM (nordic/nrf54lm20a_cpuapp_partition.dtsi).
     boot=BootLayout(0x0),

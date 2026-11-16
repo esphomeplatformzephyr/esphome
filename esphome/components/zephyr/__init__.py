@@ -708,18 +708,20 @@ def _variant_data() -> ZephyrData | dict[str, object]:
 
 
 def zephyr_variant() -> str | None:
-    """Return the active Zephyr variant name, or None if not yet set."""
+    """The active Zephyr variant name; None off the Zephyr toolchain or on a
+    platform that also builds without Zephyr. Raises when read too early."""
     return _variant_data().get(KEY_VARIANT)
 
 
 def zephyr_framework_type() -> str | None:
-    """Return the active `framework: type:` (e.g. "zephyr", "ncs"), or None if
-    not yet set."""
+    """The active `framework: type:` (e.g. "zephyr", "ncs"); None as for
+    zephyr_variant()."""
     return _variant_data().get(KEY_FRAMEWORK_TYPE)
 
 
 def zephyr_variant_family() -> str | None:
-    """Return the active variant's silicon family (e.g. "esp32"), or None if unset/unfamilied."""
+    """The active variant's family (e.g. "esp32"); None without one, or as for
+    zephyr_variant()."""
     return _variant_data().get(KEY_FAMILY)
 
 
@@ -1447,7 +1449,7 @@ _MODULE_SCHEMA = cv.All(
 # schema is applied independently of key order. resolve_framework_version() (called
 # per-variant, after the platform schema) does that check, along with version:/source:
 # mutual exclusion and everything else that needs the variant to already be known.
-_FRAMEWORK_SCHEMA = cv.Schema(
+_FRAMEWORK_SCHEMA: cv.Schema = cv.Schema(
     {
         cv.Optional(CONF_TYPE): cv.string_strict,
         # Also accepts the literal "recommended", an explicit alias for the selected

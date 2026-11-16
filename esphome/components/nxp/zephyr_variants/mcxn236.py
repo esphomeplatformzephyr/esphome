@@ -29,11 +29,11 @@ from esphome.types import ConfigType
 
 from ..const import VARIANT_MCXN236
 
-_DEFAULT_BOARD = "frdm_mcxn236"
+_DEFAULT_BOARD: str = "frdm_mcxn236"
 
 # frdm_mcxn236.dts sets zephyr,code-partition = &slot0_partition and the chip resets
 # to 0x0, so only MCUboot boots it.
-_ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
+_ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(
     {
         cv.Optional(CONF_BOOTLOADER, default=BOOTLOADER_MCUBOOT): cv.one_of(
             BOOTLOADER_NONE, BOOTLOADER_MCUBOOT, lower=True
@@ -42,8 +42,8 @@ _ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
 )
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = VARIANT_MCXN236
-VARIANT = ZephyrVariant(
+VARIANT_NAME: str = VARIANT_MCXN236
+VARIANT: ZephyrVariant = ZephyrVariant(
     # Resets from the start of flash (frdm_mcxn236.dts boot_partition@0).
     boot=BootLayout(0x0),
     sdk=ZEPHYR_MAINLINE,

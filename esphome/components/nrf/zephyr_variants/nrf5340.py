@@ -33,11 +33,11 @@ from ..const import VARIANT_NRF5340
 
 _LOGGER = logging.getLogger(__name__)
 
-_DEFAULT_BOARD = "nrf7002dk/nrf5340/cpuapp"
+_DEFAULT_BOARD: str = "nrf7002dk/nrf5340/cpuapp"
 
 # Only the application core is built. BLE, 802.15.4, OpenThread and Zigbee need the
 # network core image, which isn't built yet; Wi-Fi (nRF7002 over QSPI) doesn't.
-_ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
+_ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(
     {
         # The board DTS always links the app into slot0, so only MCUboot is offered.
         cv.Optional(CONF_BOOTLOADER, default=BOOTLOADER_MCUBOOT): cv.one_of(
@@ -47,7 +47,7 @@ _ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
 )
 
 # SAADC inputs: P0.04-P0.07 = AIN0-AIN3, P0.25-P0.28 = AIN4-AIN7 (not nRF52's layout).
-_ADC_AIN_MAP = {
+_ADC_AIN_MAP: dict[int, str] = {
     4: "AIN0",
     5: "AIN1",
     6: "AIN2",
@@ -59,10 +59,10 @@ _ADC_AIN_MAP = {
 }
 
 # gpio0 (0-31) + gpio1 (32-47), any pin for any UART/SPI signal (NRF_PSEL).
-_GPIO_MATRIX_PINS = frozenset(range(48))
+_GPIO_MATRIX_PINS: frozenset[int] = frozenset(range(48))
 
-VARIANT_NAME = VARIANT_NRF5340
-VARIANT = ZephyrVariant(
+VARIANT_NAME: str = VARIANT_NRF5340
+VARIANT: ZephyrVariant = ZephyrVariant(
     boot=BootLayout(0x0),
     sdk=NCS,
     sdk_name="ncs",

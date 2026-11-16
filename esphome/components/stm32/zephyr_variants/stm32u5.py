@@ -33,12 +33,12 @@ from ..const import VARIANT_STM32U5
 # unset below). ST's own Discovery kit for the STM32U5 line. Its stock flash0 partition
 # table is already MCUboot-shaped (boot 64K / slot0 1952K / slot1 1960K / storage 120K),
 # so unlike stm32f4's nucleo_f401re no `overlays:` storage_partition is needed.
-_DEFAULT_BOARD = "stm32u5g9j_dk1"
+_DEFAULT_BOARD: str = "stm32u5g9j_dk1"
 
 # Like stm32f1/f4/wb55: the stock board links the app at slot0_partition (0x10000) and
 # the chip resets to offset 0, so a `none` image would never run. none stays selectable
 # for a board whose own DTS runs the app from offset 0.
-_ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
+_ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(
     {
         cv.Optional(CONF_BOOTLOADER, default=BOOTLOADER_MCUBOOT): cv.one_of(
             BOOTLOADER_NONE, BOOTLOADER_MCUBOOT, lower=True
@@ -47,8 +47,8 @@ _ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
 )
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = VARIANT_STM32U5
-VARIANT = ZephyrVariant(
+VARIANT_NAME: str = VARIANT_STM32U5
+VARIANT: ZephyrVariant = ZephyrVariant(
     # Resets from the start of flash (stm32u5g9j_dk1.dts boot_partition@0).
     boot=BootLayout(0x0),
     sdk=ZEPHYR_MAINLINE,

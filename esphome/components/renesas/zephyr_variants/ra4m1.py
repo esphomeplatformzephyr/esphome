@@ -31,16 +31,16 @@ from ..const import VARIANT_RA4M1
 # RA4M1 is single-core -- soc= is left unset (that field exists to disambiguate
 # multi-core chips like esp32_c6's HP/LP split, not to pin a single package variant;
 # each supported board's own board.yml already declares its one real SoC package).
-_DEFAULT_BOARD = "ek_ra4m1"
+_DEFAULT_BOARD: str = "ek_ra4m1"
 
 # ek_ra4m1's stock board has no slot0/slot1 partitions -- MCUboot is opt-in, same
 # shape as rp2040.py: anyone choosing it supplies their own fully-qualified board and
 # MCUboot-shaped partition overlay.
-_ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(BOOTLOADER_SCHEMA)
+_ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(BOOTLOADER_SCHEMA)
 
 # GPIO (port*16 + pin) -> RA4M1 ADC channel name, from Renesas' RA4M1 Group
 # Datasheet's Pin Lists (100-pin LQFP column).
-_ADC_AIN_MAP = {
+_ADC_AIN_MAP: dict[int, str] = {
     0: "AN000",  # P000
     1: "AN001",  # P001
     2: "AN002",  # P002
@@ -74,14 +74,14 @@ _ADC_AIN_MAP = {
 # -- are wired to pwm1, the only PWM instance this codebase enables (see
 # pwm_node_labels below). Matches ek_ra4m1's own default pinctrl
 # (RA_PSEL(RA_PSEL_GPT1, 4, 5) / RA_PSEL(RA_PSEL_GPT1, 4, 6)).
-_PWM_PIN_MAP = {
+_PWM_PIN_MAP: dict[int, tuple[int, int]] = {
     69: (0, 0),
     70: (0, 1),
 }
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = VARIANT_RA4M1
-VARIANT = ZephyrVariant(
+VARIANT_NAME: str = VARIANT_RA4M1
+VARIANT: ZephyrVariant = ZephyrVariant(
     # Resets from the start of flash (ek_ra4m1.dts has no code partition).
     boot=BootLayout(0x0),
     # Arduino's resident bootloader keeps 0x0-0x4000 and starts the app at 0x4000

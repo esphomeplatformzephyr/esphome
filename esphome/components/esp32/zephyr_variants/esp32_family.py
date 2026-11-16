@@ -16,7 +16,7 @@ from ..const import (
 )
 
 # Devicetree property esp32-family pinctrl groups pack all their signal macros into.
-PROPERTY_NAME = "pinmux"
+PROPERTY_NAME: str = "pinmux"
 
 # Software UART drivers (devicetree compatible strings) that work on this family,
 # on top of its hardware UARTs.
@@ -27,15 +27,15 @@ UART_DRIVERS: frozenset[str] = frozenset()
 # vendor HALs are not fetched.
 ADDITIONAL_FRAMEWORK_PROJECTS: frozenset[str] = frozenset({"hal_espressif"})
 # CPU architecture (see ZephyrVariant.cpu_arch)
-CPU_ARCH = "riscv"
+CPU_ARCH: str = "riscv"
 # Kind of USB UART (see ZephyrVariant.usb_uart_type)
-USB_UART_TYPE = "serial_jtag"
+USB_UART_TYPE: str = "serial_jtag"
 # See ZephyrVariant.has_poweroff
-HAS_POWEROFF = True
+HAS_POWEROFF: bool = True
 # Matches platform: esp32's 8192 loop task; UDP OTA overflows 4096
-MAIN_STACK_SIZE = 8192
+MAIN_STACK_SIZE: int = 8192
 # Flashes over serial with esptool; `--device PYOCD` is not supported
-PYOCD_UPLOAD = False
+PYOCD_UPLOAD: bool = False
 
 
 def to_code(config: ConfigType) -> None:
@@ -71,20 +71,20 @@ def to_code(config: ConfigType) -> None:
 
 
 # I2C pinctrl group/state to assume when DTS resolution fails.
-I2C_FALLBACK_GROUP = "group1"
-I2C_FALLBACK_STATE_SUFFIXES = ("default",)
+I2C_FALLBACK_GROUP: str = "group1"
+I2C_FALLBACK_STATE_SUFFIXES: tuple[str, ...] = ("default",)
 
 # GPIO-matrix pinmux value layout (esp-pinctrl-common.h and per-chip variants):
 # sig_i (controller input signal id) and sig_o (controller output signal id) are
 # packed into the same 32-bit pinmux value at different bit offsets.
-_ESP32_PINMUX_SIGI_SHIFT = 6
-_ESP32_PINMUX_SIGO_SHIFT = 15
-_ESP32_PINMUX_SIG_MASK = 0x1FF
-_ESP32_PINMUX_NOSIG = 0x1FF  # ESP_SIG_INVAL in esp-pinctrl-common.h
+_ESP32_PINMUX_SIGI_SHIFT: int = 6
+_ESP32_PINMUX_SIGO_SHIFT: int = 15
+_ESP32_PINMUX_SIG_MASK: int = 0x1FF
+_ESP32_PINMUX_NOSIG: int = 0x1FF  # ESP_SIG_INVAL in esp-pinctrl-common.h
 
 # esp32-family I2C instance -> {"scl": id, "sda": id} GPIO-matrix signal IDs. I2C
 # is bidirectional, so sig_i and sig_o are always equal -- either field identifies it.
-_I2C_INSTANCE_SIGNAL_IDS = {
+_I2C_INSTANCE_SIGNAL_IDS: dict[str, dict[int, dict[str, int]]] = {
     VARIANT_ESP32: {0: {"scl": 29, "sda": 30}, 1: {"scl": 95, "sda": 96}},
     VARIANT_ESP32C3: {0: {"scl": 53, "sda": 54}},
     VARIANT_ESP32C5: {0: {"scl": 46, "sda": 47}},
@@ -139,7 +139,7 @@ def i2c_value_role_decoder(bus_label: str) -> Callable[[int], str | None] | None
 # <chip>-gpio-sigmap.h in scope. Direction (sig_i vs sig_o) alone can't tell TX
 # from RTS or RX from CTS (RXD_IN/TXD_OUT and CTS_IN/RTS_OUT are each a shared ID
 # used in different direction slots) -- this ID is what actually distinguishes them.
-_UART_INSTANCE_SIGNAL_BASE = {
+_UART_INSTANCE_SIGNAL_BASE: dict[str, dict[int, int]] = {
     VARIANT_ESP32: {0: 14, 1: 17, 2: 198},
     VARIANT_ESP32C3: {0: 6, 1: 9},
     VARIANT_ESP32C5: {0: 6, 1: 9},
@@ -221,7 +221,7 @@ def uart_pinctrl(
 # only a single one, spi2=FSPI (confirmed via each chip's own -gpio-sigmap.h; no
 # spi3 node exists on any of them). S3 has spi2=FSPI and spi3=SPI3_ (its signals
 # are named ESP_SPI3_CLK_OUT etc., hence the trailing underscore).
-SPI_INSTANCE_SIGNAL_PREFIX = {
+SPI_INSTANCE_SIGNAL_PREFIX: dict[str, dict[int, str]] = {
     VARIANT_ESP32: {2: "HSPI", 3: "VSPI"},
     VARIANT_ESP32C3: {2: "FSPI"},
     VARIANT_ESP32C5: {2: "FSPI"},
@@ -235,7 +235,7 @@ SPI_INSTANCE_SIGNAL_PREFIX = {
 # against zephyr main, 2026-09-09). "miso" is the only sig_i (controller input);
 # clk/mosi/wp/hd are all sig_o -- used to decode which real board pinctrl group
 # already carries each signal.
-_SPI_INSTANCE_SIGNAL_IDS = {
+_SPI_INSTANCE_SIGNAL_IDS: dict[str, dict[int, dict[str, int]]] = {
     VARIANT_ESP32: {
         2: {"clk": 8, "miso": 9, "mosi": 10, "hd": 12, "wp": 13},
         3: {"clk": 63, "miso": 64, "mosi": 65, "hd": 66, "wp": 67},

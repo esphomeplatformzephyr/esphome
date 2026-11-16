@@ -15,6 +15,7 @@ from esphome.components.zephyr.variants import (
     resolve_framework_version,
     set_core_data,
 )
+import esphome.config_validation as cv
 from esphome.const import (
     CONF_ADVANCED,
     CONF_BOARD,
@@ -30,16 +31,16 @@ from ..const import VARIANT_STM32L4
 # Bare name; no SoC/qualifier segment needed -- upstream's board.yml declares a single
 # SoC for this board (stm32l476xx), so qualify_board() is a no-op here (soc= is left
 # unset below).
-_DEFAULT_BOARD = "nucleo_l476rg"
+_DEFAULT_BOARD: str = "nucleo_l476rg"
 
 # nucleo_l476rg's stock board has no slot0/slot1 partitions -- MCUboot is opt-in, same
 # shape as rp2040.py/ra4m1.py: anyone choosing it supplies their own fully-qualified
 # board and MCUboot-shaped partition overlay.
-_ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(BOOTLOADER_SCHEMA)
+_ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(BOOTLOADER_SCHEMA)
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = VARIANT_STM32L4
-VARIANT = ZephyrVariant(
+VARIANT_NAME: str = VARIANT_STM32L4
+VARIANT: ZephyrVariant = ZephyrVariant(
     # Resets from the start of flash (nucleo_l476rg.dts has no code partition).
     boot=BootLayout(0x0),
     sdk=ZEPHYR_MAINLINE,

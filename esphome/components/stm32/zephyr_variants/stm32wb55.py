@@ -34,13 +34,13 @@ from ..const import VARIANT_STM32WB55
 # as WeAct's stm32wb55_core, the board this variant targets. Its stock flash0 partition
 # table is already MCUboot-shaped (boot/slot0/slot1/storage) but has no
 # scratch_partition, unlike WeAct's own board which reserves 16K for one.
-_DEFAULT_BOARD = "nucleo_wb55rg"
+_DEFAULT_BOARD: str = "nucleo_wb55rg"
 
 # Like stm32f4, not stm32l4: the default board's stock layout is already MCUboot-shaped
 # (boot_partition 48K, slot0/slot1 ~400K each) with plenty of room for real MCUboot
 # (ECDSA-P256), so bootloader: defaults to mcuboot here. none stays selectable for a
 # board with its own resident bootloader.
-_ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
+_ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(
     {
         cv.Optional(CONF_BOOTLOADER, default=BOOTLOADER_MCUBOOT): cv.one_of(
             BOOTLOADER_NONE, BOOTLOADER_MCUBOOT, lower=True
@@ -49,8 +49,8 @@ _ADVANCED_SCHEMA = ADVANCED_SCHEMA.extend(
 )
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = VARIANT_STM32WB55
-VARIANT = ZephyrVariant(
+VARIANT_NAME: str = VARIANT_STM32WB55
+VARIANT: ZephyrVariant = ZephyrVariant(
     # Resets from the start of flash (nucleo_wb55rg.dts boot_partition@0).
     boot=BootLayout(0x0),
     sdk=ZEPHYR_MAINLINE,

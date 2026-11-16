@@ -31,13 +31,13 @@ from ..const import VARIANT_ESP32
 _LOGGER = logging.getLogger(__name__)
 
 # qualify_board() expands this to "esp32_devkitc/esp32/procpu" via soc=/qualifier= below.
-_DEFAULT_BOARD = "esp32_devkitc"
+_DEFAULT_BOARD: str = "esp32_devkitc"
 
-_ADVANCED_SCHEMA = ADVANCED_SCHEMA
+_ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA
 
 # https://github.com/zephyrproject-rtos/zephyr/blob/main/include/zephyr/dt-bindings/pinctrl/esp32-pinctrl.h
 # No GPIO 6-11 (SPI flash) or 24/28-31 (don't exist). GPIO34-39 are input-only.
-_OUTPUT_CAPABLE_PINS = frozenset(
+_OUTPUT_CAPABLE_PINS: frozenset[int] = frozenset(
     {
         0,
         1,
@@ -64,11 +64,13 @@ _OUTPUT_CAPABLE_PINS = frozenset(
         33,
     }
 )
-_INPUT_CAPABLE_PINS = _OUTPUT_CAPABLE_PINS | frozenset({34, 35, 36, 37, 38, 39})
+_INPUT_CAPABLE_PINS: frozenset[int] = _OUTPUT_CAPABLE_PINS | frozenset(
+    {34, 35, 36, 37, 38, 39}
+)
 
 # Registry entries — collected by variants/__init__.py
-VARIANT_NAME = VARIANT_ESP32
-VARIANT = ZephyrVariant(
+VARIANT_NAME: str = VARIANT_ESP32
+VARIANT: ZephyrVariant = ZephyrVariant(
     # No USB Serial/JTAG on the original ESP32
     usb_uart_type=None,
     cpu_arch="xtensa",
