@@ -1733,3 +1733,68 @@ def test_dts_include_resolves_as_zephyr_does(tmp_path: Path) -> None:
         "vendor",
         "7",
     ]
+
+
+_DEPRECATED_CMAKE: str = """\
+# comment
+set(rpi_pico2/rp2350a/m33_DEPRECATED
+    rpi_pico2/rp2350a/m33_0
+)
+set(old_board_DEPRECATED new_board@2.0.0)
+"""
+
+
+@pytest.mark.parametrize(
+    ("board", "expected"),
+    [
+        ("rpi_pico2/rp2350a/m33", "rpi_pico2/rp2350a/m33_0"),
+        # The revision is not part of the key, and is kept
+        ("rpi_pico2@1.0/rp2350a/m33", "rpi_pico2@1.0/rp2350a/m33_0"),
+        # A new name that is a revision of another board
+        ("old_board", "new_board@2.0.0"),
+        ("rpi_pico2/rp2350a/m33_0", "rpi_pico2/rp2350a/m33_0"),
+    ],
+)
+def test_undeprecate_board(tmp_path: Path, board: str, expected: str) -> None:
+    (tmp_path / "boards").mkdir()
+    (tmp_path / "boards" / "deprecated.cmake").write_text(_DEPRECATED_CMAKE)
+    assert dts_lookup._undeprecate_board(tmp_path, board) == expected
+
+
+def test_undeprecate_board_reads_the_ncs_file_too(tmp_path: Path) -> None:
+    """NCS adds its own renames; Zephyr's file wins on a clash."""
+    zephyr_base = tmp_path / "zephyr"
+    (zephyr_base / "boards").mkdir(parents=True)
+    (zephyr_base / "boards" / "deprecated.cmake").write_text(
+        "set(shared_DEPRECATED from_zephyr)\n"
+    )
+    (tmp_path / "nrf" / "boards").mkdir(parents=True)
+    (tmp_path / "nrf" / "boards" / "deprecated.cmake").write_text(
+        "set(thingy91_nrf9160ns_DEPRECATED thingy91_nrf9160_ns)\n"
+        "set(shared_DEPRECATED from_ncs)\n"
+    )
+    assert dts_lookup._undeprecate_board(zephyr_base, "thingy91_nrf9160ns") == (
+        "thingy91_nrf9160_ns"
+    )
+    assert dts_lookup._undeprecate_board(zephyr_base, "shared") == "from_zephyr"
+
+
+def test_undeprecate_board_without_the_file(tmp_path: Path) -> None:
+    assert dts_lookup._undeprecate_board(tmp_path, "rpi_pico2/rp2350a/m33") == (
+        "rpi_pico2/rp2350a/m33"
+    )
+
+
+def test_get_edt_reads_a_deprecated_board_under_its_new_name(
+    edt_texts: list[str], tmp_path: Path
+) -> None:
+    """Zephyr 4.5 renamed the RP2350 core m33 to m33_0; west build still takes m33."""
+    board_dir = tmp_path / "boards" / "raspberrypi" / "rpi_pico2"
+    board_dir.mkdir(parents=True)
+    (tmp_path / "boards" / "deprecated.cmake").write_text(_DEPRECATED_CMAKE)
+    (board_dir / "rpi_pico2_rp2350a_m33_0.dts").write_text("/* m33_0 */")
+    (board_dir / "rpi_pico2_rp2350a_hazard3_0.dts").write_text("/* hazard3_0 */")
+
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data(dts_base_path=str(tmp_path))
+    assert _get_edt("rpi_pico2/rp2350a/m33") is not None
+    assert edt_texts == ["/* m33_0 */"]

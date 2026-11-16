@@ -633,8 +633,37 @@ class _DtsReadError(Exception):
     """Why a board's devicetree couldn't be read."""
 
 
+_DEPRECATED_BOARD_RE: Final = re.compile(r"set\(\s*(\S+)_DEPRECATED\s+(\S+)\s*\)")
+
+
+def _undeprecate_board(zephyr_base: Path, board: str) -> str:
+    """``board`` renamed as Zephyr's build does from boards/deprecated.cmake, which
+    maps ``<board>/<qualifiers>`` (no revision) to the new name. NCS adds its own
+    file, included first, so Zephyr's wins on a clash."""
+    renames: dict[str, str] = {}
+    for path in (
+        zephyr_base.parent / "nrf" / "boards" / "deprecated.cmake",
+        zephyr_base / "boards" / "deprecated.cmake",
+    ):
+        try:
+            renames.update(
+                _DEPRECATED_BOARD_RE.findall(path.read_text(encoding="utf-8"))
+            )
+        except OSError:
+            continue
+    parts = parse_board_string(board)
+    renamed = renames.get(parts.name + (parts.qualifiers or ""))
+    if renamed is None:
+        return board
+    new = parse_board_string(renamed)
+    revision = new.revision or parts.revision
+    _LOGGER.debug("[zephyr] Board '%s' is deprecated; reading '%s'", board, renamed)
+    return new.name + (f"@{revision}" if revision else "") + (new.qualifiers or "")
+
+
 def _build_edt(board: str, zephyr_base: Path, shields: list[str], snippets: list[str]):
     """Parse board's devicetree with its revision/shield/snippet overlays."""
+    board = _undeprecate_board(zephyr_base, board)
     edtlib = _load_edtlib(zephyr_base)
     if edtlib is None:
         raise _DtsReadError("the devicetree Python library is unavailable")
