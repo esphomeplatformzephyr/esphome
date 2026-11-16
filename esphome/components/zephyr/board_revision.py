@@ -1,10 +1,5 @@
-"""Zephyr `board@revision` string parsing and `board.yml` revision resolution.
-
-Mirrors Zephyr's own `parse_board_components()` (cmake/modules/boards.cmake) and
-`board_check_revision()` (cmake/modules/extensions.cmake) so ESPHome's config-time
-board resolution and DTS validation stay in lockstep with what a real `west build`
-would resolve for the same `board@revision` target.
-"""
+"""Parse `board@revision` strings and resolve revisions from `board.yml` the way
+Zephyr's `parse_board_components()` and `board_check_revision()` do."""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,8 +21,7 @@ def parse_board_string(board: str) -> BoardParts:
     """Split a `<board>[@<revision>][/<qualifiers>]` string into its parts."""
     m = _BOARD_RE.match(board)
     if m is None:
-        # The `name` group (`[^@/]+`) matches any non-empty string not starting with
-        # '@' or '/', so this should be unreachable for any non-empty board string.
+        # Empty, or starting with "@" or "/"
         return BoardParts(board, None, None)
     return BoardParts(m.group("name"), m.group("revision"), m.group("qualifiers"))
 
@@ -51,16 +45,13 @@ def _read_revision_block(board_dir: Path) -> dict | None:
     """Return `board_dir/board.yml`'s `board: revision:` block, or None if absent/unreadable."""
     board_yml = board_dir / "board.yml"
     try:
-        doc = yaml.safe_load(board_yml.read_text())
+        doc = yaml.safe_load(board_yml.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError):
         return None
     if not isinstance(doc, dict):
         return None
-    # Two board.yml schemas coexist upstream: the older singular "board:" and newer
-    # HWMv2 "boards:" (a list) -- see dts_lookup._find_board_dir's fallback scanner for
-    # the same distinction. A single-entry list is unambiguous; multiple entries in one
-    # file (rare) aren't disambiguated here since board_dir alone doesn't say which one
-    # this call is about, so this returns "no revision info" rather than guessing wrong.
+    # Older files have one "board:", newer ones a "boards:" list; with several boards
+    # the folder doesn't say which one, so no revision rather than a guess
     if "board" in doc:
         entry = doc["board"]
     else:

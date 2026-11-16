@@ -13,7 +13,12 @@ import yaml
 import esphome.config_validation as cv
 from esphome.core import CORE, EsphomeError
 
-from .board_revision import default_revision, parse_board_string, resolve_revision
+from .board_revision import (
+    declared_revisions,
+    default_revision,
+    parse_board_string,
+    resolve_revision,
+)
 from .const import (
     KEY_BOARD_ROOT,
     KEY_SHIELD_ROOT,
@@ -198,25 +203,32 @@ def get_pinctrl_group_property(
 
 
 def get_watchdog_node_label(board: str) -> tuple[str | None, bool]:
-    """Return (label, already_working) for this board's watchdog -- found by
-    binding path under `.../bindings/watchdog/`, not a per-family list, so any
-    vendor's board is covered. already_working is True if a `watchdog0` alias
-    already points at an enabled node (nothing to fix)."""
+    """``(label, already_working)`` for the board's watchdog: the node its watchdog0
+    alias names, even if disabled, or else a node whose binding is in Zephyr's
+    bindings/watchdog/ folder, enabled ones first. already_working is True when the
+    aliased node is enabled."""
     edt = _get_edt(board)
     if edt is None:
         return None, False
+    aliased = None
     for node in _iter_nodes(edt):
-        if "watchdog0" in node.aliases and node.status == "okay":
-            return (node.labels[0] if node.labels else None), True
-    for node in _iter_nodes(edt):
-        binding_path = node.binding_path
-        if (
-            binding_path
-            and Path(binding_path).parent.name == "watchdog"
-            and node.labels
-        ):
-            return node.labels[0], False
-    return None, False
+        if "watchdog0" in node.aliases:
+            if node.status == "okay":
+                return (node.labels[0] if node.labels else None), True
+            aliased = node
+    # The board's own choice, though disabled, before any guess
+    if aliased is not None and aliased.labels:
+        return aliased.labels[0], False
+    watchdogs = [
+        node
+        for node in _iter_nodes(edt)
+        if node.binding_path
+        and Path(node.binding_path).parent.name == "watchdog"
+        and node.labels
+    ]
+    # Enabled ones first; sort() keeps devicetree order otherwise
+    watchdogs.sort(key=lambda node: node.status != "okay")
+    return (watchdogs[0].labels[0], False) if watchdogs else (None, False)
 
 
 def resolve_zephyr_bus(
@@ -306,10 +318,14 @@ def _lookup_bus_labels_by_name_match(
     return result
 
 
-def _lookup_bus_labels_by_property_match(
-    board: str, property_label: str
-) -> list[str] | None:
-    """Return sorted DTS node labels whose binding declares `bus: property_label`,
+def _natural_key(label: str) -> tuple[list[str | int], str]:
+    """Numbers compare as numbers, so usart2 comes before usart10."""
+    parts = [int(p) if p.isdigit() else p for p in re.split(r"(\d+)", label)]
+    return parts, label
+
+
+def _bus_node_labels(board: str, bus: str) -> list[str] | None:
+    """Return sorted DTS node labels whose binding declares `bus: <bus>`,
     enabled first then disabled, or None if DTS is unavailable -- robust to
     per-vendor label naming a regex match can't handle."""
     edt = _get_edt(board)
@@ -320,13 +336,13 @@ def _lookup_bus_labels_by_property_match(
     disabled: list[str] = []
 
     for node in _iter_nodes(edt):
-        if property_label in node.buses and node.labels:
+        if bus in node.buses and node.labels:
             (enabled if node.status == "okay" else disabled).append(node.labels[0])
 
-    result = sorted(set(enabled)) + sorted(set(disabled) - set(enabled))
-    _LOGGER.debug(
-        "[zephyr] Buses with bus='%s' for '%s': %s", property_label, board, result
+    result = sorted(set(enabled), key=_natural_key) + sorted(
+        set(disabled) - set(enabled), key=_natural_key
     )
+    _LOGGER.debug("[zephyr] Buses with bus='%s' for '%s': %s", bus, board, result)
     return result
 
 
@@ -411,20 +427,20 @@ def get_can_controller_labels(board: str) -> list[str] | None:
 def get_i2c_controller_labels(board: str) -> list[str] | None:
     """Return I2C controller node labels (enabled first, then disabled), or None
     if DTS unavailable."""
-    return _lookup_bus_labels_by_property_match(board, "i2c")
+    return _bus_node_labels(board, "i2c")
 
 
 def get_spi_controller_labels(board: str) -> list[str] | None:
     """Return SPI controller node labels (enabled first, then disabled), or None
     if DTS unavailable."""
-    return _lookup_bus_labels_by_property_match(board, "spi")
+    return _bus_node_labels(board, "spi")
 
 
 def get_uart_controller_labels(board: str) -> list[str] | None:
     """Return UART controller node labels (enabled first, then disabled), or None
     if DTS unavailable. Matched by `bus: uart` property, not label name -- some
     vendors (e.g. Renesas' sci0/sci9) don't use a `uart<N>` label convention."""
-    return _lookup_bus_labels_by_property_match(board, "uart")
+    return _bus_node_labels(board, "uart")
 
 
 def _discover_uart_node_labels(board: str) -> dict[str, str] | None:
@@ -631,7 +647,7 @@ def _build_edt(board: str, zephyr_base: Path, shields: list[str], snippets: list
 
     dts_file = _find_dts_file(board_dir, board)
     if dts_file is None:
-        raise _DtsReadError(f"no .dts file in {board_dir}")
+        raise _DtsReadError(f"no .dts file named for it in {board_dir}")
 
     # Raw paths, not pre-processed individually -- an overlay's macros (e.g. a
     # pinctrl helper) may only be in scope via the base tree's own #includes,
@@ -659,11 +675,9 @@ def _build_edt(board: str, zephyr_base: Path, shields: list[str], snippets: list
                     resolved_revision,
                 )
         elif declares_revisions:
-            _LOGGER.debug(
-                "[zephyr] Revision '%s' does not resolve against board '%s''s "
-                "declared revisions; DTS validation uses the base board tree only",
-                requested_revision,
-                board,
+            raise _DtsReadError(
+                f"revision '{requested_revision}' is not one it declares "
+                f"({', '.join(declared_revisions(board_dir))})"
             )
 
     zd = CORE.data[KEY_ZEPHYR]
@@ -850,10 +864,9 @@ def _find_dts_file(board_dir: Path, board: str) -> Path | None:
     if found is not None:
         return found
 
-    candidates = [
-        f for f in board_dir.glob("*.dts") if not f.name.endswith("_defconfig.dts")
-    ]
-    return candidates[0] if candidates else None
+    # With several, a guess could read another core's tree
+    candidates = list(board_dir.glob("*.dts"))
+    return candidates[0] if len(candidates) == 1 else None
 
 
 def _find_board_yaml(board_dir: Path, board: str) -> Path | None:
@@ -869,7 +882,9 @@ def _find_board_yaml(board_dir: Path, board: str) -> Path | None:
 
 def _cpp_command(cpp: str, include_dirs: list[str], src_file: Path) -> list[str]:
     """The preprocessor command line, shared by the real run and the candidate check."""
-    cmd = [cpp, "-x", "assembler-with-cpp", "-nostdinc", "-E", "-P"]
+    # -undef and -D__DTS__ as Zephyr's build: no host macros such as linux=1
+    # No -P: Zephyr keeps the linemarkers so dtlib's errors name the real file
+    cmd = [cpp, "-x", "assembler-with-cpp", "-nostdinc", "-undef", "-D__DTS__", "-E"]
     for d in include_dirs:
         cmd += ["-I", d]
     cmd.append(str(src_file))
@@ -1029,13 +1044,17 @@ def _get_dts_include_paths(zephyr_base: Path) -> list[str]:
     zd = CORE.data[KEY_ZEPHYR]
     if zd["dts_include_paths"] is None:
         dts_dir = zephyr_base / "dts"
-        paths = [str(zephyr_base / "include"), str(dts_dir)]
+        # Zephyr's order (pre_dt.cmake): vendor/ before the arch folders, dts/ last
+        paths = [str(zephyr_base / "include"), str(zephyr_base / "include" / "zephyr")]
         if dts_dir.is_dir():
+            paths += [str(dts_dir / "common"), str(dts_dir / "vendor")]
             paths.extend(
                 str(subdir)
-                for subdir in dts_dir.iterdir()
-                if subdir.is_dir() and subdir.name != "bindings"
+                for subdir in sorted(dts_dir.iterdir())
+                if subdir.is_dir()
+                and subdir.name not in ("bindings", "common", "vendor")
             )
+        paths.append(str(dts_dir))
         # Some vendors (STM32, NXP, TI, ...) ship SoC/pinctrl dts fragments in their
         # own HAL module, a sibling `modules/hal/<vendor>/dts` boards #include
         # directly -- without this, cpp fails on that include, silently breaking DTS

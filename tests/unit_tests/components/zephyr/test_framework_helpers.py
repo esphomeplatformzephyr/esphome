@@ -275,20 +275,20 @@ def test_install_clones_the_manifest_with_the_filter(
     assert update.kwargs == {"cwd": workspace, "stream_output": True}
     # Streamed, so the long clone's progress reaches the log
     assert init.kwargs["stream_output"] is True
-    # Required projects are never checked by name
-    assert _west_call(west, "list").args[0][-1:] == ["hal_a"]
+    # Every name, required ones too, is checked after the first update
+    assert _west_call(west, "list").args[0][-2:] == ["hal_a", "zephyr"]
     assert (workspace / ".west_projects").read_text(encoding="utf-8").split() == [
         "hal_a",
         "zephyr",
     ]
 
 
-def test_install_of_only_required_projects_checks_no_names(
+def test_install_of_only_required_projects_checks_them(
     workspace: Path, west: MagicMock
 ) -> None:
     _install(workspace, {"zephyr"})
 
-    assert _subcommands(west) == ["init", "config", "update"]
+    assert _subcommands(west) == ["init", "config", "update", "list"]
 
 
 def test_interrupted_download_resumes(workspace: Path, west: MagicMock) -> None:
@@ -299,7 +299,7 @@ def test_interrupted_download_resumes(workspace: Path, west: MagicMock) -> None:
     _install(workspace, {"zephyr"})
 
     west.rmdir.assert_not_called()
-    assert _subcommands(west) == ["config", "update"]
+    assert _subcommands(west) == ["config", "update", "list"]
     assert not (workspace / ".resume_failed").exists()
 
 
@@ -328,7 +328,14 @@ def test_second_failed_resume_starts_over(workspace: Path, west: MagicMock) -> N
     _install(workspace, {"zephyr"})
 
     west.rmdir.assert_called_once_with(workspace, msg=ANY)
-    assert _subcommands(west) == ["config", "update", "init", "config", "update"]
+    assert _subcommands(west) == [
+        "config",
+        "update",
+        "init",
+        "config",
+        "update",
+        "list",
+    ]
 
 
 def test_cut_short_init_starts_over(workspace: Path, west: MagicMock) -> None:
@@ -371,16 +378,27 @@ def test_unknown_project_is_never_recorded(workspace: Path, west: MagicMock) -> 
     assert not (workspace / ".west_projects").exists()
 
 
-def test_fetch_of_only_required_projects_reads_nothing(
+def test_fetch_of_installed_required_projects_runs_nothing(
     workspace: Path, west: MagicMock
 ) -> None:
-    """Any install has the required projects; an unreadable stamp shows nothing looked."""
-    _mark_finished(workspace, None)
-    (workspace / ".west_projects").mkdir()
+    """A stamp with every required project needs no west call."""
+    _mark_finished(workspace, "zephyr")
 
     _fetch(workspace, {"zephyr"})
 
     west.assert_not_called()
+
+
+def test_fetch_of_only_a_new_required_project_fetches_it(
+    workspace: Path, west: MagicMock
+) -> None:
+    """A stamp from before a project became required, with nothing else wanted."""
+    _mark_finished(workspace, "hal_a")
+
+    _fetch(workspace, {"zephyr"})
+
+    assert _west_call(west, "update").args[0][-1:] == ["zephyr"]
+    assert _project_filter(west) == "-hal_.*,+hal_a,+zephyr"
 
 
 def test_fetch_gains_only_the_missing_project(workspace: Path, west: MagicMock) -> None:
@@ -391,7 +409,7 @@ def test_fetch_gains_only_the_missing_project(workspace: Path, west: MagicMock) 
     _fetch(workspace, {"zephyr", "hal_b"})
 
     assert _subcommands(west) == ["list", "config", "update"]
-    assert _west_call(west, "list").args[0][-1:] == ["hal_b"]
+    assert _west_call(west, "list").args[0][-2:] == ["hal_b", "zephyr"]
     assert _project_filter(west) == "-hal_.*,+hal_a,+hal_b,+zephyr"
     assert _west_call(west, "update").args[0][-1] == "hal_b"
     assert (workspace / ".west_projects").read_text(encoding="utf-8").split() == [
@@ -433,28 +451,26 @@ def test_fetch_with_the_project_only_checks_the_names(
 def test_fetch_without_a_record_fetches_again(
     workspace: Path, west: MagicMock, lose_config: bool
 ) -> None:
-    """Nothing says what the install has, so the wanted projects are fetched with a
-    full update, which skips a required project the manifest lacks."""
+    """Nothing says what the install has, so every wanted project is fetched."""
     _mark_finished(workspace, None)
     if lose_config:
         (workspace / ".west" / "config").unlink()
 
     _fetch(workspace, {"zephyr", "hal_a"})
 
-    assert _subcommands(west) == ["list", "config", "update", "list"]
-    assert _west_call(west, "update").args[0][-1] == "--fetch-opt=--depth=1"
+    assert _subcommands(west) == ["list", "config", "update"]
+    assert _west_call(west, "update").args[0][-2:] == ["hal_a", "zephyr"]
 
 
-def test_fetch_of_a_new_required_project_updates_in_full(
+def test_fetch_of_a_new_required_project_fetches_it(
     workspace: Path, west: MagicMock
 ) -> None:
-    """A stamp from before a project became required: west update by name would
-    fail on a version whose manifest lacks it."""
+    """A stamp from before a project became required."""
     _mark_finished(workspace, "hal_a")
 
     _fetch(workspace, {"zephyr", "hal_b"})
 
-    assert _west_call(west, "update").args[0][-1] == "--fetch-opt=--depth=1"
+    assert _west_call(west, "update").args[0][-2:] == ["hal_b", "zephyr"]
     assert _project_filter(west) == "-hal_.*,+hal_a,+hal_b,+zephyr"
 
 
@@ -522,7 +538,9 @@ def zephyr_reqs(tmp_path: Path) -> Path:
 
 
 def _ensure_zephyr_requirements(tmp_path: Path, venv_rebuilt: bool = False) -> None:
-    ensure_zephyr_requirements(tmp_path / "penv", tmp_path / "sdk", venv_rebuilt, "v1")
+    ensure_zephyr_requirements(
+        tmp_path / "penv", tmp_path / "sdk", venv_rebuilt, "v1", ".marker"
+    )
 
 
 @pytest.mark.parametrize(
@@ -543,7 +561,7 @@ def test_ensure_zephyr_requirements(
 ) -> None:
     """Installed when the venv was rebuilt, the marker is missing, or the
     workspace's requirements are newer than the marker."""
-    marker = tmp_path / "penv" / ".zephyr_reqs_ready-sdk"
+    marker = tmp_path / "penv" / ".marker"
     if marker_age is not None:
         marker.touch()
         reqs_time = marker.stat().st_mtime - marker_age
@@ -567,22 +585,7 @@ def test_ensure_zephyr_requirements_raises_when_pip_fails(
     ):
         _ensure_zephyr_requirements(tmp_path)
 
-    assert not (tmp_path / "penv" / ".zephyr_reqs_ready-sdk").exists()
-
-
-def test_each_workspace_sharing_the_penv_installs_its_requirements(
-    tmp_path: Path, zephyr_reqs: Path
-) -> None:
-    """Another workspace's newer marker does not stand for this one's install."""
-    marker = tmp_path / "penv" / ".zephyr_reqs_ready-other-sdk"
-    marker.touch()
-    reqs_time = marker.stat().st_mtime - 10
-    os.utime(zephyr_reqs, (reqs_time, reqs_time))
-
-    with patch.object(framework_helpers, "run_command_ok", return_value=True) as pip:
-        _ensure_zephyr_requirements(tmp_path)
-
-    assert pip.called
+    assert not (tmp_path / "penv" / ".marker").exists()
 
 
 PIN: str = "0123456789abcdef0123456789abcdef01234567"
@@ -595,7 +598,14 @@ def test_pinned_install_clones_the_default_branch_then_pins(
     repository is moved to the pin before west update reads it."""
     install_framework(ENV_PYTHON, workspace, SOURCE, "main", {"zephyr"}, pin=PIN)
 
-    assert _subcommands(west) == ["init", "git fetch", "git reset", "config", "update"]
+    assert _subcommands(west) == [
+        "init",
+        "git fetch",
+        "git reset",
+        "config",
+        "update",
+        "list",
+    ]
     assert "--mr" not in _west_call(west, "init").args[0]
     fetch = _west_call(west, "fetch")
     assert fetch.args[0] == ["git", "fetch", "--depth=1", "--", "origin", PIN]
@@ -620,7 +630,7 @@ def test_pinned_resume_pins_again_first(workspace: Path, west: MagicMock) -> Non
 
     install_framework(ENV_PYTHON, workspace, SOURCE, "main", {"zephyr"}, pin=PIN)
 
-    assert _subcommands(west) == ["git fetch", "git reset", "config", "update"]
+    assert _subcommands(west) == ["git fetch", "git reset", "config", "update", "list"]
 
 
 def test_pinned_resume_failing_to_pin_keeps_the_download_once(
@@ -734,7 +744,7 @@ def test_ensure_zephyr_requirements_of_a_local_checkout(tmp_path: Path) -> None:
 
     with patch.object(framework_helpers, "run_command_ok", return_value=True) as pip:
         ensure_zephyr_requirements(
-            tmp_path / "penv", tmp_path, False, "v1", zephyr_dir=checkout
+            tmp_path / "penv", tmp_path, False, "v1", ".marker", zephyr_dir=checkout
         )
 
     assert pip.call_args.args[0][-1] == str(checkout / "scripts" / "requirements.txt")
@@ -858,7 +868,7 @@ def test_ensure_zephyr_requirements_patches_pyocd_every_build(
     tmp_path: Path, zephyr_reqs: Path
 ) -> None:
     """A current requirements marker skips pip, not the pyOCD patch."""
-    (tmp_path / "penv" / ".zephyr_reqs_ready-sdk").touch()
+    (tmp_path / "penv" / ".marker").touch()
     with (
         patch.object(framework_helpers, "run_command_ok") as pip,
         patch.object(framework_helpers, "patch_pyocd_nrf54lm20a_flash_algo") as fix,

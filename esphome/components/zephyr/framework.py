@@ -298,8 +298,14 @@ def _check_and_install(
         _install_workspace(python_bin, framework, sdk, ver_tag, source, projects)
 
     with install_lock(get_zephyr_tools_path(), f"penv-{ver_tag}"):
+        # One marker per workspace, since workspaces share the penv
         ensure_zephyr_requirements(
-            python_env, framework, install_venv, ver_tag, zephyr_dir=zephyr_dir
+            python_env,
+            framework,
+            install_venv,
+            ver_tag,
+            f".zephyr_reqs_ready-{framework.name}",
+            zephyr_dir=zephyr_dir,
         )
 
     west_env = {

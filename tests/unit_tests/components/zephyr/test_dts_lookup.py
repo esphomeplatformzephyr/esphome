@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 from types import SimpleNamespace
@@ -256,6 +257,16 @@ def test_find_dts_file_falls_back_to_glob_when_unambiguous(tmp_path: Path) -> No
     assert result == board_dir / "only_board.dts"
 
 
+def test_find_dts_file_guesses_nothing_among_several(tmp_path: Path) -> None:
+    """With several .dts files and no name match, a guess could read another core's
+    tree."""
+    board_dir = tmp_path / "only_board"
+    board_dir.mkdir()
+    (board_dir / "renamed.dts").write_text("")
+    (board_dir / "other.dts").write_text("")
+    assert _find_dts_file(board_dir, "only_board/soc") is None
+
+
 def test_find_dts_file_doubled_soc_segment_picks_qualified_variant(
     fake_zephyr_base: Path,
 ) -> None:
@@ -494,6 +505,18 @@ def test_get_uart_controller_labels_returns_disabled_when_none_enabled(
     ]
     monkeypatch.setattr(dts_lookup, "_get_edt", lambda board: _FakeEdt(nodes))
     assert get_uart_controller_labels("some_board") == ["uart0", "uart1"]
+
+
+def test_get_uart_controller_labels_compares_numbers_as_numbers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
+    nodes = [
+        _FakeNode(labels=["usart10"], buses=["uart"], status="okay"),
+        _FakeNode(labels=["usart2"], buses=["uart"], status="okay"),
+    ]
+    monkeypatch.setattr(dts_lookup, "_get_edt", lambda board: _FakeEdt(nodes))
+    assert get_uart_controller_labels("some_board") == ["usart2", "usart10"]
 
 
 def test_has_pinctrl_configured_true_on_node_itself(
@@ -754,8 +777,8 @@ def test_get_watchdog_node_label_found_but_not_aliased(
 def test_get_watchdog_node_label_ignores_disabled_alias_target(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # An alias pointing at a disabled node doesn't count as already-working --
-    # falls through to the generic binding-path search instead.
+    # An alias pointing at a disabled node doesn't count as already-working, but it
+    # is still the board's choice.
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
     nodes = [
         _FakeNode(
@@ -767,6 +790,38 @@ def test_get_watchdog_node_label_ignores_disabled_alias_target(
     ]
     monkeypatch.setattr(dts_lookup, "_get_edt", lambda board: _FakeEdt(nodes))
     assert get_watchdog_node_label("some_board") == ("wdt", False)
+
+
+def test_get_watchdog_node_label_prefers_the_disabled_alias_target(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # XIAO nRF54L15 shape: watchdog0 names the disabled wdt31, wdt30 comes first
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
+    binding = "/zephyr/dts/bindings/watchdog/nordic,nrf-wdt.yaml"
+    nodes = [
+        _FakeNode(labels=["wdt30"], status="disabled", binding_path=binding),
+        _FakeNode(
+            labels=["wdt31"],
+            aliases=["watchdog0"],
+            status="disabled",
+            binding_path=binding,
+        ),
+    ]
+    monkeypatch.setattr(dts_lookup, "_get_edt", lambda board: _FakeEdt(nodes))
+    assert get_watchdog_node_label("some_board") == ("wdt31", False)
+
+
+def test_get_watchdog_node_label_prefers_an_enabled_watchdog(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
+    binding = "/zephyr/dts/bindings/watchdog/st,stm32-watchdog.yaml"
+    nodes = [
+        _FakeNode(labels=["wwdg"], status="disabled", binding_path=binding),
+        _FakeNode(labels=["iwdg"], status="okay", binding_path=binding),
+    ]
+    monkeypatch.setattr(dts_lookup, "_get_edt", lambda board: _FakeEdt(nodes))
+    assert get_watchdog_node_label("some_board") == ("iwdg", False)
 
 
 def test_get_watchdog_node_label_none_when_absent(
@@ -1352,6 +1407,17 @@ def test_get_edt_merges_default_revision_overlay_without_suffix(
     assert "/* rev 1.4.0 */" not in edt_texts[0]
 
 
+def test_get_edt_warns_on_an_unknown_revision(
+    edt_texts: list[str], tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    _revisioned_board_dir(tmp_path)
+
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data(dts_base_path=str(tmp_path))
+    assert _get_edt("actinius_icarus@0.1.0/nrf9160/ns") is None
+    assert edt_texts == []
+    assert "revision '0.1.0' is not one it declares (1.4.0, 2.0.0)" in caplog.text
+
+
 def test_get_edt_ignores_revision_when_board_has_none(
     edt_texts: list[str], tmp_path: Path
 ) -> None:
@@ -1473,7 +1539,16 @@ def test_cpp_candidate_check_uses_real_command(
     monkeypatch.setattr(dts_lookup.subprocess, "run", _fake_run)
 
     assert dts_lookup._cpp_candidate_works("/usr/bin/cpp")
-    assert "-nostdinc" in seen[0]
+    assert seen[0][1:7] == [
+        "-x",
+        "assembler-with-cpp",
+        "-nostdinc",
+        "-undef",
+        "-D__DTS__",
+        "-E",
+    ]
+    # Linemarkers kept, so devicetree errors name the real file
+    assert "-P" not in seen[0]
     assert seen[0][-1].endswith(".dts")
 
 
@@ -1613,3 +1688,48 @@ def test_get_nfct_pins_node_label(
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
     monkeypatch.setattr(dts_lookup, "_get_edt", lambda board: _FakeEdt(nodes))
     assert dts_lookup.get_nfct_pins_node_label("some_board") == expected
+
+
+def test_dts_include_paths_follow_zephyr_order(tmp_path: Path) -> None:
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
+    base = tmp_path / "zephyr"
+    for sub_dir in ("dts/riscv", "dts/arm", "dts/bindings", "dts/common", "dts/vendor"):
+        (base / sub_dir).mkdir(parents=True)
+    (tmp_path / "modules" / "hal" / "stm32" / "dts").mkdir(parents=True)
+
+    assert dts_lookup._get_dts_include_paths(base) == [
+        str(base / "include"),
+        str(base / "include" / "zephyr"),
+        str(base / "dts" / "common"),
+        str(base / "dts" / "vendor"),
+        str(base / "dts" / "arm"),
+        str(base / "dts" / "riscv"),
+        str(base / "dts"),
+        str(tmp_path / "modules" / "hal" / "stm32" / "dts"),
+    ]
+
+
+@pytest.mark.skipif(shutil.which("cpp") is None, reason="needs a C preprocessor")
+def test_dts_include_resolves_as_zephyr_does(tmp_path: Path) -> None:
+    """The vendor/ copy of a file both folders hold wins, and dt-bindings/ resolves
+    through include/zephyr, as in Zephyr's build."""
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
+    base = tmp_path / "zephyr"
+    for folder in ("vendor", "arm"):
+        (base / "dts" / folder / "nordic").mkdir(parents=True)
+        (base / "dts" / folder / "nordic" / "soc_ns.dtsi").write_text(folder)
+    bindings = base / "include" / "zephyr" / "dt-bindings"
+    bindings.mkdir(parents=True)
+    (bindings / "pins.h").write_text("#define PIN 7\n")
+    src = tmp_path / "board.dts"
+    src.write_text(
+        "#include <nordic/soc_ns.dtsi>\n#include <dt-bindings/pins.h>\nPIN\n"
+    )
+
+    out = dts_lookup._preprocess_dts_file(src, base, [])
+
+    # Without the linemarkers, which name the files read
+    assert [ln for ln in out.splitlines() if ln and not ln.startswith("#")] == [
+        "vendor",
+        "7",
+    ]

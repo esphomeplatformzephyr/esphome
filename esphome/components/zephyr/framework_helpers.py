@@ -313,14 +313,12 @@ def _check_west_projects(
     version: str,
     projects: set[str],
 ) -> None:
-    """Raise when the manifest lacks one of ``projects`` beyond the required ones.
+    """Raise when the manifest lacks one of ``projects``.
 
     west update quietly skips an unknown name in the filter, west list fails on it.
-    Needs the workspace updated once, since a manifest may import others. A required
-    project a later version dropped only leaves its filter entry unused.
+    Needs the workspace updated once, since a manifest may import others.
     """
-    if not (names := sorted(projects - source.required)):
-        return
+    names = sorted(projects)
     cmd = [str(env_python_path), "-m", "west", "list", "-f", "{name}", *names]
     if not run_command_ok(cmd, cwd=framework_path):
         raise EsphomeError(
@@ -413,9 +411,10 @@ def fetch_missing_west_projects(
     Only the missing projects are updated, so a build running from the others
     is left alone. Call under the workspace's install lock.
     """
-    if projects <= source.required:
-        return
     installed = _installed_west_projects(framework_path)
+    # A later release may add a required project, so check the stamp first
+    if projects <= source.required and (installed is None or projects <= installed):
+        return
     # Before the fetch, so an unknown name costs nothing on any install
     _check_west_projects(env_python_path, framework_path, source, version, projects)
     if installed is None or not (missing := projects - installed):
@@ -432,8 +431,7 @@ def fetch_missing_west_projects(
         source,
         version,
         installed | projects,
-        # west update fails on a name the manifest lacks; a full update skips it
-        only=None if missing & source.required else missing,
+        only=missing,
     ):
         _restore_project_filter(
             env_python_path, framework_path, source, version, installed
@@ -586,20 +584,21 @@ def ensure_zephyr_requirements(
     framework_path: Path,
     venv_rebuilt: bool,
     label: str,
+    marker_name: str,
     *,
     zephyr_dir: Path | None = None,
 ) -> None:
     """Install the workspace's Zephyr Python requirements into the penv unless current,
     then patch pyOCD's nRF54LM20A flash algorithm.
 
-    ``zephyr_dir`` is the Zephyr tree when it isn't ``framework_path/zephyr``
-    (a local checkout).
+    ``marker_name`` is the file in the penv that records the install, so a venv
+    rebuild removes it. ``zephyr_dir`` is the Zephyr tree when it isn't
+    ``framework_path/zephyr`` (a local checkout).
     """
     zephyr_reqs = (
         (zephyr_dir or framework_path / "zephyr") / "scripts" / "requirements.txt"
     )
-    # Inside the penv, so a rebuild removes it; one per workspace sharing the penv
-    sentinel = python_env_path / f".zephyr_reqs_ready-{framework_path.name}"
+    sentinel = python_env_path / marker_name
     if (
         venv_rebuilt
         or not sentinel.exists()
