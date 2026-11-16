@@ -46,7 +46,7 @@ def to_code(config: ConfigType) -> None:
     # resolves this itself from the board's own DTS instead of a blanket default.
     # STM32F1 has no true RNG on any family member (dts/arm/st/f1 has no rng@ node
     # at all), so stm32f1.py always uses TEST_RANDOM_GENERATOR unconditionally.
-    # STM32C5's SoC dtsi has no RNG node either; stm32c5.py looks it up per board.
+    # STM32C5's SoC dtsi ships its RNG disabled; stm32c5.py enables it per board.
     if zephyr_variant() not in (
         VARIANT_STM32C5,
         VARIANT_STM32F1,

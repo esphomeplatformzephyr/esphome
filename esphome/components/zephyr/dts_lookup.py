@@ -350,9 +350,9 @@ def _find_node_label_by_compat(
     board: str, compat: str, *, enabled_only: bool
 ) -> str | None:
     """Return the label of the first node whose `compatible` includes compat, or
-    None if not found. enabled_only=True is needed for peripherals that ship
-    `status = "disabled"` in the SoC dtsi itself (e.g. STM32's rng), so presence
-    must be checked independently of enablement."""
+    None if not found. enabled_only=False also finds nodes the SoC dtsi ships
+    `status = "disabled"` (e.g. STM32's rng), whose presence matters, not their
+    enablement."""
     edt = _get_edt(board)
     if edt is None:
         return None
@@ -518,9 +518,9 @@ def resolve_uart_node_label(
     mapping = _discover_uart_node_labels(board)
     if mapping is None:
         raise EsphomeError(
-            f"Cannot determine the console UART for board '{board}' -- couldn't "
-            "read its devicetree (see the warning above). Select the UART "
-            "explicitly with '&<label>'."
+            f"Cannot determine the console UART for board '{board}': its devicetree "
+            "has no zephyr,console UART, or couldn't be read (see the warning above). "
+            "Select the UART explicitly with '&<label>'."
         )
     label = mapping.get(hw_uart)
     if label is None:
@@ -812,7 +812,7 @@ def _find_board_dir(zephyr_base: Path, board: str) -> Path | None:
                 continue
             for board_yml in boards_root.glob("*/**/board.yml"):
                 try:
-                    doc = yaml.safe_load(board_yml.read_text())
+                    doc = yaml.safe_load(board_yml.read_text(encoding="utf-8"))
                 except (OSError, yaml.YAMLError):
                     continue
                 if not isinstance(doc, dict):

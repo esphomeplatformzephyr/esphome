@@ -1798,3 +1798,13 @@ def test_get_edt_reads_a_deprecated_board_under_its_new_name(
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data(dts_base_path=str(tmp_path))
     assert _get_edt("rpi_pico2/rp2350a/m33") is not None
     assert edt_texts == ["/* m33_0 */"]
+
+
+def test_resolve_uart_node_label_without_a_console(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A readable devicetree without zephyr,console is named as a cause too."""
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
+    monkeypatch.setattr(dts_lookup, "get_console_uart_label", lambda board: None)
+    with pytest.raises(EsphomeError, match="has no zephyr,console UART, or couldn't"):
+        dts_lookup.resolve_uart_node_label("some_board", "UART1", {})

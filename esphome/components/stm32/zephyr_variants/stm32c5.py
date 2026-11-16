@@ -116,7 +116,8 @@ async def to_code(config: ConfigType) -> None:
     zephyr_add_prj_conf("HWINFO", True)
     _xiao_to_code(config)
 
-    # The C5 SoC dtsi has no RNG node; a board that adds one gets the hardware RNG.
+    # stm32c5.dtsi has the RNG, disabled; the overlay turns it on. A board without
+    # one falls back to the test generator, which is not cryptographically secure.
     rng_label = get_rng_node_label(config[CONF_BOARD])
     if rng_label is not None:
         zephyr_add_prj_conf("ENTROPY_GENERATOR", True)

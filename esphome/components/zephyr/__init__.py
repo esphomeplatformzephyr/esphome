@@ -41,6 +41,7 @@ from esphome.const import (
     TYPE_LOCAL,
 )
 from esphome.core import CORE, CoroPriority, EsphomeError, coroutine_with_priority
+from esphome.core.config import BOARD_MAX_LENGTH
 from esphome.cpp_generator import MockObj
 from esphome.helpers import copy_file_if_changed, rmtree, write_file_if_changed
 from esphome.storage_json import StorageJSON
@@ -1504,7 +1505,9 @@ def zephyr_toolchain_schema(families: frozenset[str]) -> cv.Schema:
                 *(name for name, info in VARIANTS.items() if info.family in families),
                 upper=True,
             ),
-            cv.Optional(CONF_BOARD): cv.string_strict,
+            cv.Optional(CONF_BOARD): cv.All(
+                cv.string_strict, cv.ByteLength(max=BOARD_MAX_LENGTH)
+            ),
             cv.Optional(CONF_WATCHDOG_TIMEOUT): _WATCHDOG_TIMEOUT_VALIDATOR,
             # Which SDK to build against (type:), its version, where to fetch it from
             # (source:), and the Zephyr-only options -- see resolve_framework_version()

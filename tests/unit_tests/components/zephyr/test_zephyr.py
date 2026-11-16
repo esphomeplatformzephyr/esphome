@@ -2674,3 +2674,13 @@ def test_zephyr_additional_framework_projects_ncs_takes_nrf52s_list(
 def test_zephyr_additional_framework_projects_silabs_adds_nothing() -> None:
 
     assert zephyr_additional_framework_projects(SILABS) == frozenset()
+
+
+def test_toolchain_schema_caps_the_board_name() -> None:
+    """At most BOARD_MAX_LENGTH bytes, as on nrf52."""
+    from esphome.components.zephyr import zephyr_toolchain_schema
+
+    schema = zephyr_toolchain_schema(frozenset({"stm32"}))
+    assert schema({"variant": "stm32c5", "board": "b" * 127})["board"] == "b" * 127
+    with pytest.raises(cv.Invalid):
+        schema({"variant": "stm32c5", "board": "b" * 128})
