@@ -8,6 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from esphome.components.zephyr import mcuboot
+from esphome.components.zephyr.dts_lookup import _DtsReadError
 from esphome.components.zephyr.mcuboot import (
     _mcuboot_swap_limit,
     _read_slot_layout,
@@ -212,7 +213,7 @@ def test_read_slot_layout(tmp_path: Path, scratch: bool) -> None:
 @pytest.mark.parametrize(
     ("edt", "edtlib", "message"),
     [
-        (_edt(FLASH_PROPS), None, "edtlib is not available"),
+        (_edt(FLASH_PROPS), _DtsReadError("can't load edtlib"), "can't load edtlib"),
         (b"not a pickle", object(), "edt.pickle"),
         (_Edt({}), object(), "no slot0/slot1 partition"),
         (_edt({"erase-block-size": 4096}), object(), "has no erase-block-size"),
@@ -226,7 +227,19 @@ def test_read_slot_layout_warns_when_it_cannot_read(
     message: str,
 ) -> None:
     mcuboot_dir = _mcuboot_dir(tmp_path, edt)
-    with patch(_LOAD_EDTLIB, return_value=edtlib):
+    error = edtlib if isinstance(edtlib, Exception) else None
+    with patch(_LOAD_EDTLIB, return_value=edtlib, side_effect=error):
         assert _read_slot_layout(mcuboot_dir) is None
     assert "Skipping the MCUboot slot size check" in caplog.text
     assert message in caplog.text
+
+
+def test_read_slot_layout_without_zephyr_base(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    mcuboot_dir = _mcuboot_dir(tmp_path, _edt(FLASH_PROPS))
+    (mcuboot_dir / "CMakeCache.txt").write_text("CMAKE_BUILD_TYPE:STRING=MinSizeRel\n")
+    with patch(_LOAD_EDTLIB) as load_edtlib:
+        assert _read_slot_layout(mcuboot_dir) is None
+    load_edtlib.assert_not_called()
+    assert "no ZEPHYR_BASE in" in caplog.text

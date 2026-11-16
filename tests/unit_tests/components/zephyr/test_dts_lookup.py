@@ -6,14 +6,15 @@ from collections.abc import Callable
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from typing import Any, NoReturn
 
 import pytest
 
 from esphome.components.zephyr import dts_lookup
-from esphome.components.zephyr.const import KEY_ZEPHYR
+from esphome.components.zephyr.const import KEY_BOARD_EDT_CACHE, KEY_ZEPHYR
 from esphome.components.zephyr.dts_lookup import (
     _find_board_dir,
     _find_board_yaml,
@@ -96,6 +97,49 @@ class _FakeEdt:
 # ---------------------------------------------------------------------------
 # resolve_zephyr_bus -- explicit override parameter
 # ---------------------------------------------------------------------------
+
+
+def _bundled_zephyr_base(tmp_path: Path) -> Path:
+    """A zephyr/ folder with an (empty) devicetree library folder."""
+    base = tmp_path / "zephyr"
+    (base / "scripts" / "dts" / "python-devicetree" / "src").mkdir(parents=True)
+    return base
+
+
+def test_load_edtlib_imports_the_workspace_copy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    zephyr_base = _bundled_zephyr_base(tmp_path)
+    src = zephyr_base / "scripts" / "dts" / "python-devicetree" / "src"
+    (src / "devicetree").mkdir()
+    (src / "devicetree" / "__init__.py").write_text("")
+    (src / "devicetree" / "edtlib.py").write_text(f"WHERE = {str(src)!r}\n")
+    # A copy, so the modules the import adds don't outlive the test
+    monkeypatch.setattr(
+        sys, "modules", {**sys.modules, "devicetree": ModuleType("devicetree")}
+    )
+    monkeypatch.setattr(sys, "path", list(sys.path))
+
+    edtlib = dts_lookup._load_edtlib(zephyr_base)
+
+    assert edtlib is not None
+    assert str(src) == edtlib.WHERE
+    assert str(src.resolve()) not in sys.path
+
+
+def test_load_edtlib_reports_a_broken_copy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    zephyr_base = _bundled_zephyr_base(tmp_path)
+    monkeypatch.setattr(sys, "path", list(sys.path))
+    monkeypatch.setattr(sys, "modules", {**sys.modules, "devicetree": None})
+    with pytest.raises(dts_lookup._DtsReadError, match="can't load edtlib from .*: "):
+        dts_lookup._load_edtlib(zephyr_base)
+
+
+def test_load_edtlib_without_the_workspace_copy(tmp_path: Path) -> None:
+    with pytest.raises(dts_lookup._DtsReadError, match="has no devicetree library"):
+        dts_lookup._load_edtlib(tmp_path)
 
 
 def test_resolve_zephyr_bus_returns_explicit_override() -> None:
@@ -1298,7 +1342,7 @@ def test_get_edt_cache_key_varies_with_shields(tmp_path: Path) -> None:
     edt_with_shield = _get_edt("my_board")
 
     assert edt_no_shield is not edt_with_shield
-    cache = zd["board_edt_cache"]
+    cache = zd[KEY_BOARD_EDT_CACHE]
     assert ("my_board", (), ()) in cache
     assert ("my_board", ("nrf7002ek",), ()) in cache
 

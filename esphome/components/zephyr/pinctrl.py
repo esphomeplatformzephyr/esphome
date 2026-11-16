@@ -11,6 +11,7 @@ import logging
 
 from esphome.core import EsphomeError
 
+from .const import KEY_VARIANT
 from .gpio import pin_summary
 from .variants import VARIANTS, get_family_module
 
@@ -316,7 +317,7 @@ def zephyr_setup_uart_pinctrl(
 
     _require_zephyr_toolchain("zephyr_setup_uart_pinctrl")
 
-    variant_name = zephyr_data().get("variant") or ""
+    variant_name = zephyr_data().get(KEY_VARIANT) or ""
     tx_display = _pin_display(tx_pin, variant_name)
     rx_display = _pin_display(rx_pin, variant_name)
 
@@ -430,7 +431,7 @@ def zephyr_setup_i2c_pinctrl(
 
     _require_zephyr_toolchain("zephyr_setup_i2c_pinctrl")
 
-    variant_name = zephyr_data().get("variant") or ""
+    variant_name = zephyr_data().get(KEY_VARIANT) or ""
     sda_display = _pin_display(sda, variant_name)
     scl_display = _pin_display(scl, variant_name)
 

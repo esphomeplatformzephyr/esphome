@@ -6,7 +6,7 @@ from typing import Any
 
 from esphome.components import esp32, nrf, nxp, renesas, rp2, silabs, stm32
 from esphome.components.zephyr import ZephyrData
-from esphome.components.zephyr.const import KEY_ZEPHYR
+from esphome.components.zephyr.const import KEY_FAMILY, KEY_VARIANT, KEY_ZEPHYR
 from esphome.components.zephyr.variants import VARIANTS, set_core_data
 import esphome.config_validation as cv
 from esphome.const import KEY_CORE, Framework, Platform, PlatformFramework
@@ -57,7 +57,7 @@ def empty_zephyr_data(
         CORE.data[KEY_ZEPHYR] = previous
     assert set(data) == ZephyrData.__required_keys__ | ZephyrData.__optional_keys__
     variant_info = VARIANTS.get(variant) if variant is not None else None
-    data["variant"] = variant
-    data["family"] = variant_info.family if variant_info is not None else None
+    data[KEY_VARIANT] = variant
+    data[KEY_FAMILY] = variant_info.family if variant_info is not None else None
     data.update(overrides)
     return data

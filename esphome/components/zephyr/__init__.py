@@ -26,6 +26,7 @@ from esphome.const import (
     CONF_REF,
     CONF_REFRESH,
     CONF_SOURCE,
+    CONF_TOOLCHAIN,
     CONF_TYPE,
     CONF_URL,
     CONF_USERNAME,
@@ -37,8 +38,11 @@ from esphome.const import (
     KEY_FRAMEWORK_VERSION,
     KEY_TARGET_FRAMEWORK,
     KEY_TARGET_PLATFORM,
+    PLATFORM_ESP32,
+    PLATFORM_RP2,
     TYPE_GIT,
     TYPE_LOCAL,
+    Toolchain,
 )
 from esphome.core import CORE, CoroPriority, EsphomeError, coroutine_with_priority
 from esphome.core.config import BOARD_MAX_LENGTH
@@ -68,6 +72,7 @@ from .const import (
     KEY_BOOT_LAYOUT,
     KEY_BOOTLOADER,
     KEY_EXTRA_BUILD_FILES,
+    KEY_FAMILY,
     KEY_FRAMEWORK_TYPE,
     KEY_KCONFIG,
     KEY_MODULE_OVERRIDES,
@@ -87,6 +92,7 @@ from .const import (
     KEY_SYSBUILD,
     KEY_SYSBUILD_CONF,
     KEY_USER,
+    KEY_VARIANT,
     KEY_ZEPHYR,
     zephyr_ns,
 )
@@ -680,22 +686,41 @@ def _require_zephyr_toolchain(name: str) -> None:
         )
 
 
+# Registry platforms that also build without Zephyr: before their schema ran, a read
+# can't tell a Zephyr build from another one
+_NOT_ONLY_ZEPHYR_PLATFORMS: tuple[str, ...] = (PLATFORM_ESP32, PLATFORM_RP2)
+
+
+def _variant_data() -> ZephyrData | dict[str, object]:
+    """The Zephyr data of a Zephyr toolchain build, else {}. Raises when a read comes
+    before the platform schema of a platform that only builds with Zephyr set it."""
+    if (data := CORE.data.get(KEY_ZEPHYR)) is not None:
+        return data if CORE.using_toolchain_zephyr else {}
+    # deferred: the variants package imports this one
+    from .variants import _ZEPHYR_PLATFORMS  # noqa: PLC0415
+
+    platform = CORE.data.get(KEY_CORE, {}).get(KEY_TARGET_PLATFORM)
+    if platform is None or (
+        platform in _ZEPHYR_PLATFORMS and platform not in _NOT_ONLY_ZEPHYR_PLATFORMS
+    ):
+        raise RuntimeError("Zephyr variant read before the platform schema set it")
+    return {}
+
+
 def zephyr_variant() -> str | None:
     """Return the active Zephyr variant name, or None if not yet set."""
-    return zephyr_data().get("variant") if _using_zephyr_toolchain() else None
+    return _variant_data().get(KEY_VARIANT)
 
 
 def zephyr_framework_type() -> str | None:
     """Return the active `framework: type:` (e.g. "zephyr", "ncs"), or None if
     not yet set."""
-    if not _using_zephyr_toolchain():
-        return None
-    return zephyr_data().get(KEY_FRAMEWORK_TYPE)
+    return _variant_data().get(KEY_FRAMEWORK_TYPE)
 
 
 def zephyr_variant_family() -> str | None:
     """Return the active variant's silicon family (e.g. "esp32"), or None if unset/unfamilied."""
-    return zephyr_data().get("family") if _using_zephyr_toolchain() else None
+    return _variant_data().get(KEY_FAMILY)
 
 
 def zephyr_usb_uart_type() -> str | None:
@@ -1513,6 +1538,8 @@ def zephyr_toolchain_schema(families: frozenset[str]) -> cv.Schema:
             # (source:), and the Zephyr-only options -- see resolve_framework_version()
             # in variants/__init__.py for how type:/version:/source: are resolved.
             cv.Optional(CONF_FRAMEWORK, default={}): _FRAMEWORK_SCHEMA,
+            # Zephyr is the only one; accepted as on nrf52
+            cv.Optional(CONF_TOOLCHAIN): cv.toolchain_enum((Toolchain.ZEPHYR,)),
         }
     )
 
@@ -1716,6 +1743,10 @@ def zephyr_config_schema(
     core[KEY_TARGET_PLATFORM] = platform
     core[KEY_TARGET_FRAMEWORK] = KEY_ZEPHYR
     config = zephyr_toolchain_schema(families)(config)
+    # Before set_core_data, so a command-line or YAML toolchain is checked, not overwritten
+    config = cv.resolve_toolchain(platform, (Toolchain.ZEPHYR,), Toolchain.ZEPHYR)(
+        config
+    )
     framework = config[CONF_FRAMEWORK]
     variant = config[CONF_VARIANT]
     max_timeout_ms = VARIANTS[variant].watchdog_max_timeout_ms
@@ -1810,7 +1841,7 @@ def zephyr_config_schema(
 async def zephyr_toolchain_to_code(config: ConfigType) -> None:
     from .dts_fetch import fetch_board_dts
 
-    variant = zephyr_data()["variant"]
+    variant = zephyr_data()[KEY_VARIANT]
     sdk_name, sdk = resolve_sdk(
         VARIANTS[variant], zephyr_data().get(KEY_FRAMEWORK_TYPE)
     )
@@ -2184,7 +2215,7 @@ def run_compile(args, config: ConfigType) -> bool:
 
     from .library import generate_zephyr_modules
 
-    variant = zephyr_data()["variant"]
+    variant = zephyr_data()[KEY_VARIANT]
     extra_modules = generate_zephyr_modules(list(CORE.platformio_libraries.values()))
 
     if not CORE.using_toolchain_zephyr:

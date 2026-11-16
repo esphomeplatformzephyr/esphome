@@ -9,6 +9,7 @@ from typing import Any
 
 import esphome.codegen as cg
 from esphome.components.zephyr.const import (
+    KEY_VARIANT,
     SEGGER_RTT_UART,
     declare_component_id,
     zephyr_ns,
@@ -113,7 +114,7 @@ def uart_pinctrl(
     from esphome.components.zephyr import zephyr_data  # noqa: PLC0415 -- avoids circular import at module load
     from esphome.components.zephyr.variants import VARIANTS  # noqa: PLC0415
 
-    variant_info = VARIANTS.get(zephyr_data().get("variant") or "")
+    variant_info = VARIANTS.get(zephyr_data().get(KEY_VARIANT) or "")
     instance_pins = (
         variant_info.uart_valid_pins_by_instance.get(port_label.upper())
         if variant_info is not None

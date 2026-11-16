@@ -1,11 +1,14 @@
 from collections.abc import Callable
 import contextlib
+import importlib
 import logging
 from pathlib import Path
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
+from types import ModuleType
 from typing import Final
 
 import yaml
@@ -20,7 +23,13 @@ from .board_revision import (
     resolve_revision,
 )
 from .const import (
+    KEY_BOARD_DIR_CACHE,
+    KEY_BOARD_EDT_CACHE,
     KEY_BOARD_ROOT,
+    KEY_BOARD_YAML_CACHE,
+    KEY_CPP_PATH,
+    KEY_DTS_BASE_PATH,
+    KEY_DTS_INCLUDE_PATHS,
     KEY_SHIELD_ROOT,
     KEY_SHIELDS,
     KEY_SNIPPET_ROOT,
@@ -551,45 +560,27 @@ def format_uart_node_label_map(board: str, static_labels: dict[str, str]) -> str
 # ---------------------------------------------------------------------------
 
 
-def _load_edtlib(zephyr_base: Path | None):
-    """Import edtlib, preferring Zephyr's bundled copy over the PyPI package --
-    the PyPI devicetree 0.0.2 snapshot is older and can reject binding keys newer
-    Zephyr releases add (e.g. 'examples:')."""
-    import importlib
-    import sys
-
-    if zephyr_base is not None:
-        bundled = (
-            zephyr_base / "scripts" / "dts" / "python-devicetree" / "src"
-        ).resolve()
-        if bundled.is_dir():
-            # Evict any previously-loaded (PyPI) devicetree so the bundled version wins.
-            for key in [
-                k
-                for k in sys.modules
-                if k == "devicetree" or k.startswith("devicetree.")
-            ]:
-                del sys.modules[key]
-            sys.path.insert(0, str(bundled))
-            importlib.invalidate_caches()
-            try:
-                from devicetree import edtlib
-
-                return edtlib
-            except ImportError as exc:
-                _LOGGER.debug("[zephyr] bundled edtlib load failed: %s", exc)
-            finally:
-                # Path only needed during import; modules stay in sys.modules cache.
-                with contextlib.suppress(ValueError):
-                    sys.path.remove(str(bundled))
-
+def _load_edtlib(zephyr_base: Path) -> ModuleType:
+    """Import Zephyr's own copy of edtlib; the PyPI devicetree package is older and
+    rejects binding keys newer Zephyr versions add. Raises _DtsReadError."""
+    bundled = (zephyr_base / "scripts" / "dts" / "python-devicetree" / "src").resolve()
+    if not bundled.is_dir():
+        raise _DtsReadError(f"the workspace has no devicetree library in {bundled}")
+    # Another workspace's copy may be loaded already
+    for key in [
+        k for k in sys.modules if k == "devicetree" or k.startswith("devicetree.")
+    ]:
+        del sys.modules[key]
+    sys.path.insert(0, str(bundled))
+    importlib.invalidate_caches()
     try:
-        from devicetree import edtlib
-
-        return edtlib
-    except ImportError:
-        _LOGGER.debug("[zephyr] devicetree/edtlib not available; DTS lookup disabled")
-        return None
+        return importlib.import_module("devicetree.edtlib")
+    except ImportError as exc:
+        raise _DtsReadError(f"can't load edtlib from {bundled}: {exc}") from exc
+    finally:
+        # Only needed for the import; the modules stay loaded
+        with contextlib.suppress(ValueError):
+            sys.path.remove(str(bundled))
 
 
 def _get_edt(board: str):
@@ -603,12 +594,12 @@ def _get_edt(board: str):
     # cache key's intent obvious and matches the other two selections' explicitness.
     cache_key = (board, tuple(shields), tuple(snippets))
 
-    cache = CORE.data[KEY_ZEPHYR]["board_edt_cache"]
+    cache = CORE.data[KEY_ZEPHYR][KEY_BOARD_EDT_CACHE]
     if cache_key in cache:
         result = cache[cache_key]
         return None if result is _NOT_FOUND else result
 
-    dts_base = zd.get("dts_base_path")
+    dts_base = zd.get(KEY_DTS_BASE_PATH)
     if not dts_base:
         # fetch_board_dts() already warned (or this build has no DTS tree at all).
         cache[cache_key] = _NOT_FOUND
@@ -665,8 +656,6 @@ def _build_edt(board: str, zephyr_base: Path, shields: list[str], snippets: list
     """Parse board's devicetree with its revision/shield/snippet overlays."""
     board = _undeprecate_board(zephyr_base, board)
     edtlib = _load_edtlib(zephyr_base)
-    if edtlib is None:
-        raise _DtsReadError("the devicetree Python library is unavailable")
 
     board_dir = _find_board_dir(zephyr_base, board)
     if board_dir is None:
@@ -773,7 +762,7 @@ def _find_board_dir(zephyr_base: Path, board: str) -> Path | None:
     """Find board's on-disk board directory, or None. Falls back to scanning
     board.yml `name:` fields -- some HWMv2 dirs drop the vendor prefix the
     dirname would otherwise need."""
-    cache = CORE.data[KEY_ZEPHYR]["board_dir_cache"]
+    cache = CORE.data[KEY_ZEPHYR][KEY_BOARD_DIR_CACHE]
     if board in cache:
         cached = cache[board]
         return Path(cached) if cached else None
@@ -1056,22 +1045,22 @@ def _cpp_candidate_works(path: str) -> bool:
 def _find_cpp() -> str | None:
     """Return the cached path to a working cpp/gcc/cc on PATH, or None."""
     zd = CORE.data[KEY_ZEPHYR]
-    if zd["cpp_path"] == "":
+    if zd[KEY_CPP_PATH] == "":
         found = None
         for name in ("cpp", "gcc", "cc"):
             path = shutil.which(name)
             if path is not None and _cpp_candidate_works(path):
                 found = path
                 break
-        zd["cpp_path"] = found
-    return zd["cpp_path"]
+        zd[KEY_CPP_PATH] = found
+    return zd[KEY_CPP_PATH]
 
 
 def _get_dts_include_paths(zephyr_base: Path) -> list[str]:
     """Return (and cache) cpp include search paths for zephyr_base, including
     per-vendor HAL dts/ dirs some SoCs #include directly."""
     zd = CORE.data[KEY_ZEPHYR]
-    if zd["dts_include_paths"] is None:
+    if zd[KEY_DTS_INCLUDE_PATHS] is None:
         dts_dir = zephyr_base / "dts"
         # Zephyr's order (pre_dt.cmake): vendor/ before the arch folders, dts/ last
         paths = [str(zephyr_base / "include"), str(zephyr_base / "include" / "zephyr")]
@@ -1095,8 +1084,8 @@ def _get_dts_include_paths(zephyr_base: Path) -> list[str]:
                 for vendor_dir in hal_dir.iterdir()
                 if (vendor_dts := vendor_dir / "dts").is_dir()
             )
-        zd["dts_include_paths"] = paths
-    return zd["dts_include_paths"]
+        zd[KEY_DTS_INCLUDE_PATHS] = paths
+    return zd[KEY_DTS_INCLUDE_PATHS]
 
 
 def _iter_nodes(edt):
@@ -1175,7 +1164,7 @@ def get_board_features(board: str) -> list[str] | None:
 def get_board_yaml_supported(board: str) -> list[str] | None:
     """Return the board's own `supported:` list from its Twister YAML, or None.
     Independent of DTS parsing, so it still works without cpp/gcc installed."""
-    cache: dict[str, object] = CORE.data[KEY_ZEPHYR]["board_yaml_cache"]
+    cache: dict[str, object] = CORE.data[KEY_ZEPHYR][KEY_BOARD_YAML_CACHE]
     if board in cache:
         result = cache[board]
         return None if result is _NOT_FOUND else list(result)  # type: ignore[arg-type]
@@ -1188,7 +1177,7 @@ def get_board_yaml_supported(board: str) -> list[str] | None:
 def _lookup_board_yaml_supported(board: str) -> list[str] | None:
     """Uncached implementation behind get_board_yaml_supported()."""
     zd = CORE.data.get(KEY_ZEPHYR, {})
-    dts_base = zd.get("dts_base_path")
+    dts_base = zd.get(KEY_DTS_BASE_PATH)
     if not dts_base:
         return None
 
@@ -1349,7 +1338,7 @@ def validate_board(board: str) -> bool | None:
     """Check whether board resolves to a real board directory. None means "can't
     tell" (standard tree unavailable), not invalid."""
     zd = CORE.data.get(KEY_ZEPHYR, {})
-    dts_base = zd.get("dts_base_path")
+    dts_base = zd.get(KEY_DTS_BASE_PATH)
     if not dts_base:
         return None
     return _find_board_dir(Path(dts_base), board) is not None
@@ -1363,7 +1352,7 @@ def validate_board_revision(board: str) -> bool | None:
     if requested_revision is None:
         return None
     zd = CORE.data.get(KEY_ZEPHYR, {})
-    dts_base = zd.get("dts_base_path")
+    dts_base = zd.get(KEY_DTS_BASE_PATH)
     if not dts_base:
         return None
     board_dir = _find_board_dir(Path(dts_base), board)

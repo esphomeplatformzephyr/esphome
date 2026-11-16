@@ -151,7 +151,7 @@ def _read_slot_layout(mcuboot_dir: Path) -> dict[str, int] | None:
     """Slot, scratch, sector and write sizes from MCUboot's own devicetree."""
     import pickle
 
-    from .dts_lookup import _load_edtlib
+    from .dts_lookup import _DtsReadError, _load_edtlib
 
     cache = mcuboot_dir / "CMakeCache.txt"
     edt_pickle = mcuboot_dir / "zephyr" / "edt.pickle"
@@ -170,9 +170,16 @@ def _read_slot_layout(mcuboot_dir: Path) -> dict[str, int] | None:
         ),
         None,
     )
+    if zephyr_base is None:
+        _LOGGER.warning(
+            "Skipping the MCUboot slot size check: no ZEPHYR_BASE in %s", cache
+        )
+        return None
     # edt.pickle holds edtlib objects, so the build's own edtlib must be importable
-    if _load_edtlib(zephyr_base) is None:
-        _LOGGER.warning("Skipping the MCUboot slot size check: edtlib is not available")
+    try:
+        _load_edtlib(zephyr_base)
+    except _DtsReadError as err:
+        _LOGGER.warning("Skipping the MCUboot slot size check: %s", err)
         return None
     try:
         with edt_pickle.open("rb") as f:

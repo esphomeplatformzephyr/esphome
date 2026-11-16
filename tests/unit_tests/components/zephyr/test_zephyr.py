@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 import dataclasses
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -47,6 +48,7 @@ from esphome.components.zephyr import (
     zephyr_claim_cdc_acm,
     zephyr_config_schema,
     zephyr_data,
+    zephyr_framework_type,
     zephyr_only_on_variant,
     zephyr_set_module_override,
     zephyr_setup_i2c_pinctrl,
@@ -100,6 +102,8 @@ from esphome.const import (
     KEY_TARGET_PLATFORM,
     PLATFORM_ESP32,
     PLATFORM_NRF,
+    PLATFORM_NRF52,
+    PLATFORM_RP2,
     PLATFORM_STM32,
     TYPE_GIT,
     TYPE_LOCAL,
@@ -164,6 +168,42 @@ def test_zephyr_variant_family_returns_family_for_esp32h2() -> None:
 def test_zephyr_variant_family_returns_family_for_esp32c6() -> None:
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant="ESP32C6")
     assert zephyr_variant_family() == "esp32"
+
+
+_VARIANT_READERS = [zephyr_variant, zephyr_variant_family, zephyr_framework_type]
+
+
+@pytest.mark.parametrize("platform", [None, PLATFORM_STM32])
+@pytest.mark.parametrize("lookup", _VARIANT_READERS)
+def test_variant_read_before_the_platform_schema_is_rejected(
+    lookup: Callable[[], str | None], platform: str | None
+) -> None:
+    """stm32 only builds with Zephyr, so an early read is an ordering bug."""
+    CORE.data.pop(KEY_ZEPHYR, None)
+    CORE.data[KEY_CORE] = {} if platform is None else {KEY_TARGET_PLATFORM: platform}
+    with pytest.raises(RuntimeError, match="before the platform schema set it"):
+        lookup()
+
+
+@pytest.mark.parametrize("platform", [PLATFORM_ESP32, PLATFORM_RP2, PLATFORM_NRF52])
+@pytest.mark.parametrize("lookup", _VARIANT_READERS)
+def test_variant_read_without_zephyr_data_is_none(
+    lookup: Callable[[], str | None], platform: str
+) -> None:
+    """esp32 and rp2 also build without Zephyr; nrf52 is not in the registry."""
+    CORE.data.pop(KEY_ZEPHYR, None)
+    CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: platform}
+    assert lookup() is None
+
+
+@pytest.mark.parametrize("lookup", _VARIANT_READERS)
+def test_variant_read_off_the_zephyr_toolchain_is_none(
+    lookup: Callable[[], str | None],
+) -> None:
+    """nrf52 keeps Zephyr data on its PlatformIO toolchain, which has no variant."""
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant="ESP32C6")
+    CORE.toolchain = Toolchain.PLATFORMIO
+    assert lookup() is None
 
 
 # ---------------------------------------------------------------------------
@@ -2684,3 +2724,34 @@ def test_toolchain_schema_caps_the_board_name() -> None:
     assert schema({"variant": "stm32c5", "board": "b" * 127})["board"] == "b" * 127
     with pytest.raises(cv.Invalid):
         schema({"variant": "stm32c5", "board": "b" * 128})
+
+
+def test_toolchain_schema_accepts_only_zephyr() -> None:
+    """`toolchain: zephyr` is accepted, as on nrf52; no other toolchain builds here."""
+    from esphome.components.zephyr import zephyr_toolchain_schema
+
+    schema = zephyr_toolchain_schema(frozenset({"stm32"}))
+    assert schema({"variant": "stm32c5", "toolchain": "zephyr"})["toolchain"] == (
+        Toolchain.ZEPHYR
+    )
+    with pytest.raises(cv.Invalid):
+        schema({"variant": "stm32c5", "toolchain": "platformio"})
+
+
+@pytest.mark.parametrize(
+    ("command_line", "expected"),
+    [(None, Toolchain.ZEPHYR), (Toolchain.ZEPHYR, Toolchain.ZEPHYR)],
+)
+def test_platform_schema_resolves_the_toolchain(
+    command_line: Toolchain | None, expected: Toolchain
+) -> None:
+    CORE.toolchain = command_line
+    _validate({CONF_VARIANT: "STM32C5"})
+    assert CORE.toolchain == expected
+
+
+def test_platform_schema_rejects_another_command_line_toolchain() -> None:
+    """--toolchain platformio is refused, not quietly replaced with zephyr."""
+    CORE.toolchain = Toolchain.PLATFORMIO
+    with pytest.raises(cv.Invalid, match="Unsupported toolchain 'platformio'"):
+        _validate({CONF_VARIANT: "STM32C5"})

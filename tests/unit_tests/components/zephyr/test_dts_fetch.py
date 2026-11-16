@@ -13,7 +13,11 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from esphome.components.zephyr.const import KEY_SDK_SOURCE_RESOLVED_REF, KEY_ZEPHYR
+from esphome.components.zephyr.const import (
+    KEY_DTS_BASE_PATH,
+    KEY_SDK_SOURCE_RESOLVED_REF,
+    KEY_ZEPHYR,
+)
 from esphome.components.zephyr.dts_fetch import (
     _SPARSE_CHECKOUT_SCHEMA,
     _dts_cache_root,
@@ -893,7 +897,7 @@ async def test_fetch_board_dts_is_a_no_op_once_resolved(
     native, clone, source = fetch_mocks
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data(dts_base_path="/already/there")
     await fetch_board_dts("ESP32H2", "zephyr", ZEPHYR_MAINLINE, None)
-    assert CORE.data[KEY_ZEPHYR]["dts_base_path"] == "/already/there"
+    assert CORE.data[KEY_ZEPHYR][KEY_DTS_BASE_PATH] == "/already/there"
     native.assert_not_called()
     clone.assert_not_called()
     source.assert_not_called()
@@ -907,7 +911,7 @@ async def test_fetch_board_dts_uses_local_source_directly(
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
     local = {CONF_TYPE: TYPE_LOCAL, CONF_PATH: tmp_path}
     await fetch_board_dts("ESP32H2", "zephyr", ZEPHYR_MAINLINE, local)
-    assert CORE.data[KEY_ZEPHYR]["dts_base_path"] == str(tmp_path)
+    assert CORE.data[KEY_ZEPHYR][KEY_DTS_BASE_PATH] == str(tmp_path)
     native.assert_not_called()
     clone.assert_not_called()
     source.assert_not_called()
@@ -922,7 +926,7 @@ async def test_fetch_board_dts_clones_git_source(
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
     git = {CONF_TYPE: TYPE_GIT, CONF_URL: "https://example.invalid/z", CONF_REF: "x"}
     await fetch_board_dts("ESP32H2", "zephyr", ZEPHYR_MAINLINE, git, "esp32")
-    assert CORE.data[KEY_ZEPHYR]["dts_base_path"] == str(tmp_path)
+    assert CORE.data[KEY_ZEPHYR][KEY_DTS_BASE_PATH] == str(tmp_path)
     source.assert_called_once_with(git, "esp32")
     native.assert_not_called()
     clone.assert_not_called()
@@ -936,7 +940,7 @@ async def test_fetch_board_dts_warns_when_git_source_clone_fails(
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
     git = {CONF_TYPE: TYPE_GIT, CONF_URL: "https://example.invalid/z"}
     await fetch_board_dts("ESP32H2", "zephyr", ZEPHYR_MAINLINE, git)
-    assert CORE.data[KEY_ZEPHYR]["dts_base_path"] is None
+    assert CORE.data[KEY_ZEPHYR][KEY_DTS_BASE_PATH] is None
     assert "Board DTS files unavailable for sdk_source" in caplog.text
     assert "default branch" in caplog.text
     # A failed source clone must not fall through to the stock SDK.
@@ -952,7 +956,7 @@ async def test_fetch_board_dts_prefers_native_sdk_install(
     native.return_value = tmp_path
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
     await fetch_board_dts("ESP32H2", "zephyr", ZEPHYR_MAINLINE, None)
-    assert CORE.data[KEY_ZEPHYR]["dts_base_path"] == str(tmp_path)
+    assert CORE.data[KEY_ZEPHYR][KEY_DTS_BASE_PATH] == str(tmp_path)
     clone.assert_not_called()
 
 
@@ -964,7 +968,7 @@ async def test_fetch_board_dts_falls_back_to_sparse_clone(
     clone.return_value = tmp_path
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
     await fetch_board_dts("ESP32H2", "zephyr", ZEPHYR_MAINLINE, None, "esp32")
-    assert CORE.data[KEY_ZEPHYR]["dts_base_path"] == str(tmp_path)
+    assert CORE.data[KEY_ZEPHYR][KEY_DTS_BASE_PATH] == str(tmp_path)
     clone.assert_called_once_with("zephyr", ZEPHYR_MAINLINE, "esp32")
 
 
@@ -975,5 +979,5 @@ async def test_fetch_board_dts_warns_when_nothing_found(
     _set_framework_version(4, 4, 2)
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
     await fetch_board_dts("ESP32H2", "zephyr", ZEPHYR_MAINLINE, None)
-    assert CORE.data[KEY_ZEPHYR]["dts_base_path"] is None
+    assert CORE.data[KEY_ZEPHYR][KEY_DTS_BASE_PATH] is None
     assert "Board DTS files unavailable for ESP32H2 zephyr 4.4.2" in caplog.text

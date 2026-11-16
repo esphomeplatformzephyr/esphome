@@ -24,7 +24,12 @@ from esphome.core import CORE, TimePeriodSeconds
 from esphome.framework_helpers import install_lock
 from esphome.types import ConfigType
 
-from .const import COMMIT_SHA_RE, KEY_SDK_SOURCE_RESOLVED_REF, KEY_ZEPHYR
+from .const import (
+    COMMIT_SHA_RE,
+    KEY_DTS_BASE_PATH,
+    KEY_SDK_SOURCE_RESOLVED_REF,
+    KEY_ZEPHYR,
+)
 from .framework import get_zephyr_tools_path
 from .variants import ZephyrSDK, get_family_module
 
@@ -631,20 +636,20 @@ async def fetch_board_dts(
     no-op after the first successful resolve.
     """
     zd = CORE.data[KEY_ZEPHYR]
-    if zd.get("dts_base_path") is not None:
+    if zd.get(KEY_DTS_BASE_PATH) is not None:
         return
 
     if sdk_source is not None and sdk_source[CONF_TYPE] == TYPE_LOCAL:
-        zd["dts_base_path"] = str(sdk_source[CONF_PATH])
+        zd[KEY_DTS_BASE_PATH] = str(sdk_source[CONF_PATH])
         _LOGGER.debug(
-            "[zephyr] DTS base path: %s (local sdk_source)", zd["dts_base_path"]
+            "[zephyr] DTS base path: %s (local sdk_source)", zd[KEY_DTS_BASE_PATH]
         )
         return
 
     if sdk_source is not None and sdk_source[CONF_TYPE] == TYPE_GIT:
         zephyr_dir = _sparse_clone_dts_from_source(sdk_source, family)
         if zephyr_dir is not None:
-            zd["dts_base_path"] = str(zephyr_dir)
+            zd[KEY_DTS_BASE_PATH] = str(zephyr_dir)
             _LOGGER.debug("[zephyr] DTS base path: %s (git sdk_source)", zephyr_dir)
         else:
             _LOGGER.warning(
@@ -659,7 +664,7 @@ async def fetch_board_dts(
         sdk_name, sdk, family
     )
     if zephyr_dir is not None:
-        zd["dts_base_path"] = str(zephyr_dir)
+        zd[KEY_DTS_BASE_PATH] = str(zephyr_dir)
         _LOGGER.debug("[zephyr] DTS base path: %s", zephyr_dir)
     else:
         _LOGGER.warning(

@@ -7,7 +7,7 @@ import esphome.config_validation as cv
 from esphome.const import CONF_ID, CONF_INVERTED, CONF_MODE, CONF_NUMBER
 from esphome.core import EsphomeError
 
-from .const import zephyr_ns
+from .const import KEY_VARIANT, zephyr_ns
 
 if TYPE_CHECKING:
     from .variants import ZephyrVariant
@@ -37,7 +37,7 @@ def _check_lettered_port(pin: int) -> int:
     from . import zephyr_data
     from .variants import VARIANTS
 
-    variant_info = VARIANTS.get(zephyr_data().get("variant"))
+    variant_info = VARIANTS.get(zephyr_data().get(KEY_VARIANT))
     if variant_info is None or variant_info.gpio_port_labels is None:
         return pin
     if pin < 0 or pin // variant_info.gpio_port_width >= len(
@@ -70,7 +70,7 @@ def _validate_gpio_pin(value):
             from . import zephyr_data
             from .variants import VARIANTS
 
-            variant_info = VARIANTS.get(zephyr_data().get("variant"))
+            variant_info = VARIANTS.get(zephyr_data().get(KEY_VARIANT))
             port_labels = (
                 variant_info.gpio_port_labels if variant_info is not None else None
             )
@@ -96,7 +96,7 @@ def _validate_gpio_pin(value):
             from . import zephyr_data
             from .variants import VARIANTS
 
-            variant_info = VARIANTS.get(zephyr_data().get("variant"))
+            variant_info = VARIANTS.get(zephyr_data().get(KEY_VARIANT))
             if _pin_notation(variant_info) != "dotted":
                 raise cv.Invalid(
                     f"'{value}' is not a valid pin: this variant does not use "
@@ -113,7 +113,7 @@ def _validate_gpio_pin(value):
             from . import zephyr_data
             from .variants import VARIANTS
 
-            variant_info = VARIANTS.get(zephyr_data().get("variant"))
+            variant_info = VARIANTS.get(zephyr_data().get(KEY_VARIANT))
             if _pin_notation(variant_info) != "concat":
                 raise cv.Invalid(
                     f"'{value}' is not a valid pin: this variant does not use "
@@ -130,7 +130,7 @@ def _validate_gpio_pin(value):
             from . import zephyr_data
             from .variants import VARIANTS
 
-            variant_info = VARIANTS.get(zephyr_data().get("variant"))
+            variant_info = VARIANTS.get(zephyr_data().get(KEY_VARIANT))
             if _pin_notation(variant_info) != "underscore":
                 raise cv.Invalid(
                     f"'{value}' is not a valid pin: this variant does not use "
@@ -198,7 +198,7 @@ async def zephyr_pin_to_code(config):
     from .variants import VARIANTS
 
     num = config[CONF_NUMBER]
-    variant_info = VARIANTS[zephyr_data()["variant"]]
+    variant_info = VARIANTS[zephyr_data()[KEY_VARIANT]]
     gpio_port_width = variant_info.gpio_port_width
     port = num // gpio_port_width
     port_labels = variant_info.gpio_port_labels
