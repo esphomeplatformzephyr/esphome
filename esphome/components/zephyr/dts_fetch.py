@@ -9,6 +9,7 @@ from esphome.build_helpers.tools_cache import ZEPHYR_TOOLS_CACHE, tools_cache_pa
 import esphome.config_validation as cv
 from esphome.const import CONF_PATH, CONF_REF, CONF_TYPE, CONF_URL, TYPE_LOCAL
 from esphome.core import CORE, TimePeriodSeconds
+from esphome.framework_helpers import install_lock
 from esphome.types import ConfigType
 
 from .const import KEY_SDK_SOURCE_RESOLVED_REF
@@ -128,17 +129,18 @@ def resolve_sdk_source_version(source: ConfigType, refresh: TimePeriodSeconds) -
     dest = _sdk_source_version_cache_root() / _sdk_source_cache_key(url, ref)
     version_file = dest / "VERSION"
 
-    needs_fetch = not version_file.is_file()
-    if (
-        not needs_fetch
-        and refresh is not None
-        and not CORE.skip_external_update
-        and (time.time() - version_file.stat().st_mtime) > refresh.total_seconds
-    ):
-        needs_fetch = True
+    with install_lock(_sdk_source_version_cache_root(), dest.name):
+        needs_fetch = not version_file.is_file()
+        if (
+            not needs_fetch
+            and refresh is not None
+            and not CORE.skip_external_update
+            and (time.time() - version_file.stat().st_mtime) > refresh.total_seconds
+        ):
+            needs_fetch = True
 
-    if needs_fetch:
-        _fetch_sdk_source_version(url, ref, dest)
+        if needs_fetch:
+            _fetch_sdk_source_version(url, ref, dest)
 
-    source[KEY_SDK_SOURCE_RESOLVED_REF] = _resolve_git_head(dest)
+        source[KEY_SDK_SOURCE_RESOLVED_REF] = _resolve_git_head(dest)
     return _parse_zephyr_version_file(version_file)

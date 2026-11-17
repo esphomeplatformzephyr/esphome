@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import nullcontext
 import os
 from pathlib import Path
 import subprocess
@@ -21,6 +22,17 @@ from esphome.components.zephyr.dts_fetch import (
 )
 import esphome.config_validation as cv
 from esphome.core import TimePeriodSeconds
+
+
+@pytest.fixture(autouse=True)
+def install_lock() -> Iterator[MagicMock]:
+    """Keep the cache's lock file out of the real tools cache."""
+    with patch(
+        "esphome.components.zephyr.dts_fetch.install_lock",
+        side_effect=lambda root, name: nullcontext(),
+    ) as lock:
+        yield lock
+
 
 _FAKE_RESOLVED_SHA: str = "a" * 40
 
@@ -179,6 +191,22 @@ def test_resolve_sdk_source_version_clones_when_not_cached(tmp_path: Path) -> No
 
     assert version == "4.4.2"
     assert calls[0][:2] == ["git", "clone"]
+
+
+def test_resolve_sdk_source_version_fetches_under_the_cache_lock(
+    tmp_path: Path, install_lock: MagicMock
+) -> None:
+    """Builds at once would otherwise clone into, or delete, the same folder."""
+
+    def git(cmd: list[str]) -> None:
+        dest = Path(cmd[-1])
+        (dest / ".git").mkdir(parents=True)
+        (dest / "VERSION").write_text(_VERSION_442)
+
+    _resolve_with(tmp_path, git)
+
+    key = _sdk_source_cache_key(_SOURCE["url"], _SOURCE["ref"])
+    install_lock.assert_called_once_with(tmp_path, key)
 
 
 def test_resolve_sdk_source_version_failed_clone_leaves_no_partial_dir(

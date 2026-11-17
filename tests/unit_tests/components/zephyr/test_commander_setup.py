@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from contextlib import AbstractContextManager
+from contextlib import AbstractContextManager, contextmanager
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -199,3 +199,36 @@ def test_check_and_install_downloads_the_aarch64_archive(
     assert (
         mock_download.call_args.kwargs["sha256"] == _RELEASES[_TEST_VERSION]["aarch64"]
     )
+
+
+def test_check_and_install_skips_a_download_finished_while_waiting(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mock_commander_download_ops: tuple[MagicMock, MagicMock],
+) -> None:
+    """Another build installed it while this one waited for the lock."""
+    monkeypatch.setenv("ESPHOME_SDK_SILABS_PREFIX", str(tmp_path / "cache"))
+    mock_download, _ = mock_commander_download_ops
+    install_dir = _install_dir(_TEST_VERSION)
+    locks: list[tuple[Path, str]] = []
+
+    @contextmanager
+    def _other_build_finishes(root: Path, name: str) -> Iterator[None]:
+        locks.append((root, name))
+        install_dir.mkdir(parents=True)
+        (install_dir / ".esphome_complete").touch()
+        yield
+
+    p1, p2 = _patch_host()
+    with (
+        p1,
+        p2,
+        patch(
+            "esphome.components.zephyr.commander_setup.install_lock",
+            side_effect=_other_build_finishes,
+        ),
+    ):
+        assert check_and_install(_TEST_VERSION) == install_dir
+
+    assert locks == [(install_dir.parent, _TEST_VERSION)]
+    mock_download.assert_not_called()
