@@ -492,10 +492,10 @@ def upload_serial_dfu(host: str) -> bool:
     python_bin, _, env = west_install(
         sdk,
         str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]),
+        zephyr_additional_framework_projects(sdk),
         zephyr_data()["west_version"],
         zephyr_data()["ninja_version"],
         zephyr_data()["sdk_source"],
-        projects=zephyr_additional_framework_projects(sdk),
     )
     if zephyr_data()[KEY_BOOTLOADER] == BOOTLOADER_NRF:
         return _upload_open_dfu(host, package, env)

@@ -263,10 +263,10 @@ def install_git_modules(modules: list[ZephyrModule], sdk_url: str) -> list[Path]
 def check_and_install(
     sdk: ZephyrSDK,
     version: str,
+    projects: frozenset[str],
     west_version: str | None = None,
     ninja_version: str | None = None,
     source: ConfigType | None = None,
-    projects: frozenset[str] = frozenset(),
 ) -> tuple[Path, Path, dict[str, str]]:
     """Install west and the Zephyr SDK, serialized against other builds installing
     the same workspace at once (see install_lock)."""

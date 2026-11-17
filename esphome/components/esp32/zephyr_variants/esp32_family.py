@@ -307,10 +307,10 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
     python_bin, framework_path, west_env = west_install(
         sdk,
         version,
+        zephyr_additional_framework_projects(sdk),
         zephyr_data()["west_version"],
         zephyr_data()["ninja_version"],
         zephyr_data()["sdk_source"],
-        projects=zephyr_additional_framework_projects(sdk),
     )
 
     build_dir = CORE.relative_build_path(".west_build")

@@ -1856,10 +1856,10 @@ async def zephyr_toolchain_to_code(config: ConfigType) -> None:
     west_install(
         sdk,
         version,
+        zephyr_additional_framework_projects(sdk),
         zephyr_data()["west_version"],
         zephyr_data()["ninja_version"],
         zephyr_data()["sdk_source"],
-        projects=zephyr_additional_framework_projects(sdk),
     )
 
     from .dts_lookup import (
@@ -2141,10 +2141,10 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
         python_bin, framework_path, west_env = west_install(
             sdk,
             version,
+            zephyr_additional_framework_projects(sdk),
             zephyr_data()["west_version"],
             zephyr_data()["ninja_version"],
             zephyr_data()["sdk_source"],
-            projects=zephyr_additional_framework_projects(sdk),
         )
         build_dir = CORE.relative_build_path(".west_build")
         if not run_west_flash_pyocd(python_bin, framework_path, west_env, build_dir):
@@ -2180,10 +2180,10 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
     python_bin, framework_path, west_env = west_install(
         sdk,
         version,
+        zephyr_additional_framework_projects(sdk),
         zephyr_data()["west_version"],
         zephyr_data()["ninja_version"],
         zephyr_data()["sdk_source"],
-        projects=zephyr_additional_framework_projects(sdk),
     )
     build_dir = CORE.relative_build_path(".west_build")
     configured_runner = zephyr_data().get(KEY_RUNNER)
@@ -2238,10 +2238,10 @@ def run_compile(args, config: ConfigType) -> bool:
     python_bin, framework_path, west_env = west_install(
         sdk,
         version,
+        zephyr_additional_framework_projects(sdk),
         zephyr_data()["west_version"],
         zephyr_data()["ninja_version"],
         zephyr_data()["sdk_source"],
-        projects=zephyr_additional_framework_projects(sdk),
     )
     if sdk_name == "silabs":
         from .commander_setup import check_and_install as commander_install
