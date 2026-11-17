@@ -1,3 +1,5 @@
+"""Install the Zephyr framework for Zephyr toolchain builds."""
+
 from dataclasses import replace
 import hashlib
 import logging

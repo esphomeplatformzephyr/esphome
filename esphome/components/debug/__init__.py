@@ -1,6 +1,5 @@
 import esphome.codegen as cg
 from esphome.components import logger
-from esphome.components.nrf52.framework import include_west_project
 from esphome.components.zephyr import (
     DEBUG_OWNER,
     claim_rtt_channel,
@@ -80,6 +79,9 @@ CONFIG_SCHEMA = cv.All(
 
 async def to_code(config: ConfigType) -> None:
     if CORE.using_zephyr:
+        # Imported here so configs for other platforms do not load the nrf52 package
+        from esphome.components.nrf52.framework import include_west_project
+
         zephyr_add_prj_conf("HWINFO", True)
         # gdb thread support
         zephyr_add_prj_conf("DEBUG_THREAD_INFO", True)
