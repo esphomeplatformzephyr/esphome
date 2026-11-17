@@ -1920,13 +1920,12 @@ def _restore_upload_data(zephyr_config: ConfigType) -> None:
             sdk_source[KEY_SDK_SOURCE_RESOLVED_REF] = resolved_ref
     set_core_data(
         variant,
-        zephyr_config[CONF_BOARD],
-        get_family_module(variant_data.family).bootloader(advanced)
+        zephyr_config,
+        CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION],
+        framework_type=resolve_sdk(variant_data, framework.get(CONF_TYPE))[0],
+        bootloader=get_family_module(variant_data.family).bootloader(advanced)
         if variant_data.family
         else "",
-        CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION],
-        zephyr_config,
-        framework_type=resolve_sdk(variant_data, framework.get(CONF_TYPE))[0],
         sdk_source=sdk_source,
         runner=advanced.get(CONF_RUNNER),
     )

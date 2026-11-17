@@ -10,6 +10,7 @@ from typing import Any, Final
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ADVANCED,
+    CONF_BOARD,
     CONF_FRAMEWORK,
     CONF_REFRESH,
     CONF_SOURCE,
@@ -40,6 +41,34 @@ from ..const import (
     CONF_SINGLE_SLOT,
     CONF_SNIPPETS,
     CONF_WEST_VERSION,
+    KEY_BOARD_DIR_CACHE,
+    KEY_BOARD_EDT_CACHE,
+    KEY_BOARD_ROOT,
+    KEY_BOARD_YAML_CACHE,
+    KEY_BOOT_LAYOUT,
+    KEY_BOOTLOADER,
+    KEY_CPP_PATH,
+    KEY_DTS_INCLUDE_PATHS,
+    KEY_EXTRA_BUILD_FILES,
+    KEY_FAMILY,
+    KEY_FRAMEWORK_TYPE,
+    KEY_KCONFIG,
+    KEY_MODULE_OVERRIDES,
+    KEY_MODULE_REQUESTS,
+    KEY_OVERLAY,
+    KEY_OVERLAY_BUILDER,
+    KEY_PARTITION_REQUIREMENTS,
+    KEY_PM_STATIC,
+    KEY_PRJ_CONF,
+    KEY_RUNNER,
+    KEY_SHIELD_ROOT,
+    KEY_SHIELDS,
+    KEY_SINGLE_SLOT,
+    KEY_SNIPPET_ROOT,
+    KEY_SNIPPETS,
+    KEY_SYSBUILD_CONF,
+    KEY_USER,
+    KEY_VARIANT,
     KEY_ZEPHYR,
     VERSION_RECOMMENDED,
 )
@@ -504,12 +533,12 @@ def resolve_framework_version(
 
 def set_core_data(
     variant_name: str,
-    board: str,
-    bootloader: str,
-    framework_ver: cv.Version,
     config: ConfigType,
+    framework_ver: cv.Version,
     *,
     framework_type: str,
+    bootloader: str,
+    runner: str | None = None,
     sdk_source: ConfigType | None = None,
     prj_conf: dict | None = None,
     sysbuild_conf: dict | None = None,
@@ -518,9 +547,9 @@ def set_core_data(
     extra_build_files: dict | None = None,
     pm_static: list | None = None,
     user: dict | None = None,
-    kconfig: str = "",
+    kconfig: str | None = None,
     fake_board_manifest: str | None = None,
-    cpp_path: str = "",
+    cpp_path: str | None = None,
     board_dir_cache: dict | None = None,
     dts_include_paths: list | None = None,
     board_edt_cache: dict | None = None,
@@ -529,65 +558,84 @@ def set_core_data(
     shields: list[str] | None = None,
     shield_root: Path | None = None,
     snippet_root: Path | None = None,
-    runner: str | None = None,
 ) -> None:
-    """Populate CORE.data for a Zephyr variant's config_schema().
+    """Fill CORE.data for a variant's config_schema; ``bootloader`` is "" for none.
+    The keywords after ``runner`` replace a field's start value."""
+    # deferred: zephyr's __init__ may import this package
+    from .. import zephyr_data, zephyr_set_core_data
 
-    `config` supplies cross-variant user overrides (framework: advanced: west_version:
-    and ninja_version:).
-    Every keyword defaults to today's shared "nothing configured yet" starting point. A
-    future variant (e.g. Nordic, STM32) that genuinely needs a different starting value for
-    any of these passes its own instead of forking this function.
-    """
-    from .. import (
-        ZephyrData,  # deferred: zephyr/__init__.py imports this package at load time
-    )
-
-    advanced = config.get(CONF_FRAMEWORK, {}).get(CONF_ADVANCED, {})
-    CORE.toolchain = Toolchain.ZEPHYR
+    zephyr_set_core_data({**config, KEY_BOOTLOADER: bootloader})
+    zephyr_data()[KEY_VARIANT] = variant_name
+    zephyr_data()[KEY_FAMILY] = VARIANTS[variant_name].family
+    zephyr_data()[KEY_FRAMEWORK_TYPE] = framework_type
+    # The devicetree caches, filled as code generation reads the board
+    zephyr_data()[KEY_CPP_PATH] = ""
+    zephyr_data()[KEY_DTS_INCLUDE_PATHS] = None
+    zephyr_data()[KEY_BOARD_DIR_CACHE] = {}
+    zephyr_data()[KEY_BOARD_EDT_CACHE] = {}
     CORE.data[KEY_CORE][KEY_TARGET_FRAMEWORK] = KEY_ZEPHYR
     CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION] = framework_ver
-
-    CORE.data[KEY_ZEPHYR] = ZephyrData(
-        board=board,
-        board_root=board_root,
-        sdk_source=sdk_source,
-        bootloader=bootloader,
-        variant=variant_name,
-        family=VARIANTS[variant_name].family,
-        framework_type=framework_type,
-        prj_conf=prj_conf if prj_conf is not None else {},
-        sysbuild_conf=sysbuild_conf if sysbuild_conf is not None else {},
-        overlay=overlay if overlay is not None else {"": ""},
-        overlay_builder=overlay_builder if overlay_builder is not None else [],
-        cdc_acm_users={},
-        cdc_acm_required=False,
-        extra_build_files=extra_build_files if extra_build_files is not None else {},
-        pm_static=pm_static if pm_static is not None else [],
-        partition_requirements=[],
-        boot_layout=board_boot_layout(VARIANTS[variant_name], board),
-        user=user if user is not None else {},
-        kconfig=kconfig,
-        fake_board_manifest=fake_board_manifest,
-        cpp_path=cpp_path,
-        board_dir_cache=board_dir_cache if board_dir_cache is not None else {},
-        dts_include_paths=dts_include_paths,
-        board_edt_cache=board_edt_cache if board_edt_cache is not None else {},
-        board_yaml_cache=board_yaml_cache if board_yaml_cache is not None else {},
-        west_version=advanced.get(CONF_WEST_VERSION),
-        ninja_version=advanced.get(CONF_NINJA_VERSION),
-        snippets=config.get(CONF_FRAMEWORK, {}).get(CONF_SNIPPETS, []),
-        single_slot=config.get(CONF_FRAMEWORK, {}).get(CONF_SINGLE_SLOT, False),
-        shields=shields if shields is not None else [],
-        shield_root=shield_root,
-        snippet_root=snippet_root,
-        module_requests={},
-        module_overrides={},
-        blobs=[],
-        runner=runner,
-        sysbuild=False,
-        rtt_channels={},
+    zephyr_data()[KEY_BOARD_YAML_CACHE] = {}
+    zephyr_data()["fake_board_manifest"] = None
+    zephyr_data()["blobs"] = []
+    zephyr_data()[KEY_RUNNER] = runner
+    zephyr_data()[KEY_BOOT_LAYOUT] = board_boot_layout(
+        VARIANTS[variant_name], config[CONF_BOARD]
     )
+    zephyr_data()[KEY_SYSBUILD_CONF] = {}
+    framework = config.get(CONF_FRAMEWORK, {})
+    advanced = framework.get(CONF_ADVANCED, {})
+    zephyr_data()["sdk_source"] = sdk_source
+    zephyr_data()["west_version"] = advanced.get(CONF_WEST_VERSION)
+    zephyr_data()["ninja_version"] = advanced.get(CONF_NINJA_VERSION)
+    zephyr_data()[KEY_BOARD_ROOT] = None
+    zephyr_data()[KEY_SNIPPETS] = framework.get(CONF_SNIPPETS, [])
+    zephyr_data()[KEY_SHIELDS] = []
+    zephyr_data()[KEY_SHIELD_ROOT] = None
+    zephyr_data()[KEY_SNIPPET_ROOT] = None
+    zephyr_data()[KEY_SINGLE_SLOT] = framework.get(CONF_SINGLE_SLOT, False)
+    zephyr_data()[KEY_PARTITION_REQUIREMENTS] = []
+    zephyr_data()[KEY_USER] = {}
+    zephyr_data()[KEY_MODULE_REQUESTS] = {}
+    zephyr_data()[KEY_MODULE_OVERRIDES] = {}
+    zephyr_data()["rtt_channels"] = {}
+    if prj_conf is not None:
+        zephyr_data()[KEY_PRJ_CONF] = prj_conf
+    if sysbuild_conf is not None:
+        zephyr_data()[KEY_SYSBUILD_CONF] = sysbuild_conf
+    if overlay is not None:
+        zephyr_data()[KEY_OVERLAY] = overlay
+    if overlay_builder is not None:
+        zephyr_data()[KEY_OVERLAY_BUILDER] = overlay_builder
+    if extra_build_files is not None:
+        zephyr_data()[KEY_EXTRA_BUILD_FILES] = extra_build_files
+    if pm_static is not None:
+        zephyr_data()[KEY_PM_STATIC] = pm_static
+    if user is not None:
+        zephyr_data()[KEY_USER] = user
+    if kconfig is not None:
+        zephyr_data()[KEY_KCONFIG] = kconfig
+    if fake_board_manifest is not None:
+        zephyr_data()["fake_board_manifest"] = fake_board_manifest
+    if cpp_path is not None:
+        zephyr_data()[KEY_CPP_PATH] = cpp_path
+    if board_dir_cache is not None:
+        zephyr_data()[KEY_BOARD_DIR_CACHE] = board_dir_cache
+    if dts_include_paths is not None:
+        zephyr_data()[KEY_DTS_INCLUDE_PATHS] = dts_include_paths
+    if board_edt_cache is not None:
+        zephyr_data()[KEY_BOARD_EDT_CACHE] = board_edt_cache
+    if board_yaml_cache is not None:
+        zephyr_data()[KEY_BOARD_YAML_CACHE] = board_yaml_cache
+    if board_root is not None:
+        zephyr_data()[KEY_BOARD_ROOT] = board_root
+    if shields is not None:
+        zephyr_data()[KEY_SHIELDS] = shields
+    if shield_root is not None:
+        zephyr_data()[KEY_SHIELD_ROOT] = shield_root
+    if snippet_root is not None:
+        zephyr_data()[KEY_SNIPPET_ROOT] = snippet_root
+    CORE.toolchain = Toolchain.ZEPHYR
 
 
 ZEPHYR_MAINLINE: ZephyrSDK = ZephyrSDK(

@@ -83,11 +83,10 @@ def config_schema(config: ConfigType) -> ConfigType:
     )
     set_core_data(
         VARIANT_NAME,
-        config[CONF_BOARD],
-        BOOTLOADER_MCUBOOT,
-        framework_ver,
         config,
+        framework_ver,
         framework_type=sdk_name,
+        bootloader=BOOTLOADER_MCUBOOT,
         sdk_source=config[CONF_FRAMEWORK].get(CONF_SOURCE),
         runner=config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_RUNNER),
     )

@@ -12,7 +12,7 @@ from esphome.components.zephyr import ZephyrData, dts_lookup
 from esphome.components.zephyr.const import KEY_FAMILY, KEY_VARIANT, KEY_ZEPHYR
 from esphome.components.zephyr.variants import VARIANTS, set_core_data
 import esphome.config_validation as cv
-from esphome.const import KEY_CORE, Framework, Platform, PlatformFramework
+from esphome.const import CONF_BOARD, KEY_CORE, Framework, Platform, PlatformFramework
 from esphome.core import CORE
 
 _PLATFORM_FAMILIES = {
@@ -48,11 +48,10 @@ def empty_zephyr_data(
     CORE.data.setdefault(KEY_CORE, {})
     set_core_data(
         variant if variant in VARIANTS else next(iter(VARIANTS)),
-        "some_board",
-        "none",
+        {CONF_BOARD: "some_board"},
         cv.Version(4, 5, 0),
-        {},
         framework_type=framework_type,
+        bootloader="none",
     )
     data: dict[str, Any] = dict(CORE.data.pop(KEY_ZEPHYR))
     CORE.data[KEY_CORE] = previous_core
