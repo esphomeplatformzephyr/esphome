@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 import importlib
 import logging
 from pathlib import Path
+import re
 from types import ModuleType
 from typing import Any, Final
 
@@ -388,6 +389,19 @@ def _sdk_min_version(
     return sdk.min_version
 
 
+def _release_order(version: cv.Version) -> tuple[int, int, int, bool, str, int]:
+    """Sort key in which a release follows its prereleases and rc2 comes before rc10."""
+    suffix = re.fullmatch(r"(\D*)(\d*)", version.extra)
+    return (
+        version.major,
+        version.minor,
+        version.patch,
+        not version.extra,
+        suffix[1],
+        int(suffix[2] or 0),
+    )
+
+
 def mcuboot_or_none(advanced: dict) -> str:
     """Return MCUboot if advanced: bootloader: selects it, else "" -- the value
     variants with an opt-in bootloader pass to set_core_data()."""
@@ -483,7 +497,7 @@ def resolve_framework_version(
         raise cv.Invalid(
             f"'{version_str}' is not a version number", [CONF_FRAMEWORK, CONF_VERSION]
         ) from err
-    if framework_ver < min_version:
+    if _release_order(framework_ver) < _release_order(min_version):
         raise cv.Invalid(
             f"{variant_name} requires {sdk_name} >= {min_version} ({requires_reason}). "
             f"Got {version_str}.",

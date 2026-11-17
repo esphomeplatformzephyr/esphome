@@ -154,6 +154,26 @@ def test_resolve_framework_version_rejects_version_below_min() -> None:
         resolve_framework_version(variant, "fake", config, "test")
 
 
+def test_resolve_framework_version_rejects_prerelease_of_min() -> None:
+    variant = _fake_variant()
+    config = {CONF_FRAMEWORK: _framework_config(**{CONF_VERSION: "1.0.0-rc1"})}
+
+    with pytest.raises(cv.Invalid, match=">= 1.0.0"):
+        resolve_framework_version(variant, "fake", config, "test")
+
+
+def test_resolve_framework_version_release_meets_prerelease_min() -> None:
+    sdk = ZephyrSDK(
+        source=_DEFAULT_SDK.source,
+        default_version="1.0.0",
+        min_version=cv.Version(1, 0, 0, "rc2"),
+    )
+    variant = ZephyrVariant(sdk=sdk, sdk_name="default")
+    for version in ("1.0.0", "1.0.0-rc10"):
+        config = {CONF_FRAMEWORK: _framework_config(**{CONF_VERSION: version})}
+        resolve_framework_version(variant, "fake", config, "test")
+
+
 def test_resolve_framework_version_accepts_recommended_literal() -> None:
     variant = _fake_variant()
     config = {CONF_FRAMEWORK: _framework_config(**{CONF_VERSION: VERSION_RECOMMENDED})}
@@ -299,7 +319,7 @@ def test_simg301_defaults_to_a_version_with_six301_support() -> None:
     assert str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]) == "4.5.0"
 
 
-@pytest.mark.parametrize("version", ["4.5.0-rc1", "4.5.0", "4.5.1"])
+@pytest.mark.parametrize("version", ["4.5.0", "4.5.1"])
 def test_simg301_accepts_4_5(version: str) -> None:
     _simg301_schema({CONF_VERSION: version})
 
