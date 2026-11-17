@@ -183,6 +183,20 @@ def test_finished_workspace_only_checks_the_names(tmp_path: Path) -> None:
     assert [c[2:4] for c in calls] == [["west", "list"]]
 
 
+def test_installed_workspace_gets_the_patches(tmp_path: Path) -> None:
+    """Every run patches the workspace, which an existing install needs too."""
+    _install(tmp_path)
+
+    with (
+        patch.object(framework, "patch_gen_defines_dts_path") as gen_defines,
+        patch.object(framework, "patch_west_build_source_dir_relpath") as west_build,
+    ):
+        _install(tmp_path)
+
+    gen_defines.assert_called_once_with(_workspace(tmp_path))
+    west_build.assert_called_once_with(_workspace(tmp_path))
+
+
 def test_rebuilt_venv_keeps_the_workspace(tmp_path: Path) -> None:
     """A rebuilt venv (its interpreter was removed) only gets Zephyr's requirements."""
     _install(tmp_path)

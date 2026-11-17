@@ -24,7 +24,9 @@ from esphome.components.zephyr.dts_lookup import (
     _find_shield_dir,
     _find_snippet_dir,
     _format_size,
+    _get_dts_include_paths,
     _get_edt,
+    _iter_nodes,
     _shield_overlay_files,
     _snippet_overlay_files,
     dts_node_enabled,
@@ -35,6 +37,7 @@ from esphome.components.zephyr.dts_lookup import (
     get_i2c_controller_labels,
     get_pinctrl_group_property,
     get_pinctrl_states,
+    get_rng_node_label,
     get_spi_controller_labels,
     get_uart_controller_labels,
     get_watchdog_node_label,
@@ -1622,6 +1625,31 @@ def _board_tree(tmp_path: Path) -> None:
     (board / "my_board.dts").write_text("/ { };")
 
 
+def test_get_edt_is_cached_per_board(
+    edt_texts: list[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _board_tree(tmp_path)
+    monkeypatch.setattr(dts_lookup, "get_zephyr_base", lambda: tmp_path)
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
+
+    first = _get_edt("my_board")
+
+    assert _get_edt("my_board") is first
+    assert len(edt_texts) == 1
+
+
+def test_get_edt_fails_without_the_devicetree_library(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(dts_lookup, "get_zephyr_base", lambda: tmp_path)
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
+
+    with pytest.raises(
+        EsphomeError, match="the workspace has no devicetree library in"
+    ):
+        _get_edt("my_board")
+
+
 def test_get_edt_fails_when_cpp_missing(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -1724,14 +1752,20 @@ def test_get_nfct_pins_node_label(
     assert dts_lookup.get_nfct_pins_node_label("some_board") == expected
 
 
-def test_dts_include_paths_follow_zephyr_order(tmp_path: Path) -> None:
+def test_dts_include_paths_cover_zephyr_and_the_hal_modules(tmp_path: Path) -> None:
+    """Board files #include the SoC files in the vendor's HAL module."""
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
     base = tmp_path / "zephyr"
-    for sub_dir in ("dts/riscv", "dts/arm", "dts/bindings", "dts/common", "dts/vendor"):
-        (base / sub_dir).mkdir(parents=True)
+    for sub in ("dts/riscv", "dts/arm", "dts/bindings", "dts/common", "dts/vendor"):
+        (base / sub).mkdir(parents=True)
+    (base / "dts" / "README").write_text("")
     (tmp_path / "modules" / "hal" / "stm32" / "dts").mkdir(parents=True)
+    (tmp_path / "modules" / "hal" / "cmsis").mkdir(parents=True)
 
-    assert dts_lookup._get_dts_include_paths(base) == [
+    paths = _get_dts_include_paths(base)
+
+    # Zephyr's order, the arch folders sorted
+    assert paths == [
         str(base / "include"),
         str(base / "include" / "zephyr"),
         str(base / "dts" / "common"),
@@ -1740,6 +1774,55 @@ def test_dts_include_paths_follow_zephyr_order(tmp_path: Path) -> None:
         str(base / "dts" / "riscv"),
         str(base / "dts"),
         str(tmp_path / "modules" / "hal" / "stm32" / "dts"),
+    ]
+    # Built once per build
+    assert _get_dts_include_paths(tmp_path / "other") is paths
+
+
+def test_dts_include_paths_of_a_bare_tree(tmp_path: Path) -> None:
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
+    assert _get_dts_include_paths(tmp_path) == [
+        str(tmp_path / "include"),
+        str(tmp_path / "include" / "zephyr"),
+        str(tmp_path / "dts"),
+    ]
+
+
+def test_iter_nodes_flattens_scc_order() -> None:
+    edt = SimpleNamespace(scc_order=["a", ["b", "c"], "d"])
+    assert list(_iter_nodes(edt)) == ["a", "b", "c", "d"]
+
+
+def test_preprocess_dts_file_runs_cpp_with_the_include_folders(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    seen: list[list[str]] = []
+
+    def _fake_run(cmd: list[str], **kwargs: Any) -> SimpleNamespace:
+        seen.append(cmd)
+        return SimpleNamespace(stdout="/ { };")
+
+    monkeypatch.setattr(dts_lookup, "_find_cpp", lambda: "/usr/bin/cpp")
+    monkeypatch.setattr(dts_lookup, "_get_dts_include_paths", lambda base: ["/inc"])
+    monkeypatch.setattr(dts_lookup.subprocess, "run", _fake_run)
+
+    src = tmp_path / "board.dts"
+    assert dts_lookup._preprocess_dts_file(src, tmp_path, ["/board"]) == "/ { };"
+    assert seen == [
+        [
+            "/usr/bin/cpp",
+            "-x",
+            "assembler-with-cpp",
+            "-nostdinc",
+            "-undef",
+            "-D__DTS__",
+            "-E",
+            "-I",
+            "/inc",
+            "-I",
+            "/board",
+            str(src),
+        ]
     ]
 
 
@@ -1971,3 +2054,82 @@ def test_get_edt_fails_when_the_workspace_is_missing(
 
     with pytest.raises(EsphomeError, match="is not installed"):
         _get_edt("my_board")
+
+
+def test_uart_controller_labels_enabled_first(board_edt: Callable[..., None]) -> None:
+    board_edt(
+        [
+            _uart("usart3", "disabled"),
+            _uart("usart10"),
+            _uart("usart2"),
+            _uart("lpuart1"),
+            _uart("usart10", "disabled"),
+            _uart("usart1", "disabled"),
+            # Not a UART, and a UART node without a label
+            _FakeNode(["i2c1"], buses=["i2c"]),
+            _FakeNode([], buses=["uart"]),
+        ]
+    )
+    # Numbers compare as numbers: usart2 before usart10
+    assert get_uart_controller_labels("nucleo_c5a3zg") == [
+        "lpuart1",
+        "usart2",
+        "usart10",
+        "usart1",
+        "usart3",
+    ]
+
+
+@pytest.mark.parametrize(
+    ("hw_uart", "label"),
+    [("UART0", "usart2"), ("UART1", "lpuart1"), ("UART2", "usart1")],
+)
+def test_resolve_uart_node_label_counts_from_the_console(
+    board_edt: Callable[..., None], hw_uart: str, label: str
+) -> None:
+    """UART0 is the console whatever its name; the others follow, enabled first."""
+    console = _uart("usart2")
+    board_edt([_uart("usart1", "disabled"), console, _uart("lpuart1")], console)
+    assert resolve_uart_node_label("nucleo_c5a3zg", hw_uart, {}) == label
+
+
+def _rng(label: str, status: str = "okay") -> _FakeNode:
+    return _FakeNode([label], status=status, compats=["st,stm32-rng"])
+
+
+@pytest.mark.parametrize(
+    ("nodes", "expected"),
+    [
+        # The SoC file ships it disabled; the variant enables it
+        ([_FakeNode(["usart1"]), _rng("rng", "disabled")], "rng"),
+        ([_rng("rng")], "rng"),
+        # A matching node without a label can't be referenced
+        ([_FakeNode([], compats=["st,stm32-rng"]), _rng("rng2")], "rng2"),
+        ([_FakeNode(["usart1"])], None),
+    ],
+)
+def test_rng_node_label(
+    board_edt: Callable[..., None], nodes: list[_FakeNode], expected: str | None
+) -> None:
+    board_edt(nodes)
+    assert get_rng_node_label("nucleo_c5a3zg") == expected
+
+
+def test_rng_node_label_of_another_compatible(board_edt: Callable[..., None]) -> None:
+    board_edt([_rng("rng"), _FakeNode(["trng"], compats=["nxp,els-trng"])])
+    assert get_rng_node_label("frdm_mcxn236", "nxp,els-trng") == "trng"
+
+
+@pytest.mark.parametrize(
+    ("enabled_only", "expected"), [(True, "rng2"), (False, "rng1")]
+)
+def test_find_node_label_by_compat_can_skip_disabled_nodes(
+    board_edt: Callable[..., None], enabled_only: bool, expected: str
+) -> None:
+    board_edt([_rng("rng1", "disabled"), _rng("rng2")])
+    assert (
+        dts_lookup._find_node_label_by_compat(
+            "nucleo_c5a3zg", "st,stm32-rng", enabled_only=enabled_only
+        )
+        == expected
+    )

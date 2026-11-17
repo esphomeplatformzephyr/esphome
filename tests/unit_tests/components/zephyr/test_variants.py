@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable, Mapping
 from importlib import import_module
 import sys
 from types import ModuleType
@@ -9,11 +10,17 @@ from typing import Any
 
 import pytest
 
-from esphome.components.zephyr import variants
-from esphome.components.zephyr.const import VERSION_RECOMMENDED
+from esphome.components.zephyr import (
+    variants,
+    zephyr_framework_type,
+    zephyr_variant,
+    zephyr_variant_family,
+)
+from esphome.components.zephyr.const import KEY_BOOTLOADER, VERSION_RECOMMENDED
 from esphome.components.zephyr.framework_helpers import FrameworkSource
 from esphome.components.zephyr.variants import (
     VARIANTS,
+    ZEPHYR_MAINLINE,
     ZephyrModule,
     ZephyrModuleTemplate,
     ZephyrSDK,
@@ -21,17 +28,22 @@ from esphome.components.zephyr.variants import (
     get_family_module,
     resolve_framework_version,
     resolve_sdk,
+    set_core_data,
 )
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_ADVANCED,
+    CONF_BOARD,
     CONF_FRAMEWORK,
     CONF_REFRESH,
     CONF_SOURCE,
     CONF_TYPE,
     CONF_VERSION,
+    KEY_CORE,
+    KEY_FRAMEWORK_VERSION,
+    KEY_TARGET_FRAMEWORK,
 )
-from esphome.core import EsphomeError
+from esphome.core import CORE, EsphomeError
 
 _DEFAULT_SDK = ZephyrSDK(
     source=FrameworkSource(
@@ -390,6 +402,84 @@ def fake_platform(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
     monkeypatch.setitem(sys.modules, family.__name__, family)
     monkeypatch.setattr(variants, "_ZEPHYR_PLATFORMS", ("fakeplatform",))
     return chip
+
+
+def test_registry_loads_variants_and_families(fake_platform: ModuleType) -> None:
+    registry = variants._LazyVariants()
+
+    assert dict(registry.items()) == {"chip1": fake_platform.VARIANT}
+    assert registry.module("chip1") is fake_platform
+    assert (
+        registry.family_module("chipfam") is sys.modules[f"{_PACKAGE}.chipfam_family"]
+    )
+
+
+@pytest.mark.parametrize(
+    "access",
+    [
+        lambda r, v: r["chip1"],
+        lambda r, v: r.get("chip1"),
+        lambda r, v: next(iter(r.values())),
+        lambda r, v: v if "chip1" in r else None,
+        lambda r, v: v if list(r) == ["chip1"] else None,
+        lambda r, v: v if list(r.keys()) == ["chip1"] else None,
+        lambda r, v: v if r == {"chip1": v} else None,
+        lambda r, v: dict(r)["chip1"],
+    ],
+)
+def test_each_lookup_loads_the_registry(
+    fake_platform: ModuleType,
+    access: Callable[[Mapping[str, ZephyrVariant], ZephyrVariant], object],
+) -> None:
+    variant = fake_platform.VARIANT
+    assert access(variants._LazyVariants(), variant) is variant
+
+
+def test_module_lookups(
+    fake_platform: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(variants, "_variants_instance", variants._LazyVariants())
+
+    assert variants.get_variant_module("chip1") is fake_platform
+    assert variants.get_family_module("chipfam").__name__.endswith("chipfam_family")
+
+
+def test_stm32_variants_load() -> None:
+    registry = variants._LazyVariants()
+
+    assert "STM32C5" in registry
+    assert registry.family_module("stm32").__name__.endswith(".stm32_family")
+
+
+def test_stm32c5_default_is_its_minimum() -> None:
+    assert (
+        cv.Version.parse(ZEPHYR_MAINLINE.default_version)
+        == VARIANTS["STM32C5"].min_version_override
+    )
+
+
+def test_set_core_data(
+    fake_platform: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(variants, "VARIANTS", {"chip1": fake_platform.VARIANT})
+    CORE.data[KEY_CORE] = {}
+
+    config = {CONF_BOARD: "chip1_dk", CONF_FRAMEWORK: {}}
+    set_core_data(
+        "chip1",
+        config,
+        cv.Version(4, 5, 0),
+        framework_type="vendor",
+        bootloader="mcuboot",
+    )
+
+    assert zephyr_variant() == "chip1"
+    assert zephyr_variant_family() == "chipfam"
+    assert zephyr_framework_type() == "vendor"
+    assert CORE.data["zephyr"][CONF_BOARD] == "chip1_dk"
+    assert CORE.data["zephyr"][KEY_BOOTLOADER] == "mcuboot"
+    assert CORE.data[KEY_CORE][KEY_TARGET_FRAMEWORK] == "zephyr"
+    assert CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION] == cv.Version(4, 5, 0)
 
 
 def test_failed_variant_import_is_raised_on_every_lookup(
