@@ -250,7 +250,7 @@ def resolve_zephyr_bus(
             )
         else:
             _LOGGER.info(
-                "[zephyr] %s bus for '%s': %s (from DTS)",
+                "%s bus on board '%s' is %s",
                 platform.upper(),
                 board,
                 buses[0],
@@ -459,7 +459,7 @@ def resolve_uart_node_label(
                 f"Valid values: {', '.join(static_labels)}"
             )
         _LOGGER.info(
-            "[zephyr] %s for '%s': %s (from hardcoded uart_node_labels)",
+            "%s on board '%s' is %s, from the variant's uart_node_labels",
             hw_uart,
             board,
             label,
@@ -489,12 +489,11 @@ def resolve_uart_node_label(
     if label is None:
         others = [v for k, v in mapping.items() if k != "UART0"]
         raise EsphomeError(
-            f"Board '{board}' has no '{hw_uart}' -- besides its console "
-            f"({mapping['UART0']}), its DTS has {len(others)} other "
-            f"UART(s): {', '.join(others) or 'none'}."
+            f"Board '{board}' has no '{hw_uart}': besides its console "
+            f"({mapping['UART0']}), its devicetree has {len(others)} other "
+            f"UART(s): {', '.join(others) or 'none'}"
         )
-    source = "board's zephyr,console, from DTS" if hw_uart == "UART0" else "from DTS"
-    _LOGGER.info("[zephyr] %s for '%s': %s (%s)", hw_uart, board, label, source)
+    _LOGGER.info("%s on board '%s' is %s", hw_uart, board, label)
     return label
 
 

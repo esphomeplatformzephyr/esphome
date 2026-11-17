@@ -1949,7 +1949,7 @@ def test_resolve_uart_node_label_rejects_a_missing_uart(
     board_edt([console, _uart("lpuart1"), _uart("usart1")], console)
     with pytest.raises(
         EsphomeError,
-        match=r"no 'UART3' -- .*\(usart2\), .* 2 other UART\(s\): lpuart1, usart1\.",
+        match=r"no 'UART3': .*\(usart2\), .* 2 other UART\(s\): lpuart1, usart1$",
     ):
         resolve_uart_node_label("nucleo_c5a3zg", "UART3", {})
 
