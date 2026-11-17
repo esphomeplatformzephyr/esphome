@@ -163,7 +163,7 @@ async def to_code(config: ConfigType) -> None:
     cg.add_define("ESPHOME_BOARD", config[CONF_BOARD])
     cg.add_define("ESPHOME_VARIANT", "NRF54LM20A")
     cg.add_define(ThreadModel.MULTI_ATOMICS)
-    zephyr_setup_preferences()
+    zephyr_setup_preferences("ZMS")
     zephyr_add_prj_conf("REBOOT", True)
     zephyr_add_prj_conf("HWINFO", True)
 

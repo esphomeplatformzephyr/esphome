@@ -21,8 +21,8 @@ def _run_to_code(
     watchdog_ms: int = 10000,
     rng_label: str | None = "trng",
     bootloader: str = BOOTLOADER_MCUBOOT,
-) -> tuple[MagicMock, MagicMock, MagicMock]:
-    """Run to_code() and return the prj.conf, overlay and sysbuild.conf mocks."""
+) -> tuple[MagicMock, MagicMock, MagicMock, MagicMock]:
+    """Run to_code() and return the prj.conf, overlay, sysbuild.conf and preferences mocks."""
     config = {
         CONF_BOARD: BOARD,
         CONF_WATCHDOG_TIMEOUT: TimePeriod(milliseconds=watchdog_ms),
@@ -31,7 +31,7 @@ def _run_to_code(
         patch(f"{_ZEPHYR}.zephyr_add_prj_conf") as mock_conf,
         patch(f"{_ZEPHYR}.zephyr_add_overlay") as mock_overlay,
         patch(f"{_ZEPHYR}.zephyr_add_sysbuild_conf") as mock_sysbuild,
-        patch(f"{_ZEPHYR}.zephyr_setup_preferences"),
+        patch(f"{_ZEPHYR}.zephyr_setup_preferences") as mock_prefs,
         patch(f"{_ZEPHYR}.zephyr_data", return_value={KEY_BOOTLOADER: bootloader}),
         patch(f"{_DTS}.get_rng_node_label", return_value=rng_label) as mock_rng,
         patch.object(mcxn236.cg, "add_build_flag"),
@@ -39,7 +39,7 @@ def _run_to_code(
     ):
         asyncio.run(mcxn236.to_code(config))
     mock_rng.assert_called_once_with(BOARD, "nxp,els-trng")
-    return mock_conf, mock_overlay, mock_sysbuild
+    return mock_conf, mock_overlay, mock_sysbuild, mock_prefs
 
 
 def _conf_names(mock_conf: MagicMock) -> list[str]:
@@ -47,14 +47,14 @@ def _conf_names(mock_conf: MagicMock) -> list[str]:
 
 
 def test_to_code_switches_settings_to_zms() -> None:
-    mock_conf, _, _ = _run_to_code()
-    mock_conf.assert_any_call("ZMS", True)
+    mock_conf, _, _, mock_prefs = _run_to_code()
+    mock_prefs.assert_called_once_with("ZMS")
     mock_conf.assert_any_call("ZMS_CUSTOMIZE_BLOCK_SIZE", True)
     mock_conf.assert_any_call("ZMS_CUSTOM_BLOCK_SIZE", 128)
 
 
 def test_to_code_builds_a_hex_file() -> None:
-    mock_conf, _, _ = _run_to_code()
+    mock_conf, _, _, _ = _run_to_code()
     mock_conf.assert_any_call("BUILD_OUTPUT_HEX", True)
 
 
@@ -62,7 +62,7 @@ def test_to_code_builds_a_hex_file() -> None:
 def test_to_code_sets_the_watchdog_warning_only_with_a_watchdog(
     watchdog_ms: int, set_warning: bool
 ) -> None:
-    mock_conf, _, _ = _run_to_code(watchdog_ms=watchdog_ms)
+    mock_conf, _, _, _ = _run_to_code(watchdog_ms=watchdog_ms)
     if set_warning:
         mock_conf.assert_any_call("WDT_MCUX_WWDT_WARNING_INTERRUPT_CFG", 1023)
     else:
@@ -70,14 +70,14 @@ def test_to_code_sets_the_watchdog_warning_only_with_a_watchdog(
 
 
 def test_to_code_uses_the_trng_when_the_soc_has_one() -> None:
-    mock_conf, mock_overlay, _ = _run_to_code(rng_label="trng")
+    mock_conf, mock_overlay, _, _ = _run_to_code(rng_label="trng")
     mock_conf.assert_any_call("ENTROPY_GENERATOR", True)
     assert "TEST_RANDOM_GENERATOR" not in _conf_names(mock_conf)
     mock_overlay.assert_called_once_with('&trng { status = "okay"; };')
 
 
 def test_to_code_falls_back_to_the_test_rng_without_a_trng() -> None:
-    mock_conf, mock_overlay, _ = _run_to_code(rng_label=None)
+    mock_conf, mock_overlay, _, _ = _run_to_code(rng_label=None)
     mock_conf.assert_any_call("TEST_RANDOM_GENERATOR", True)
     assert "ENTROPY_GENERATOR" not in _conf_names(mock_conf)
     mock_overlay.assert_not_called()
@@ -89,7 +89,7 @@ def test_to_code_falls_back_to_the_test_rng_without_a_trng() -> None:
 def test_to_code_builds_mcuboot_only_when_selected(
     bootloader: str, built: bool
 ) -> None:
-    _, _, mock_sysbuild = _run_to_code(bootloader=bootloader)
+    _, _, mock_sysbuild, _ = _run_to_code(bootloader=bootloader)
     if built:
         mock_sysbuild.assert_any_call("BOOTLOADER_MCUBOOT", True)
         mock_sysbuild.assert_any_call("BOOT_SIGNATURE_TYPE_ECDSA_P256", True)

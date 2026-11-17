@@ -101,9 +101,8 @@ async def to_code(config: ConfigType) -> None:
     cg.add_define("ESPHOME_BOARD", config[CONF_BOARD])
     cg.add_define("ESPHOME_VARIANT", "MCXN236")
     cg.add_define(ThreadModel.MULTI_ATOMICS)
-    zephyr_setup_preferences()
-    # NVS can't mount on this flash's 128-byte write blocks; settings picks ZMS when it is enabled.
-    zephyr_add_prj_conf("ZMS", True)
+    # NVS can't mount on this flash's 128-byte write blocks
+    zephyr_setup_preferences("ZMS")
     zephyr_add_prj_conf("ZMS_CUSTOMIZE_BLOCK_SIZE", True)
     zephyr_add_prj_conf("ZMS_CUSTOM_BLOCK_SIZE", 128)
     zephyr_add_prj_conf("REBOOT", True)
