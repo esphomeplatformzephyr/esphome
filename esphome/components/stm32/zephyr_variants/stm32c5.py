@@ -54,6 +54,7 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
     family="stm32",
+    min_version_override=cv.Version(4, 5, 0),
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     transports=frozenset(),
