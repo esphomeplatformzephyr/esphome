@@ -65,7 +65,9 @@ void ZephyrUartComponent::setup() {
     // SEGGER RTT drivers do not support uart_configure
     ESP_LOGD(TAG, "uart_configure not supported by driver, using driver defaults");
   } else if (ret != 0) {
-    ESP_LOGW(TAG, "uart_configure failed: %d", ret);
+    ESP_LOGE(TAG, "uart_configure failed: %d", ret);
+    this->mark_failed(LOG_STR("uart_configure failed"));
+    return;
   }
 
   this->rx_buf_mem_ = std::make_unique<uint8_t[]>(this->rx_buffer_size_);
