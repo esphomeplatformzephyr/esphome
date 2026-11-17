@@ -55,6 +55,8 @@ FAMILY_DEFAULT: Final = "family default"
 
 @dataclass
 class ZephyrSDK:
+    """A framework distribution (Zephyr, NCS, etc.), not the Zephyr SDK toolchain."""
+
     source: FrameworkSource
     manifest_rev: str = "recommended"
     boards_repo_url: str | None = (
