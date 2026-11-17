@@ -180,10 +180,3 @@ def test_get_gpio_port_size(monkeypatch: pytest.MonkeyPatch) -> None:
     assert dts_lookup.get_gpio_port_size("b", "gpio0") == 32  # binding default
     assert dts_lookup.get_gpio_port_size("b", "gpio1") == 8
     assert dts_lookup.get_gpio_port_size("b", "gpio2") == 0
-
-
-def test_get_gpio_port_size_unknown_without_dts(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    monkeypatch.setattr(dts_lookup, "_get_edt", lambda board: None)
-    assert dts_lookup.get_gpio_port_size("b", "gpio1") is None

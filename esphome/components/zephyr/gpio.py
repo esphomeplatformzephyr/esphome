@@ -206,7 +206,7 @@ async def zephyr_pin_to_code(config):
     node_label = f"{variant_info.gpio_node_prefix}{node_suffix}"
     # DEVICE_DT_GET_OR_NULL() would compile a missing pin into a null device.
     port_size = get_gpio_port_size(zephyr_data()["board"], node_label)
-    if port_size is not None and num % gpio_port_width >= port_size:
+    if num % gpio_port_width >= port_size:
         raise EsphomeError(
             f"Pin {num} does not exist on this board: GPIO controller '{node_label}' "
             + (f"has {port_size} pins" if port_size else "is not in its devicetree")

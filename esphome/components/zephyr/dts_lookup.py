@@ -28,7 +28,6 @@ from .const import (
     KEY_BOARD_ROOT,
     KEY_BOARD_YAML_CACHE,
     KEY_CPP_PATH,
-    KEY_DTS_BASE_PATH,
     KEY_DTS_INCLUDE_PATHS,
     KEY_SHIELD_ROOT,
     KEY_SHIELDS,
@@ -36,6 +35,7 @@ from .const import (
     KEY_SNIPPETS,
     KEY_ZEPHYR,
 )
+from .framework import get_zephyr_base
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -67,12 +67,8 @@ def dts_node_label_exists(board: str, label: str) -> bool:
     `label`. Used to require an existing pinctrl node (e.g. "uart1_default") before
     generating a tx_pin/rx_pin override for it -- merging into a node that doesn't
     exist would silently produce one missing whatever properties (bias-pull-up,
-    input-enable, etc.) the board's own convention expects it to have. Returns False,
-    not None, when DTS is unavailable, since there's nothing to safely merge into
-    either way."""
+    input-enable, etc.) the board's own convention expects it to have."""
     edt = _get_edt(board)
-    if edt is None:
-        return False
     return any(label in node.labels for node in _iter_nodes(edt))
 
 
@@ -82,8 +78,6 @@ def has_pinctrl_configured(board: str, label: str) -> bool:
     sci<N>/uart<N> split) put pinctrl on a parent node, not the node a port label
     resolves to -- no Zephyr binding guarantees a `<label>_default` name exists."""
     edt = _get_edt(board)
-    if edt is None:
-        return False
     for node in _iter_nodes(edt):
         if label in node.labels:
             while node is not None:
@@ -94,12 +88,10 @@ def has_pinctrl_configured(board: str, label: str) -> bool:
     return False
 
 
-def get_gpio_port_size(board: str, label: str) -> int | None:
+def get_gpio_port_size(board: str, label: str) -> int:
     """Return how many pins the GPIO controller `label` has (0 if the board has no
-    such node), or None if the DTS is unavailable."""
+    such node)."""
     edt = _get_edt(board)
-    if edt is None:
-        return None
     node = next((n for n in _iter_nodes(edt) if label in n.labels), None)
     if node is None:
         return 0
@@ -115,8 +107,6 @@ def board_has_pm_states(board: str) -> bool:
     nrf52/rp2040). Boards without it still run arch_cpu_idle() unconditionally, but
     how much power that actually saves is SoC-specific and not verified here."""
     edt = _get_edt(board)
-    if edt is None:
-        return False
     return any("zephyr,power-state" in node.compats for node in _iter_nodes(edt))
 
 
@@ -126,8 +116,6 @@ def board_has_cpu_freq_pstates(board: str) -> bool:
     "nxp,mcxn-pstate" never appears as "zephyr,pstate" too), so the container
     node's name, not a shared compatible, is the only thing to match on."""
     edt = _get_edt(board)
-    if edt is None:
-        return False
     return any(node.name == "performance-states" for node in _iter_nodes(edt))
 
 
@@ -147,13 +135,11 @@ def _pinctrl_states_for_node(node) -> list[tuple[str, list[str]]] | None:
 def get_pinctrl_states(board: str, label: str) -> list[tuple[str, list[str]]] | None:
     """Return [(real_label, child_group_names), ...] for every pinctrl-<N> state
     on the node `label` (or an ancestor) -- e.g. both "default" and "sleep" --
-    or None if unavailable. Reads the real pinctrl-<N> = <&...> phandles via
+    or None if the node has none, or a state's node has no label. Reads the real pinctrl-<N> = <&...> phandles via
     edtlib's Node.pinctrls[*].conf_nodes instead of guessing a
     `<label>_default`-style name, which no Zephyr binding guarantees (e.g.
     esp32 labels it `spim<N>_default` for `&spi<N>`, not `spi<N>_default`)."""
     edt = _get_edt(board)
-    if edt is None:
-        return None
     for node in _iter_nodes(edt):
         if label not in node.labels:
             continue
@@ -168,11 +154,9 @@ def get_pinctrl_states(board: str, label: str) -> list[tuple[str, list[str]]] | 
 def get_pinctrl_state_names(board: str, label: str) -> list[str] | None:
     """Return the real pinctrl-names strings (e.g. ["default", "sleep"]), in
     pinctrl-<N> order, for the node `label` (or an ancestor) -- or None if
-    unavailable. Needed because overriding pinctrl-0 must restate every state
+    the node has none, or a state is unnamed. Needed because overriding pinctrl-0 must restate every state
     with a matching pinctrl-names count, or it's a DTS compile error."""
     edt = _get_edt(board)
-    if edt is None:
-        return None
     for node in _iter_nodes(edt):
         if label not in node.labels:
             continue
@@ -190,14 +174,12 @@ def get_pinctrl_group_property(
 ) -> list[int] | None:
     """Return the resolved integer values of `property_name` (e.g. "pinmux")
     on the child node `group_name` of the devicetree node labeled
-    `pinctrl_label`, or None if unavailable. `pinctrl_label` is expected to be
+    `pinctrl_label`, or None if the group or property isn't there. `pinctrl_label` is expected to be
     a real label already resolved via get_pinctrl_states() -- this lets a
     caller decode a family's own bit-encoding (e.g. ESP32's ESP32_PINMUX
     sig_i/sig_o fields) to determine which group carries which signal from
     real, already-parsed data, instead of assuming group order."""
     edt = _get_edt(board)
-    if edt is None:
-        return None
     for node in _iter_nodes(edt):
         if pinctrl_label not in node.labels:
             continue
@@ -217,8 +199,6 @@ def get_watchdog_node_label(board: str) -> tuple[str | None, bool]:
     bindings/watchdog/ folder, enabled ones first. already_working is True when the
     aliased node is enabled."""
     edt = _get_edt(board)
-    if edt is None:
-        return None, False
     aliased = None
     for node in _iter_nodes(edt):
         if "watchdog0" in node.aliases:
@@ -258,9 +238,7 @@ def resolve_zephyr_bus(
         )
         return override
 
-    lookup_fn = _BUS_LOOKUP.get(platform)
-    buses = lookup_fn(board) if lookup_fn is not None else None
-
+    buses = _BUS_LOOKUP[platform](board)
     if buses:
         if len(buses) > 1:
             _LOGGER.info(
@@ -279,13 +257,10 @@ def resolve_zephyr_bus(
             )
         return buses[0]
 
-    if buses is not None:
-        detail = (
-            f"Board '{board}' has no enabled {platform.upper()} buses in its DTS. "
-            "Verify the board name or check the board's DTS file."
-        )
-    else:
-        detail = "Couldn't read the board's devicetree (see the warning above)."
+    detail = (
+        f"Board '{board}' has no enabled {platform.upper()} buses in its DTS. "
+        "Verify the board name or check the board's DTS file."
+    )
     override_hint = f"    {override_key}: {platform}0  # replace with your board's Zephyr {platform.upper()} bus label"
     raise EsphomeError(
         f"Cannot determine {platform.upper()} bus label for board '{board}'. "
@@ -301,17 +276,11 @@ def resolve_zephyr_bus(
 # ---------------------------------------------------------------------------
 
 
-def _lookup_bus_labels_by_name_match(
-    board: str, label_pattern: str
-) -> list[str] | None:
+def _lookup_bus_labels_by_name_match(board: str, label_pattern: str) -> list[str]:
     r"""Return sorted DTS node labels whose label matches label_pattern (e.g.
-    r"i2c\d+"), enabled first then disabled, or None if DTS is unavailable --
-    disabled nodes count since some SoCs (e.g. Espressif) ship everything
+    r"i2c\d+"), enabled first then disabled -- disabled nodes count since some SoCs (e.g. Espressif) ship everything
     disabled by default and expect an application overlay to enable it."""
     edt = _get_edt(board)
-    if edt is None:
-        return None
-
     enabled: list[str] = []
     disabled: list[str] = []
     for node in _iter_nodes(edt):
@@ -333,14 +302,11 @@ def _natural_key(label: str) -> tuple[list[str | int], str]:
     return parts, label
 
 
-def _bus_node_labels(board: str, bus: str) -> list[str] | None:
+def _bus_node_labels(board: str, bus: str) -> list[str]:
     """Return sorted DTS node labels whose binding declares `bus: <bus>`,
-    enabled first then disabled, or None if DTS is unavailable -- robust to
-    per-vendor label naming a regex match can't handle."""
+    enabled first then disabled -- robust to per-vendor label naming a regex
+    match can't handle."""
     edt = _get_edt(board)
-    if edt is None:
-        return None
-
     enabled: list[str] = []
     disabled: list[str] = []
 
@@ -363,8 +329,6 @@ def _find_node_label_by_compat(
     `status = "disabled"` (e.g. STM32's rng), whose presence matters, not their
     enablement."""
     edt = _get_edt(board)
-    if edt is None:
-        return None
     for node in _iter_nodes(edt):
         if (
             compat in node.compats
@@ -402,11 +366,9 @@ def get_nfct_pins_node_label(board: str) -> str | None:
 
 
 def dts_node_enabled(board: str, label: str) -> bool:
-    """Return True if the node labeled `label` has status "okay"; False if it is disabled,
-    missing, or DTS is unavailable."""
+    """Return True if the node labeled `label` has status "okay"; False if it is disabled
+    or missing."""
     edt = _get_edt(board)
-    if edt is None:
-        return False
     return any(
         label in node.labels and node.status == "okay" for node in _iter_nodes(edt)
     )
@@ -416,38 +378,32 @@ def get_console_uart_label(board: str) -> str | None:
     """Return the board's `zephyr,console` chosen-node label, or None -- the
     anchor every UART-numbering function treats as UART0."""
     edt = _get_edt(board)
-    if edt is None:
-        return None
     node = edt.chosen_node("zephyr,console")
     if node is None or not node.labels:
         return None
     return node.labels[0]
 
 
-def get_can_controller_labels(board: str) -> list[str] | None:
-    r"""Return CAN controller node labels (enabled first, then disabled), or None
-    if DTS unavailable. Matched by label name, not `compatible` or a `bus: can`
+def get_can_controller_labels(board: str) -> list[str]:
+    r"""Return CAN controller node labels (enabled first, then disabled). Matched by label name, not `compatible` or a `bus: can`
     property (neither exists uniformly for CAN across STM32's bxCAN/FDCAN split)
     -- disabled nodes count since STM32 ships CAN disabled by default, expecting
     the application overlay to enable it."""
     return _lookup_bus_labels_by_name_match(board, r"(fd)?can\d+")
 
 
-def get_i2c_controller_labels(board: str) -> list[str] | None:
-    """Return I2C controller node labels (enabled first, then disabled), or None
-    if DTS unavailable."""
+def get_i2c_controller_labels(board: str) -> list[str]:
+    """Return I2C controller node labels (enabled first, then disabled)."""
     return _bus_node_labels(board, "i2c")
 
 
-def get_spi_controller_labels(board: str) -> list[str] | None:
-    """Return SPI controller node labels (enabled first, then disabled), or None
-    if DTS unavailable."""
+def get_spi_controller_labels(board: str) -> list[str]:
+    """Return SPI controller node labels (enabled first, then disabled)."""
     return _bus_node_labels(board, "spi")
 
 
-def get_uart_controller_labels(board: str) -> list[str] | None:
-    """Return UART controller node labels (enabled first, then disabled), or None
-    if DTS unavailable. Matched by `bus: uart` property, not label name -- some
+def get_uart_controller_labels(board: str) -> list[str]:
+    """Return UART controller node labels (enabled first, then disabled). Matched by `bus: uart` property, not label name -- some
     vendors (e.g. Renesas' sci0/sci9) don't use a `uart<N>` label convention."""
     return _bus_node_labels(board, "uart")
 
@@ -460,9 +416,7 @@ def _discover_uart_node_labels(board: str) -> dict[str, str] | None:
     console = get_console_uart_label(board)
     if console is None:
         return None
-    others = [
-        label for label in (get_uart_controller_labels(board) or []) if label != console
-    ]
+    others = [label for label in get_uart_controller_labels(board) if label != console]
     mapping = {"UART0": console}
     mapping.update({f"UART{i + 1}": label for i, label in enumerate(others)})
     return mapping
@@ -528,7 +482,7 @@ def resolve_uart_node_label(
     if mapping is None:
         raise EsphomeError(
             f"Cannot determine the console UART for board '{board}': its devicetree "
-            "has no zephyr,console UART, or couldn't be read (see the warning above). "
+            "has no zephyr,console UART. "
             "Select the UART explicitly with '&<label>'."
         )
     label = mapping.get(hw_uart)
@@ -551,7 +505,7 @@ def format_uart_node_label_map(board: str, static_labels: dict[str, str]) -> str
         dict(static_labels) if static_labels else _discover_uart_node_labels(board)
     )
     if not mapping:
-        return "(unavailable)"
+        return "(no zephyr,console)"
     return ", ".join(f"{slot}={label}" for slot, label in mapping.items())
 
 
@@ -583,10 +537,10 @@ def _load_edtlib(zephyr_base: Path) -> ModuleType:
             sys.path.remove(str(bundled))
 
 
-def _get_edt(board: str) -> Any | None:
+def _get_edt(board: str) -> Any:
     """Return a parsed, cached edtlib.EDT for board merged with its shields/
-    snippets overlays, or None if unavailable -- cached per (board, shields,
-    snippets) so cpp only runs once per unique combination per run."""
+    snippets overlays -- cached per (board, shields, snippets) so cpp only runs
+    once per unique combination per run. Raises EsphomeError when it can't be read."""
     zd = CORE.data.get(KEY_ZEPHYR, {})
     shields: list[str] = zd.get(KEY_SHIELDS) or []
     snippets: list[str] = zd.get(KEY_SNIPPETS) or []
@@ -596,26 +550,11 @@ def _get_edt(board: str) -> Any | None:
 
     cache = CORE.data[KEY_ZEPHYR][KEY_BOARD_EDT_CACHE]
     if cache_key in cache:
-        result = cache[cache_key]
-        return None if result is _NOT_FOUND else result
-
-    dts_base = zd.get(KEY_DTS_BASE_PATH)
-    if not dts_base:
-        # fetch_board_dts() already warned (or this build has no DTS tree at all).
-        cache[cache_key] = _NOT_FOUND
-        return None
-
+        return cache[cache_key]
     try:
-        edt = _build_edt(board, Path(dts_base), shields, snippets)
+        edt = _build_edt(board, get_zephyr_base(), shields, snippets)
     except _DtsReadError as err:
-        _LOGGER.warning(
-            "[zephyr] Can't read board '%s''s devicetree: %s. Bus, pinctrl and label "
-            "checks will fall back to guesses or need an explicit label.",
-            board,
-            err,
-        )
-        cache[cache_key] = _NOT_FOUND
-        return None
+        raise EsphomeError(f"Can't read board '{board}''s devicetree: {err}") from err
     cache[cache_key] = edt
     return edt
 
@@ -656,6 +595,8 @@ def _build_edt(
     board: str, zephyr_base: Path, shields: list[str], snippets: list[str]
 ) -> Any:
     """Parse board's devicetree with its revision/shield/snippet overlays."""
+    if not zephyr_base.is_dir():
+        raise _DtsReadError(f"the Zephyr workspace {zephyr_base} is not installed")
     board = _undeprecate_board(zephyr_base, board)
     edtlib = _load_edtlib(zephyr_base)
 
@@ -1133,14 +1074,11 @@ _FEATURE_COMPATIBLES: dict[str, list[str]] = {
 }
 
 
-def get_board_features(board: str) -> list[str] | None:
+def get_board_features(board: str) -> list[str]:
     """Return sorted hardware feature names detected via DTS `compatible`
-    matches, or None if DTS is unavailable. Disabled nodes count -- the SoC has
+    matches. Disabled nodes count -- the SoC has
     the hardware either way, an application overlay just hasn't turned it on."""
     edt = _get_edt(board)
-    if edt is None:
-        return None
-
     present_compats: set[str] = set()
     for node in _iter_nodes(edt):
         present_compats.update(node.compats)
@@ -1178,12 +1116,7 @@ def get_board_yaml_supported(board: str) -> list[str] | None:
 
 def _lookup_board_yaml_supported(board: str) -> list[str] | None:
     """Uncached implementation behind get_board_yaml_supported()."""
-    zd = CORE.data.get(KEY_ZEPHYR, {})
-    dts_base = zd.get(KEY_DTS_BASE_PATH)
-    if not dts_base:
-        return None
-
-    board_dir = _find_board_dir(Path(dts_base), board)
+    board_dir = _find_board_dir(get_zephyr_base(), board)
     if board_dir is None:
         return None
 
@@ -1214,13 +1147,10 @@ _PARTITION_PARENT_COMPATS = {"fixed-partitions"}
 _PARTITION_NODE_COMPATS = {"zephyr,mapped-partition", "fixed-subpartitions"}
 
 
-def get_board_partitions(board: str) -> list[tuple[str, int, int]] | None:
+def get_board_partitions(board: str) -> list[tuple[str, int, int]]:
     """Return (label, offset, size) flash partitions defined by the board's DTS,
-    sorted by offset, or None if DTS is unavailable."""
+    sorted by offset."""
     edt = _get_edt(board)
-    if edt is None:
-        return None
-
     partitions: list[tuple[str, int, int]] = []
     for node in _iter_nodes(edt):
         if node.label is None or not node.regs:
@@ -1285,7 +1215,7 @@ def log_board_capabilities(
     dts_features = get_board_features(board)
     lines.append(
         "[zephyr]   Also detected via DTS scan, might be disabled: (BLE/IEEE802154/NFC/USB/WiFi/CAN only): "
-        + (", ".join(dts_features) if dts_features else "(none or unavailable)")
+        + (", ".join(dts_features) if dts_features else "(none)")
     )
 
     for name, buses in (
@@ -1296,7 +1226,7 @@ def log_board_capabilities(
     ):
         lines.append(
             f"[zephyr]   {name} buses present: "
-            + (", ".join(buses) if buses else "(none or unavailable)")
+            + (", ".join(buses) if buses else "(none)")
         )
 
     lines.append(
@@ -1324,9 +1254,7 @@ def log_board_capabilities(
                     f"[zephyr]     {label:<{label_width}}  0x{addr:06x} - {_format_size(size):>6}"
                 )
         else:
-            lines.append(
-                "[zephyr]   Flash partitions defined by the board: (unavailable)"
-            )
+            lines.append("[zephyr]   Flash partitions defined by the board: (none)")
 
     _LOGGER.info("\n".join(lines))
 
@@ -1336,14 +1264,9 @@ def log_board_capabilities(
 # ---------------------------------------------------------------------------
 
 
-def validate_board(board: str) -> bool | None:
-    """Check whether board resolves to a real board directory. None means "can't
-    tell" (standard tree unavailable), not invalid."""
-    zd = CORE.data.get(KEY_ZEPHYR, {})
-    dts_base = zd.get(KEY_DTS_BASE_PATH)
-    if not dts_base:
-        return None
-    return _find_board_dir(Path(dts_base), board) is not None
+def validate_board(board: str) -> bool:
+    """Check whether board resolves to a real board directory."""
+    return _find_board_dir(get_zephyr_base(), board) is not None
 
 
 def validate_board_revision(board: str) -> bool | None:
@@ -1353,11 +1276,7 @@ def validate_board_revision(board: str) -> bool | None:
     requested_revision = parse_board_string(board).revision
     if requested_revision is None:
         return None
-    zd = CORE.data.get(KEY_ZEPHYR, {})
-    dts_base = zd.get(KEY_DTS_BASE_PATH)
-    if not dts_base:
-        return None
-    board_dir = _find_board_dir(Path(dts_base), board)
+    board_dir = _find_board_dir(get_zephyr_base(), board)
     if board_dir is None:
         return None
     resolved, declares_revisions = resolve_revision(board_dir, requested_revision)

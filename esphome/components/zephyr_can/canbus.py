@@ -110,13 +110,9 @@ def _resolve_instance(board: str) -> str:
                 labels[0],
             )
         return labels[0]
-    if labels is None:
-        detail = "Couldn't read the board's devicetree (see the warning above)."
-    else:
-        detail = f"Board '{board}' declares no CAN controller in its devicetree."
     raise cv.Invalid(
         f"Cannot determine the CAN controller node label for board '{board}'. "
-        f"{detail}\n"
+        f"Board '{board}' declares no CAN controller in its devicetree.\n"
         "To set it explicitly:\n"
         "  canbus:\n"
         "    - platform: zephyr_can\n"

@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any
 
+import pytest
+
 from esphome.components import esp32, nrf, nxp, renesas, rp2, silabs, stm32
-from esphome.components.zephyr import ZephyrData
+from esphome.components.zephyr import ZephyrData, dts_lookup
 from esphome.components.zephyr.const import KEY_FAMILY, KEY_VARIANT, KEY_ZEPHYR
 from esphome.components.zephyr.variants import VARIANTS, set_core_data
 import esphome.config_validation as cv
@@ -61,3 +64,9 @@ def empty_zephyr_data(
     data[KEY_FAMILY] = variant_info.family if variant_info is not None else None
     data.update(overrides)
     return data
+
+
+def use_empty_devicetree(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Give every board a devicetree that reads fine but has no nodes."""
+    edt = SimpleNamespace(scc_order=[], chosen_node=lambda name: None)
+    monkeypatch.setattr(dts_lookup, "_get_edt", lambda board: edt)

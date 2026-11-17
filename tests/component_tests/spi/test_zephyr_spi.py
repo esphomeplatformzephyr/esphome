@@ -21,8 +21,14 @@ from esphome.core import CORE
 from tests.component_tests.types import SetCoreConfigCallable
 from tests.unit_tests.components.zephyr.zephyr_state import (
     empty_zephyr_data,
+    use_empty_devicetree,
     zephyr_platform_framework,
 )
+
+
+@pytest.fixture(autouse=True)
+def _devicetree(monkeypatch: pytest.MonkeyPatch) -> None:
+    use_empty_devicetree(monkeypatch)
 
 
 def _zephyr(set_core_config: SetCoreConfigCallable, variant: str | None = None) -> None:

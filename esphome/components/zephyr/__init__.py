@@ -230,8 +230,6 @@ class ZephyrData(TypedDict):
     boot_layout: NotRequired[BootLayout | None]
     user: NotRequired[dict[str, list[str]]]
     fake_board_manifest: NotRequired[str | None]
-    # Local path to zephyr/ tree root with boards/; set by dts_fetch
-    dts_base_path: NotRequired[str | None]
     # "" = unchecked; None = not found; else = executable path
     cpp_path: NotRequired[str | None]
     # board -> abs path str, "" = not found
@@ -1849,18 +1847,19 @@ def zephyr_config_schema(
 # which would add a section comment to every nrf52 main.cpp.
 @coroutine_with_priority(CoroPriority.PLATFORM)
 async def zephyr_toolchain_to_code(config: ConfigType) -> None:
-    from .dts_fetch import fetch_board_dts
+    from .framework import build_workspace, check_and_install as west_install
 
     variant = zephyr_data()[KEY_VARIANT]
-    sdk_name, sdk = resolve_sdk(
-        VARIANTS[variant], zephyr_data().get(KEY_FRAMEWORK_TYPE)
-    )
-    await fetch_board_dts(
-        variant,
-        sdk_name,
+    # Code generation reads the board's devicetree from the workspace; the compile
+    # installs again for projects components ask for later
+    sdk, version = build_workspace()
+    west_install(
         sdk,
+        version,
+        zephyr_data()["west_version"],
+        zephyr_data()["ninja_version"],
         zephyr_data()["sdk_source"],
-        family=zephyr_variant_family(),
+        projects=zephyr_additional_framework_projects(sdk),
     )
 
     from .dts_lookup import (
@@ -1870,21 +1869,12 @@ async def zephyr_toolchain_to_code(config: ConfigType) -> None:
     )
 
     board = zephyr_data()["board"]
-    board_valid = validate_board(board)
-    if board_valid is False:
+    if not validate_board(board):
         raise EsphomeError(
             f"Board '{board}' was not found. Check the board name, or "
             f"'{CONF_BOARD_SOURCE}' if using a custom board."
         )
-    if board_valid is None:
-        _LOGGER.warning(
-            "[zephyr] Could not verify board '%s' exists -- board DTS files were "
-            "unavailable (see earlier warning). If '%s' is misspelled, this will "
-            "fail later inside the build instead of here.",
-            board,
-            board,
-        )
-    elif validate_board_revision(board) is False:
+    if validate_board_revision(board) is False:
         raise EsphomeError(
             f"Board '{board}' requests a revision that is not valid for that board. "
             f"Check the '@<revision>' suffix in '{CONF_BOARD}'."

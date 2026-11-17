@@ -14,7 +14,7 @@ import platformdirs
 import pytest
 
 from esphome.components.zephyr import framework, sdk_install
-from esphome.components.zephyr.const import KEY_SDK_SOURCE_RESOLVED_REF
+from esphome.components.zephyr.const import KEY_SDK_SOURCE_RESOLVED_REF, KEY_ZEPHYR
 from esphome.components.zephyr.framework import (
     _git_output,
     _remote_commit,
@@ -24,9 +24,18 @@ from esphome.components.zephyr.framework import (
     install_git_modules,
 )
 from esphome.components.zephyr.framework_helpers import FrameworkSource
-from esphome.components.zephyr.variants import ZephyrModule, ZephyrSDK
-from esphome.core import EsphomeError
+from esphome.components.zephyr.variants import ZEPHYR_MAINLINE, ZephyrModule, ZephyrSDK
+import esphome.config_validation as cv
+from esphome.const import (
+    CONF_PATH,
+    CONF_TYPE,
+    KEY_CORE,
+    KEY_FRAMEWORK_VERSION,
+    TYPE_LOCAL,
+)
+from esphome.core import CORE, EsphomeError
 from esphome.framework_helpers import get_python_env_executable_path
+from tests.unit_tests.components.zephyr.zephyr_state import empty_zephyr_data
 
 TOOLCHAIN: str = "riscv64-zephyr-elf"
 _SHA: str = "a" * 40
@@ -774,3 +783,34 @@ def test_install_toolchain_removes_only_stale_partial_downloads(
     assert not stale_meta.exists()
     assert fresh.exists()
     assert fresh_meta.exists()
+
+
+@pytest.mark.parametrize(
+    ("source", "folder"),
+    [
+        (None, "zephyr-v4.5.0"),
+        (_git_source(), _source_cache_key(ZEPHYR_MAINLINE, "v4.5.0", _git_source())),
+    ],
+)
+def test_zephyr_base_is_the_installed_workspace(
+    zephyr_tools: Path, source: dict[str, Any] | None, folder: str
+) -> None:
+    """The devicetree readers and the install name the same workspace."""
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data("STM32C5", sdk_source=source)
+    CORE.data[KEY_CORE] = {KEY_FRAMEWORK_VERSION: cv.Version(4, 5, 0)}
+
+    assert framework.build_workspace() == (ZEPHYR_MAINLINE, "v4.5.0")
+    assert framework.get_zephyr_base() == (
+        zephyr_tools / "frameworks" / folder / "zephyr"
+    )
+
+
+def test_zephyr_base_of_a_local_source_is_the_checkout(tmp_path: Path) -> None:
+    """A local: source is used where it is, not copied into the cache."""
+    checkout = tmp_path / "zephyr"
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data(
+        "STM32C5", sdk_source={CONF_TYPE: TYPE_LOCAL, CONF_PATH: checkout}
+    )
+    CORE.data[KEY_CORE] = {KEY_FRAMEWORK_VERSION: cv.Version(4, 5, 0)}
+
+    assert framework.get_zephyr_base() == checkout

@@ -112,8 +112,15 @@ from esphome.const import (
 from esphome.core import CORE, ID, EsphomeError
 from tests.unit_tests.components.zephyr.zephyr_state import (
     empty_zephyr_data,
+    use_empty_devicetree,
     zephyr_platform_framework,
 )
+
+
+@pytest.fixture(autouse=True)
+def _devicetree(monkeypatch: pytest.MonkeyPatch) -> None:
+    use_empty_devicetree(monkeypatch)
+
 
 _ALL_FAMILIES = frozenset(info.family for info in VARIANTS.values())
 
@@ -425,7 +432,7 @@ def test_zephyr_setup_i2c_pinctrl_esp32_merges_into_every_state() -> None:
     assert overlay.count("I2C0_SCL_GPIO7") == 2
 
 
-def test_zephyr_setup_i2c_pinctrl_esp32_falls_back_when_dts_unresolved() -> None:
+def test_zephyr_setup_i2c_pinctrl_esp32_falls_back_without_pinctrl_states() -> None:
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant="ESP32H2")
     with patch(
         "esphome.components.zephyr.dts_lookup.get_pinctrl_states",
@@ -946,7 +953,7 @@ def test_resolve_uart_pinctrl_states_positional_falls_back_for_4_groups() -> Non
         ]
 
 
-def test_resolve_uart_pinctrl_states_falls_back_when_dts_unresolved() -> None:
+def test_resolve_uart_pinctrl_states_falls_back_without_pinctrl_states() -> None:
     with patch(
         "esphome.components.zephyr.dts_lookup.get_pinctrl_states",
         return_value=None,
@@ -1391,7 +1398,9 @@ def test_zephyr_setup_spi_pinctrl_esp32_partial_override_preserves_other_signal(
     assert f"<{_ESP32_SPI_MISO_PINMUX}>" in overlay
 
 
-def test_zephyr_setup_spi_pinctrl_esp32_no_dts_assumes_single_shared_group() -> None:
+def test_zephyr_setup_spi_pinctrl_esp32_without_pinctrl_states_assumes_single_shared_group() -> (
+    None
+):
     # No group1/group2 split guess -- that'd be as much a guess as the wrong
     # 'spi{n}_default' label this replaced.
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant="ESP32")
@@ -1469,7 +1478,9 @@ def test_zephyr_setup_spi_pinctrl_nordic_uses_nrf_psel_and_role_decode() -> None
     assert "pinctrl-0 = <&spi0_default>;" in overlay
 
 
-def test_zephyr_setup_spi_pinctrl_nordic_no_dts_assumes_single_shared_group() -> None:
+def test_zephyr_setup_spi_pinctrl_nordic_without_pinctrl_states_assumes_single_shared_group() -> (
+    None
+):
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant="NRF52")
     zephyr_setup_spi_pinctrl("some_board", "spi0", clk=36, miso=38, mosi=37)
     overlay = CORE.data[KEY_ZEPHYR]["overlay"][""]
@@ -1507,7 +1518,9 @@ def test_zephyr_setup_spi_pinctrl_silabs_uses_lettered_ports_and_role_decode() -
     assert "pinctrl-0 = <&usart0_default>;" in overlay
 
 
-def test_zephyr_setup_spi_pinctrl_silabs_no_dts_assumes_single_shared_group() -> None:
+def test_zephyr_setup_spi_pinctrl_silabs_without_pinctrl_states_assumes_single_shared_group() -> (
+    None
+):
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant="EFR32MG24")
     zephyr_setup_spi_pinctrl("some_board", "usart0", clk=3, miso=6, mosi=5)
     overlay = CORE.data[KEY_ZEPHYR]["overlay"][""]

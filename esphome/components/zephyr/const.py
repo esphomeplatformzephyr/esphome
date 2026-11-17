@@ -56,9 +56,8 @@ KEY_RUNNER: Final = "runner"
 # Stashed onto the `framework: source:` dict itself (not ZephyrData) by
 # dts_fetch.resolve_sdk_source_version(), which resolves a moving git ref (branch,
 # or an omitted ref: meaning "default branch") to one concrete commit SHA per run.
-# The to_code()-time consumers (dts_fetch.fetch_board_dts(), framework.py's SDK
-# install) read this instead of independently re-resolving the moving ref against
-# their own timer, so a single build can't silently mix commits across the three.
+# framework.py's SDK install reads this instead of re-resolving the moving ref
+# against its own timer, so a single build can't silently mix commits.
 KEY_SDK_SOURCE_RESOLVED_REF: Final = "resolved_ref"
 KEY_SHIELDS: Final = "shields"
 KEY_SHIELD_ROOT: Final = "shield_root"
@@ -78,7 +77,6 @@ KEY_DTS_INCLUDE_PATHS: Final = "dts_include_paths"
 KEY_BOARD_DIR_CACHE: Final = "board_dir_cache"
 KEY_BOARD_EDT_CACHE: Final = "board_edt_cache"
 KEY_BOARD_YAML_CACHE: Final = "board_yaml_cache"
-KEY_DTS_BASE_PATH: Final = "dts_base_path"
 
 # Devicetree compatible of Zephyr's SEGGER RTT UART driver
 SEGGER_RTT_UART = "segger,rtt-uart"

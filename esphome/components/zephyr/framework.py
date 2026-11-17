@@ -12,8 +12,16 @@ import time
 import yaml
 
 from esphome.build_helpers.tools_cache import ZEPHYR_TOOLS_CACHE, tools_cache_path
-from esphome.const import CONF_PATH, CONF_REF, CONF_TYPE, CONF_URL, TYPE_LOCAL
-from esphome.core import EsphomeError
+from esphome.const import (
+    CONF_PATH,
+    CONF_REF,
+    CONF_TYPE,
+    CONF_URL,
+    KEY_CORE,
+    KEY_FRAMEWORK_VERSION,
+    TYPE_LOCAL,
+)
+from esphome.core import CORE, EsphomeError
 from esphome.framework_helpers import (
     get_python_env_executable_path,
     install_lock,
@@ -34,7 +42,7 @@ from .framework_helpers import (
     refresh_framework,
 )
 from .sdk_install import ensure_sdk
-from .variants import ZephyrModule, ZephyrSDK
+from .variants import VARIANTS, ZephyrModule, ZephyrSDK, resolve_sdk
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -61,8 +69,33 @@ def _get_toolchain_path(sdk_version: str, toolchain: str) -> Path:
     )
 
 
-def _framework_path(cache_key: str) -> Path:
-    return get_zephyr_tools_path() / "frameworks" / cache_key
+def _get_framework_path(
+    sdk: ZephyrSDK, version: str, source: ConfigType | None = None
+) -> Path:
+    return (
+        get_zephyr_tools_path() / "frameworks" / _source_cache_key(sdk, version, source)
+    )
+
+
+def build_workspace() -> tuple[ZephyrSDK, str]:
+    """The SDK this build installs and the version its workspace is installed at;
+    the install and every reader of the workspace take it from here."""
+    # deferred: zephyr's __init__ may import this module
+    from . import zephyr_framework_type, zephyr_variant
+
+    _, sdk = resolve_sdk(VARIANTS[zephyr_variant()], zephyr_framework_type())
+    return sdk, f"v{CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]}"
+
+
+def get_zephyr_base() -> Path:
+    """This build's workspace's zephyr/ folder, Zephyr's ZEPHYR_BASE."""
+    # deferred: zephyr's __init__ may import this module
+    from . import zephyr_data
+
+    source = zephyr_data()["sdk_source"]
+    if source is not None and source[CONF_TYPE] == TYPE_LOCAL:
+        return source[CONF_PATH]
+    return _get_framework_path(*build_workspace(), source) / "zephyr"
 
 
 def _source_cache_key(
@@ -295,7 +328,7 @@ def _check_and_install(
             )
         framework = install_local_framework(python_bin, zephyr_dir, sdk.source.name)
     else:
-        framework = _framework_path(_source_cache_key(sdk, ver_tag, source))
+        framework = _get_framework_path(sdk, ver_tag, source)
         zephyr_dir = framework / "zephyr"
         _install_workspace(python_bin, framework, sdk, ver_tag, source, projects)
 

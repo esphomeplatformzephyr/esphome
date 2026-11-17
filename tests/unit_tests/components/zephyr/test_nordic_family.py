@@ -10,7 +10,16 @@ from esphome.components.nrf.zephyr_variants import nordic_family
 from esphome.components.zephyr import zephyr_data
 from esphome.components.zephyr.const import KEY_PRJ_CONF, KEY_ZEPHYR
 from esphome.core import CORE, EsphomeError
-from tests.unit_tests.components.zephyr.zephyr_state import empty_zephyr_data
+from tests.unit_tests.components.zephyr.zephyr_state import (
+    empty_zephyr_data,
+    use_empty_devicetree,
+)
+
+
+@pytest.fixture(autouse=True)
+def _devicetree(monkeypatch: pytest.MonkeyPatch) -> None:
+    use_empty_devicetree(monkeypatch)
+
 
 _WARNING = "insecure software one is used"
 

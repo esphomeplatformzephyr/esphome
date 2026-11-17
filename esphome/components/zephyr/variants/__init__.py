@@ -59,9 +59,6 @@ class ZephyrSDK:
 
     source: FrameworkSource
     manifest_rev: str = "recommended"
-    boards_repo_url: str | None = (
-        None  # repo containing boards/; defaults to source.url when None
-    )
     # Prefix of the workspace folder, so SDKs with the same version string don't share one
     workspace_prefix: str | None = None
     # Default/minimum supported Zephyr version; a variant overrides these via its own
@@ -69,16 +66,6 @@ class ZephyrSDK:
     # wifi_mgmt.h consumer hits.
     default_version: str = "4.5.0"
     min_version: cv.Version = cv.Version(4, 4, 1)
-    # False: boards_repo_url is checked out directly at tag f"v{version}" (mainline's own
-    # tag scheme). True: boards_repo_url's *checkout ref* isn't derivable from version at
-    # all -- it must be read from source.url's own west.yml (at tag f"v{version}"), which
-    # states the exact revision it pins for the boards_repo_url project. NCS needs this:
-    # its bundled sdk-zephyr fork's tag scheme isn't a stable function of the nrf release
-    # version (confirmed: NCS 2.9.2 pins zephyr at "v3.7.99-ncs2-2", NCS 3.4.0 pins it at
-    # "ncs-v3.4.0" -- two different, unrelated schemes), so guessing a format string would
-    # silently break on some past or future NCS release. Reading the real manifest is the
-    # only correct way to know it.
-    resolve_boards_ref_via_manifest: bool = False
     # Set when this SDK has no tagged release usable as a default -- framework: source: is
     # then mandatory; explains why in the raised error.
     requires_source_reason: str | None = None
@@ -533,7 +520,6 @@ def set_core_data(
     user: dict | None = None,
     kconfig: str = "",
     fake_board_manifest: str | None = None,
-    dts_base_path: str | None = None,
     cpp_path: str = "",
     board_dir_cache: dict | None = None,
     dts_include_paths: list | None = None,
@@ -583,7 +569,6 @@ def set_core_data(
         user=user if user is not None else {},
         kconfig=kconfig,
         fake_board_manifest=fake_board_manifest,
-        dts_base_path=dts_base_path,
         cpp_path=cpp_path,
         board_dir_cache=board_dir_cache if board_dir_cache is not None else {},
         dts_include_paths=dts_include_paths,
@@ -647,8 +632,7 @@ NCS_ZIGBEE_TEMPLATE: ZephyrModuleTemplate = ZephyrModuleTemplate(
 # nRF Connect SDK (NCS) -- Nordic's own vendor SDK, a manifest-of-manifests around a
 # bundled Zephyr fork (nrfconnect/sdk-zephyr) rather than a single repo. boards/dts/
 # for real Nordic silicon live in that bundled fork, not in the nrf manifest repo
-# itself, and the fork's own checkout ref isn't a stable function of the nrf release
-# version -- see resolve_boards_ref_via_manifest on ZephyrSDK. 3.4.0: Nordic's stated
+# itself. 3.4.0: Nordic's stated
 # minimum for this integration; its bundled zephyr fork reports 4.4.0 (close to
 # ZEPHYR_MAINLINE's own 4.4.1 baseline), though NCS cherry-picks fixes independently of
 # upstream release numbers, so that number is not a reliable cross-SDK gating signal.
@@ -662,20 +646,17 @@ NRF_CONNECT_SDK: FrameworkSource = FrameworkSource(
 
 NCS: ZephyrSDK = ZephyrSDK(
     source=NRF_CONNECT_SDK,
-    boards_repo_url="https://github.com/nrfconnect/sdk-zephyr",
     workspace_prefix="sdk-nrf",
     default_version="3.4.1",
     min_version=cv.Version(3, 4, 0),
-    resolve_boards_ref_via_manifest=True,
     modules={"zigbee": NCS_ZIGBEE_TEMPLATE},
 )
 
 # Silicon Labs' "Simplicity SDK for Zephyr" -- same manifest-of-manifests shape as NCS:
 # a vendor overlay repo (mcuboot/tf-psa-crypto overrides, hal_silabs, extra HAL modules)
 # around a bundled Zephyr fork (SiliconLabsSoftware/zephyr) pinned by raw commit SHA in
-# zephyr-silabs's own west.yml, not derivable from the vendor repo's version tag -- same
-# reasoning as NCS's resolve_boards_ref_via_manifest. Real board/DTS support for chips
-# not yet upstreamed to mainline Zephyr lives in that bundled fork.
+# zephyr-silabs's own west.yml. Real board/DTS support for chips not yet upstreamed to
+# mainline Zephyr lives in that bundled fork.
 SILABS: ZephyrSDK = ZephyrSDK(
     # Nothing left out: the manifest's own name-allowlist already limits the projects
     source=FrameworkSource(
@@ -684,11 +665,9 @@ SILABS: ZephyrSDK = ZephyrSDK(
         optional=(),
         required=frozenset(),
     ),
-    boards_repo_url="https://github.com/SiliconLabsSoftware/zephyr",
     workspace_prefix="zephyr-silabs",
     default_version="2026.6.0",
     min_version=cv.Version(2026, 6, 0),
-    resolve_boards_ref_via_manifest=True,
 )
 
 # Platforms that keep Zephyr variants in a zephyr_variants package, which lists them
