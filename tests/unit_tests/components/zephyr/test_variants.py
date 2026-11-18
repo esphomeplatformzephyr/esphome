@@ -452,10 +452,9 @@ def test_stm32_variants_load() -> None:
 
 
 def test_stm32c5_default_is_its_minimum() -> None:
-    assert (
-        cv.Version.parse(ZEPHYR_MAINLINE.default_version)
-        == VARIANTS["STM32C5"].min_version_override
-    )
+    assert cv.Version.parse(
+        ZEPHYR_MAINLINE.default_version
+    ) == variants._sdk_min_version(VARIANTS["STM32C5"], "zephyr", ZEPHYR_MAINLINE)
 
 
 def test_set_core_data(

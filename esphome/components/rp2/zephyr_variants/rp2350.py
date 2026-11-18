@@ -72,7 +72,6 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     soc="rp2350a",
     qualifier="m33",
     swap_methods=frozenset({"move", "offset"}),
-    min_version_override=cv.Version(4, 5, 0),
     gpio_port_width=30,
     adc1_channel_map=_ADC_CHANNEL_MAP,
     uart_node_labels={},

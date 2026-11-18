@@ -66,7 +66,6 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     # only the procpu image is built.
     qualifier="procpu",
     swap_methods=frozenset({"scratch", "move", "offset"}),
-    min_version_override=cv.Version(4, 5, 0),
     # https://github.com/espressif/esp-idf/blob/master/components/soc/esp32s3/include/soc/adc_channel.h
     adc1_channel_map={pin: pin - 1 for pin in range(1, 11)},
     uart_node_labels={},

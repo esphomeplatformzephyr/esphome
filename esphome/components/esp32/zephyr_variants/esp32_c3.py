@@ -58,7 +58,6 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     },
     soc="esp32c3",
     swap_methods=frozenset({"scratch", "move", "offset"}),
-    min_version_override=cv.Version(4, 5, 0),
     # https://github.com/espressif/esp-idf/blob/master/components/soc/esp32c3/include/soc/adc_channel.h
     adc1_channel_map={0: 0, 1: 1, 2: 2, 3: 3, 4: 4},
     uart_node_labels={},

@@ -41,8 +41,6 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     boot=BootLayout(0x0),
     sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
-    # six301 SoC support first shipped in 4.5.0.
-    min_version_override=cv.Version(4, 5, 0),
     family="silabs",
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",

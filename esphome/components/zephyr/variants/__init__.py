@@ -91,10 +91,9 @@ class ZephyrSDK:
     # Prefix of the workspace folder, so SDKs with the same version string don't share one
     workspace_prefix: str | None = None
     # Default/minimum supported Zephyr version; a variant overrides these via its own
-    # *_version_override fields. 4.4.1: fixes a C++ compile error in ethernet.h that any
-    # wifi_mgmt.h consumer hits.
+    # *_version_override fields.
     default_version: str = "4.5.0"
-    min_version: cv.Version = cv.Version(4, 4, 1)
+    min_version: cv.Version = cv.Version(4, 5, 0)
     # Set when this SDK has no tagged release usable as a default -- framework: source: is
     # then mandatory; explains why in the raised error.
     requires_source_reason: str | None = None
@@ -683,8 +682,8 @@ NCS_ZIGBEE_TEMPLATE: ZephyrModuleTemplate = ZephyrModuleTemplate(
 # bundled Zephyr fork (nrfconnect/sdk-zephyr) rather than a single repo. boards/dts/
 # for real Nordic silicon live in that bundled fork, not in the nrf manifest repo
 # itself. 3.4.0: Nordic's stated
-# minimum for this integration; its bundled zephyr fork reports 4.4.0 (close to
-# ZEPHYR_MAINLINE's own 4.4.1 baseline), though NCS cherry-picks fixes independently of
+# minimum for this integration; its bundled zephyr fork reports 4.4.0, though NCS
+# cherry-picks fixes independently of
 # upstream release numbers, so that number is not a reliable cross-SDK gating signal.
 NRF_CONNECT_SDK: FrameworkSource = FrameworkSource(
     name="nRF Connect SDK",

@@ -97,7 +97,6 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     toolchain="arm-zephyr-eabi",
     transports=frozenset(),
     swap_methods=frozenset({"move", "offset"}),
-    min_version_override=cv.Version(4, 5, 0),
     gpio_port_width=16,
     # RA4M1's GPIO port nodes are labelled ioport0/ioport1/... in Zephyr's own dtsi
     # (renesas,ra-gpio-ioport), not the gpio0/gpio1 convention every other variant uses.
