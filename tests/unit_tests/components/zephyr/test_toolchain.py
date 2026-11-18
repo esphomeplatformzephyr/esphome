@@ -3,6 +3,8 @@
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from esphome.build_helpers.native import NATIVE_TOOLCHAIN_MODULES
 from esphome.components.zephyr import toolchain
 from esphome.const import Toolchain
@@ -39,9 +41,13 @@ def test_tools_missing_before_configure(tmp_path: Path) -> None:
     assert not toolchain.get_readelf_path().exists()
 
 
-def test_registered_for_zephyr() -> None:
+@pytest.mark.parametrize(
+    "platform", ["esp32", "nrf", "nxp", "renesas", "rp2", "silabs", "stm32"]
+)
+def test_registered_for_zephyr(platform: str) -> None:
+    """Keyed by the target platform, which a Zephyr build keeps as its own name."""
     assert (
-        NATIVE_TOOLCHAIN_MODULES[("zephyr", Toolchain.ZEPHYR)]
+        NATIVE_TOOLCHAIN_MODULES[(platform, Toolchain.ZEPHYR)]
         == "esphome.components.zephyr.toolchain"
     )
 
