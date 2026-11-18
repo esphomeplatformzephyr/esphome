@@ -508,8 +508,11 @@ def test_registry_rejects_an_unknown_family(fake_platform: ModuleType) -> None:
         variants._LazyVariants().family_module("other")
 
 
-def test_resolve_framework_version_rejects_a_version_that_is_not_a_number() -> None:
-    config = {CONF_FRAMEWORK: _framework_config(**{CONF_VERSION: "v1.0.0"})}
-    with pytest.raises(cv.Invalid, match="'v1.0.0' is not a version number") as err:
+@pytest.mark.parametrize("version", ["v1.0.0", "1.0.0-rc1a"])
+def test_resolve_framework_version_rejects_a_version_that_is_not_a_number(
+    version: str,
+) -> None:
+    config = {CONF_FRAMEWORK: _framework_config(**{CONF_VERSION: version})}
+    with pytest.raises(cv.Invalid, match=f"'{version}' is not a version number") as err:
         resolve_framework_version(_fake_variant(), "fake", config, "test")
     assert err.value.path == [CONF_FRAMEWORK, CONF_VERSION]

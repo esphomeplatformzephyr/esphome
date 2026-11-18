@@ -409,7 +409,8 @@ def _sdk_min_version(
 
 def _release_order(version: cv.Version) -> tuple[int, int, int, bool, str, int]:
     """Sort key in which a release follows its prereleases and rc2 comes before rc10."""
-    suffix = re.fullmatch(r"(\D*)(\d*)", version.extra)
+    if (suffix := re.fullmatch(r"(\D*)(\d*)", version.extra)) is None:
+        raise ValueError(f"Cannot order the version suffix {version.extra!r}")
     return (
         version.major,
         version.minor,
@@ -511,11 +512,12 @@ def resolve_framework_version(
 
     try:
         framework_ver = cv.Version.parse(version_str)
+        framework_order = _release_order(framework_ver)
     except ValueError as err:
         raise cv.Invalid(
             f"'{version_str}' is not a version number", [CONF_FRAMEWORK, CONF_VERSION]
         ) from err
-    if _release_order(framework_ver) < _release_order(min_version):
+    if framework_order < _release_order(min_version):
         raise cv.Invalid(
             f"{variant_name} requires {sdk_name} >= {min_version} ({requires_reason}). "
             f"Got {version_str}.",
