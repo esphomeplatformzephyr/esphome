@@ -47,7 +47,7 @@ def copy_files() -> None:
     if CORE.using_toolchain_zephyr:
         from esphome.components import zephyr
 
-        zephyr.zephyr_toolchain_copy_files()
+        zephyr.copy_files()
 
 
 def get_download_types(storage_json: StorageJSON) -> list[dict[str, str]]:
@@ -59,7 +59,7 @@ def get_download_types(storage_json: StorageJSON) -> list[dict[str, str]]:
     return []
 
 
-def run_compile(args, config: ConfigType) -> bool:
+def run_compile(args: object, config: ConfigType) -> bool:
     if not CORE.using_toolchain_zephyr:
         return False
     from esphome.components import zephyr

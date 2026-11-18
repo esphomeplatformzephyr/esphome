@@ -47,7 +47,7 @@ from esphome.const import (
 from esphome.core import CORE, CoroPriority, EsphomeError, coroutine_with_priority
 from esphome.core.config import BOARD_MAX_LENGTH
 from esphome.cpp_generator import MockObj
-from esphome.helpers import copy_file_if_changed, rmtree, write_file_if_changed
+from esphome.helpers import copy_file_if_changed, write_file_if_changed
 from esphome.storage_json import StorageJSON
 from esphome.types import ConfigType
 from esphome.writer import clean_cmake_cache
@@ -136,6 +136,7 @@ from .rtt import (  # noqa: F401
 )
 from .variants import (
     NCS,
+    SILABS,
     VARIANTS,
     ZEPHYR_MAINLINE,
     ZephyrModule,
@@ -379,10 +380,7 @@ def zephyr_to_code(config: ConfigType) -> None:
     cg.add_define("USE_PREFERENCE_KEY_LOOKUP")
     cg.set_cpp_standard("gnu++20")
     # c++ support
-    zephyr_add_prj_conf("FPU", True)
     zephyr_add_prj_conf("STD_CPP20", True)
-    # random_bytes() uses sys_rand_get() which requires the entropy subsystem
-    zephyr_add_prj_conf("ENTROPY_GENERATOR", True)
 
     # <err> os: ***** USAGE FAULT *****
     # <err> os:   Illegal load of EXC_RETURN into PC
@@ -538,6 +536,9 @@ def zephyr_require_cdc_acm() -> None:
 
 def _cdc_acm_add_ports() -> None:
     """Set up every CDC ACM port claimed with zephyr_claim_cdc_acm()."""
+    if CORE.using_toolchain_zephyr:
+        _zephyr_toolchain_cdc_acm_add_ports()
+        return
     data = zephyr_data()
     ids = sorted(data["cdc_acm_users"])
     if not ids and data["cdc_acm_required"]:
@@ -582,11 +583,19 @@ def _write_file_if_changed_or_remove_when_empty(path: Path, content: str) -> boo
 
 
 def copy_files() -> None:
+    toolchain = CORE.using_toolchain_zephyr
     for builder_func in zephyr_data()[KEY_OVERLAY_BUILDER]:
         overlay_contents = builder_func()
         zephyr_add_overlay(overlay_contents)
 
     changed = False
+    written: set[Path] = set()
+
+    if toolchain and (manifest := zephyr_data()["fake_board_manifest"]):
+        changed |= write_file_if_changed(
+            CORE.relative_build_path(f"boards/{zephyr_data()[KEY_BOARD]}.json"),
+            manifest,
+        )
 
     for image, want_opts in zephyr_data()[KEY_PRJ_CONF].items():
         prj_conf = (
@@ -602,14 +611,33 @@ def copy_files() -> None:
         else:
             path = CORE.relative_build_path("zephyr/prj.conf")
 
+        written.add(path)
         changed |= write_file_if_changed(path, prj_conf)
 
     for image, content in zephyr_data()[KEY_OVERLAY].items():
         if image:
             path = CORE.relative_build_path(f"zephyr/sysbuild/{image}.overlay")
+            if (
+                toolchain
+                and image == "mcuboot"
+                and zephyr_data()[KEY_BOOTLOADER] == BOOTLOADER_MCUBOOT
+            ):
+                # Writing any overlay file for the mcuboot sysbuild image replaces its
+                # normal auto-detected overlay chain (Zephyr sysbuild convention),
+                # which silently drops MCUboot's own
+                # zephyr,code-partition = &boot_partition; setting -- restate it here,
+                # once, for every caller that writes to this image's overlay, rather
+                # than relying on each one to remember to.
+                content += (
+                    "\n/ { chosen { zephyr,code-partition = &boot_partition; }; };\n"
+                )
         else:
             path = CORE.relative_build_path("zephyr/app.overlay")
+        written.add(path)
         changed |= write_file_if_changed(path, content)
+
+    if toolchain:
+        changed |= _remove_stale_image_files(written)
 
     for filename, path in zephyr_data()[KEY_EXTRA_BUILD_FILES].items():
         changed |= copy_file_if_changed(
@@ -640,11 +668,29 @@ def copy_files() -> None:
     )
 
     sysbuild_conf = ""
-    if zephyr_data()[KEY_SYSBUILD]:
+    if toolchain:
+        sysbuild_conf_lines = [
+            f"{name}={_format_prj_conf_val(value[0])}"
+            for name, value in sorted(zephyr_data()[KEY_SYSBUILD_CONF].items())
+        ]
+        if sysbuild_conf_lines:
+            sysbuild_conf = "\n".join(sysbuild_conf_lines) + "\n"
+    elif zephyr_data()[KEY_SYSBUILD]:
         sysbuild_conf = "SB_CONFIG_BOOTLOADER_MCUBOOT=y\n"
     changed |= _write_file_if_changed_or_remove_when_empty(
         CORE.relative_build_path("zephyr/sysbuild.conf"), sysbuild_conf
     )
+
+    if toolchain:
+        # Flash layout checks. A change drops the CMake cache, which a new file needs
+        # anyway to replace Zephyr's sysbuild template.
+        sysbuild_cmake = render_sysbuild_cmake(
+            zephyr_data()[KEY_BOOT_LAYOUT],
+            zephyr_data()[KEY_PARTITION_REQUIREMENTS],
+        )
+        changed |= _write_file_if_changed_or_remove_when_empty(
+            CORE.relative_build_path("zephyr/sysbuild/CMakeLists.txt"), sysbuild_cmake
+        )
 
     if changed:
         # A configure-time input changed; drop the CMake cache so the build
@@ -929,14 +975,7 @@ def zephyr_additional_framework_projects(sdk: ZephyrSDK) -> frozenset[str]:
 
 
 def _base_to_code(config: ConfigType) -> None:
-    cg.add_build_flag("-DUSE_ZEPHYR")
-    # Zephyr's base warnings include -Wdouble-promotion, which every float passed to a log call
-    # trips; the promotion is how variadic arguments work, so the warning only adds noise
-    cg.add_build_flag("-Wno-double-promotion")
-    cg.add_define("USE_NATIVE_64BIT_TIME")
-    # The settings subsystem finds stored preferences by key, so key migration is possible
-    cg.add_define("USE_PREFERENCE_KEY_LOOKUP")
-    cg.set_cpp_standard("gnu++20")
+    """The toolchain build's base code beyond the shared zephyr_to_code()."""
     # USE_ZEPHYR_FRAMEWORK_ZEPHYR not defined, no need in code so far.
     # USE_ZEPHYR_FRAMEWORK_ZIGBEE is set by zigbee_zephyr.py itself, alongside its
     # request_zephyr_module("zigbee") call -- this runs before zigbee:'s own
@@ -953,10 +992,6 @@ def _base_to_code(config: ConfigType) -> None:
 
         mcuboot.apply_single_slot()
 
-    zephyr_add_prj_conf("STD_CPP20", True)
-    # <err> os: ***** USAGE FAULT *****
-    # <err> os:   Illegal load of EXC_RETURN into PC
-    _main_stack_to_code(config)
     zephyr_add_prj_conf("SYSTEM_WORKQUEUE_STACK_SIZE", 2048, required=False)
     if CONF_WIFI in CORE.config:
         # Doubles Zephyr's default stack size for WiFi's dynamically-spawned worker
@@ -994,7 +1029,6 @@ def _base_to_code(config: ConfigType) -> None:
     CORE.add_job(_kconfig_options_to_code, config)
     CORE.add_job(_modules_to_code, config)
     CORE.add_job(_overlays_to_code, config)
-    CORE.add_job(_zephyr_toolchain_cdc_acm_to_code)
 
 
 def _main_stack_to_code(config: ConfigType) -> None:
@@ -1096,13 +1130,6 @@ async def _overlays_to_code(config: ConfigType) -> None:
         zephyr_add_overlay(app_overlay)
     if mcuboot_overlay := overlays.get("mcuboot"):
         zephyr_add_overlay(mcuboot_overlay, image="mcuboot")
-
-
-@coroutine_with_priority(CoroPriority.FINAL)
-async def _zephyr_toolchain_cdc_acm_to_code() -> None:
-    # Runs last so these required options override the optional defaults set by
-    # _base_to_code() and the variants
-    _zephyr_toolchain_cdc_acm_add_ports()
 
 
 def zephyr_cdc_acm_label(id: int) -> str:
@@ -1214,114 +1241,6 @@ def _remove_stale_image_files(written: set[Path]) -> bool:
             path.unlink()
             removed = True
     return removed
-
-
-def zephyr_toolchain_copy_files() -> None:
-    changed = False
-    written: set[Path] = set()
-
-    for builder_func in zephyr_data()[KEY_OVERLAY_BUILDER]:
-        overlay_contents = builder_func()
-        zephyr_add_overlay(overlay_contents)
-
-    if manifest := zephyr_data()["fake_board_manifest"]:
-        changed |= write_file_if_changed(
-            CORE.relative_build_path(f"boards/{zephyr_data()[KEY_BOARD]}.json"),
-            manifest,
-        )
-
-    for image, want_opts in zephyr_data()[KEY_PRJ_CONF].items():
-        prj_conf = (
-            "\n".join(
-                f"{name}={_format_prj_conf_val(value[0])}"
-                for name, value in sorted(want_opts.items())
-            )
-            + "\n"
-        )
-
-        if image:
-            path = CORE.relative_build_path(f"zephyr/sysbuild/{image}.conf")
-        else:
-            path = CORE.relative_build_path("zephyr/prj.conf")
-
-        written.add(path)
-        changed |= write_file_if_changed(path, prj_conf)
-
-    for image, content in zephyr_data()[KEY_OVERLAY].items():
-        if image:
-            path = CORE.relative_build_path(f"zephyr/sysbuild/{image}.overlay")
-            if (
-                image == "mcuboot"
-                and zephyr_data()[KEY_BOOTLOADER] == BOOTLOADER_MCUBOOT
-            ):
-                # Writing any overlay file for the mcuboot sysbuild image replaces its
-                # normal auto-detected overlay chain (Zephyr sysbuild convention),
-                # which silently drops MCUboot's own
-                # zephyr,code-partition = &boot_partition; setting -- restate it here,
-                # once, for every caller that writes to this image's overlay, rather
-                # than relying on each one to remember to.
-                content += (
-                    "\n/ { chosen { zephyr,code-partition = &boot_partition; }; };\n"
-                )
-        else:
-            path = CORE.relative_build_path("zephyr/app.overlay")
-        written.add(path)
-        changed |= write_file_if_changed(path, content)
-
-    changed |= _remove_stale_image_files(written)
-
-    for filename, path in zephyr_data()[KEY_EXTRA_BUILD_FILES].items():
-        changed |= copy_file_if_changed(
-            path,
-            CORE.relative_build_path(filename),
-        )
-
-    pm_static = "\n".join(str(item) for item in zephyr_data()[KEY_PM_STATIC])
-    changed |= _write_file_if_changed_or_remove_when_empty(
-        CORE.relative_build_path("zephyr/pm_static.yml"), pm_static
-    )
-
-    kconfig = zephyr_data()[KEY_KCONFIG]
-    if kconfig:
-        kconfig = (
-            textwrap.dedent(
-                """
-                menu "Zephyr"
-                source "Kconfig.zephyr"
-                endmenu
-                """
-            )
-            + "\n"
-            + kconfig
-        )
-    changed |= _write_file_if_changed_or_remove_when_empty(
-        CORE.relative_build_path("zephyr/Kconfig"), kconfig
-    )
-
-    sysbuild_conf_opts = zephyr_data()[KEY_SYSBUILD_CONF]
-    sysbuild_conf_lines = [
-        f"{name}={_format_prj_conf_val(value[0])}"
-        for name, value in sorted(sysbuild_conf_opts.items())
-    ]
-    sysbuild_conf = "\n".join(sysbuild_conf_lines) + "\n" if sysbuild_conf_lines else ""
-    changed |= _write_file_if_changed_or_remove_when_empty(
-        CORE.relative_build_path("zephyr/sysbuild.conf"), sysbuild_conf
-    )
-
-    # Flash layout checks. A change drops the CMake cache, which a new file needs
-    # anyway to replace Zephyr's sysbuild template.
-    sysbuild_cmake = render_sysbuild_cmake(
-        zephyr_data()[KEY_BOOT_LAYOUT],
-        zephyr_data()[KEY_PARTITION_REQUIREMENTS],
-    )
-    changed |= _write_file_if_changed_or_remove_when_empty(
-        CORE.relative_build_path("zephyr/sysbuild/CMakeLists.txt"), sysbuild_cmake
-    )
-
-    if changed:
-        # A configure-time input changed; drop the CMake cache so the build can't reuse
-        # stale configure results -- see clean_cmake_cache() in esphome/writer.py.
-        clean_cmake_cache()
 
 
 # Watchdog range mirrors esp32's own CONF_WATCHDOG_TIMEOUT validator (esp32/__init__.py) --
@@ -1847,25 +1766,25 @@ def zephyr_config_schema(
 # which would add a section comment to every nrf52 main.cpp.
 @coroutine_with_priority(CoroPriority.PLATFORM)
 async def zephyr_toolchain_to_code(config: ConfigType) -> None:
-    from .framework import build_workspace, check_and_install as west_install
+    """Code generation of a platform in the variants registry."""
+    from .dts_lookup import (  # noqa: PLC0415
+        log_board_capabilities,
+        validate_board,
+        validate_board_revision,
+    )
+    from .framework import build_workspace, check_and_install  # noqa: PLC0415
 
-    variant = zephyr_data()[KEY_VARIANT]
+    variant = zephyr_variant()
     # Code generation reads the board's devicetree from the workspace; the compile
     # installs again for projects components ask for later
     sdk, version = build_workspace()
-    west_install(
+    check_and_install(
         sdk,
         version,
         zephyr_additional_framework_projects(sdk),
         zephyr_data()["west_version"],
         zephyr_data()["ninja_version"],
         zephyr_data()["sdk_source"],
-    )
-
-    from .dts_lookup import (
-        log_board_capabilities,
-        validate_board,
-        validate_board_revision,
     )
 
     board = zephyr_data()["board"]
@@ -1888,9 +1807,11 @@ async def zephyr_toolchain_to_code(config: ConfigType) -> None:
         zephyr_data()[KEY_SHIELDS],
     )
 
+    # Before zephyr_to_code: its weak 2048 is too small for these builds
+    _main_stack_to_code(config)
+    zephyr_to_code(config)
     _base_to_code(config)
-    family = zephyr_variant_family()
-    if family is not None:
+    if (family := zephyr_variant_family()) is not None:
         get_family_module(family).to_code(config)
     await get_variant_module(variant).to_code(config)
 
@@ -2210,40 +2131,61 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
     return True
 
 
-def run_compile(args, config: ConfigType) -> bool:
-
-    from .library import generate_zephyr_modules
-
-    variant = zephyr_data()[KEY_VARIANT]
-    extra_modules = generate_zephyr_modules(list(CORE.platformio_libraries.values()))
-
+def run_compile(args: object, config: ConfigType) -> bool:
+    """Build a platform in the variants registry with west."""
     if not CORE.using_toolchain_zephyr:
         return False
 
-    from .build_zephyr import generate_cmake_lists, run_west_blobs_fetch, run_west_build
-    from .framework import (
-        check_and_install as west_install,
+    from esphome.build_helpers import pch  # noqa: PLC0415
+    from esphome.build_helpers.ccache import resolve_ccache_path  # noqa: PLC0415
+    from esphome.build_helpers.idedata import warn_if_idedata_missing  # noqa: PLC0415
+    from esphome.framework_helpers import run_command_ok  # noqa: PLC0415
+
+    from .build_zephyr import (  # noqa: PLC0415
+        _write_pch_checksum,
+        clean_changed_build,
+        generate_cmake_lists,
+        log_available_runners,
+        run_west_blobs_fetch,
+        west_build_command,
+    )
+    from .framework import (  # noqa: PLC0415
+        build_workspace,
+        check_and_install,
+        get_build_env,
+        get_build_paths,
+        get_zephyr_base,
         install_git_modules,
         install_toolchain,
     )
+    from .mcuboot import check_mcuboot_swap_limit  # noqa: PLC0415
+    from .toolchain import get_idedata  # noqa: PLC0415
 
+    variant = zephyr_variant()
     variant_data = VARIANTS[variant]
-    sdk_name, sdk = resolve_sdk(variant_data, zephyr_data().get(KEY_FRAMEWORK_TYPE))
-    version = str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION])
-    modules = resolve_zephyr_modules()
-    # Modules join the build like a converted PlatformIO library, not the workspace
-    extra_modules.extend(m.local_path for m in modules if m.local_path is not None)
-    extra_modules.extend(install_git_modules(modules, sdk.source.url))
-    python_bin, framework_path, west_env = west_install(
+    if (toolchain := variant_data.toolchain) is None:
+        raise EsphomeError(f"Variant {variant} names no Zephyr SDK toolchain")
+    sdk, version = build_workspace()
+    source = zephyr_data()["sdk_source"]
+    # Again, for projects components asked for after code generation
+    check_and_install(
         sdk,
         version,
         zephyr_additional_framework_projects(sdk),
         zephyr_data()["west_version"],
         zephyr_data()["ninja_version"],
-        zephyr_data()["sdk_source"],
+        source,
     )
-    if sdk_name == "silabs":
-        from .commander_setup import check_and_install as commander_install
+    python_executable, framework_path = get_build_paths(sdk, version, source)
+    env = get_build_env(
+        python_executable,
+        framework_path,
+        install_toolchain(framework_path, toolchain),
+        resolve_ccache_path(),
+        get_zephyr_base(),
+    )
+    if sdk is SILABS:
+        from .commander_setup import check_and_install as commander_install  # noqa: PLC0415
 
         commander_version = (
             config[CORE.target_platform][CONF_FRAMEWORK]
@@ -2251,51 +2193,65 @@ def run_compile(args, config: ConfigType) -> bool:
             .get(CONF_COMMANDER_VERSION)
         )
         commander_dir = commander_install(commander_version)
-        west_env["PATH"] = f"{commander_dir}{os.pathsep}{west_env['PATH']}"
-    sdk_dir = install_toolchain(framework_path, variant_data.toolchain)
+        env["PATH"] = f"{commander_dir}{os.pathsep}{env['PATH']}"
     blob_specs = list(zephyr_data()["blobs"])
     if variant_data.blobs:
         blob_specs.append(variant_data.blobs)
     for module, allow_regex, sentinel_name in blob_specs:
         run_west_blobs_fetch(
-            python_bin, framework_path, west_env, module, allow_regex, sentinel_name
+            python_executable, framework_path, env, module, allow_regex, sentinel_name
         )
-    cmake_lists_changed = generate_cmake_lists()
+    modules = resolve_zephyr_modules()
+    # Modules join the build like a converted PlatformIO library, not the workspace
+    extra_modules = [m.local_path for m in modules if m.local_path is not None]
+    extra_modules.extend(install_git_modules(modules, sdk.source.url))
+
     board = zephyr_data()[KEY_BOARD]
-
-    # West can't detect a missing CMake cache itself -- its pristine modes read
-    # ZEPHYR_BASE from the very cache that was dropped. build_dir here must match
-    # run_west_build()'s own build_dir selection exactly.
     build_dir = CORE.relative_build_path(".west_build")
-    if (
-        cmake_lists_changed or not (build_dir / "CMakeCache.txt").is_file()
-    ) and build_dir.is_dir():
-        _LOGGER.info("Build inputs changed, cleaning %s", build_dir)
-        rmtree(build_dir)
-
-    run_west_build(
-        python_bin,
-        framework_path,
-        board,
-        west_env,
-        sdk_install_dir=sdk_dir,
-        extra_modules=extra_modules,
-        board_root=zephyr_data().get(KEY_BOARD_ROOT),
-        snippets=zephyr_data()[KEY_SNIPPETS],
-        shield_root=zephyr_data().get(KEY_SHIELD_ROOT),
-        shields=zephyr_data()[KEY_SHIELDS],
-        snippet_root=zephyr_data().get(KEY_SNIPPET_ROOT),
-        requested_runner=zephyr_data().get(KEY_RUNNER),
+    source_dir = CORE.relative_build_path("zephyr")
+    pch_on = pch.pch_enabled()
+    clean_changed_build(
+        build_dir, generate_cmake_lists("Zephyr", pch_on, extra_modules)
     )
-    from .mcuboot import check_mcuboot_swap_limit
+    if pch_on:
+        pch.log_pch_in_use()
+        _write_pch_checksum(build_dir, source_dir, board, framework_path)
+
+    west_args = [
+        arg for snippet in zephyr_data()[KEY_SNIPPETS] for arg in ("-S", snippet)
+    ]
+    if CORE.skip_bootloader:
+        # Sysbuild still configures MCUboot, which the app's signing needs;
+        # only its compile is skipped.
+        west_args += ["--domain", "zephyr"]
+    cmake_args = []
+    if (board_root := zephyr_data().get(KEY_BOARD_ROOT)) is not None:
+        cmake_args.append(f"-DBOARD_ROOT={board_root}")
+    if (shield_root := zephyr_data().get(KEY_SHIELD_ROOT)) is not None:
+        cmake_args.append(f"-DSHIELD_ROOT={shield_root}")
+    if shields := zephyr_data()[KEY_SHIELDS]:
+        cmake_args.append(f"-DSHIELD={';'.join(shields)}")
+    if (snippet_root := zephyr_data().get(KEY_SNIPPET_ROOT)) is not None:
+        cmake_args.append(f"-DSNIPPET_ROOT={snippet_root}")
+    west_cmd = west_build_command(
+        python_executable,
+        board,
+        build_dir,
+        source_dir,
+        # Off by default on mainline; the image paths assume its layout
+        sysbuild=True,
+        west_args=west_args,
+        cmake_args=cmake_args,
+    )
+    if not run_command_ok(
+        west_cmd, env=env, stream_output=True, cwd=str(framework_path)
+    ):
+        raise EsphomeError("Zephyr native build failed")
+    log_available_runners(build_dir, zephyr_data().get(KEY_RUNNER))
 
     check_mcuboot_swap_limit(build_dir, CORE.firmware_bin)
     if (post_build := _variant_hook("post_build")) is not None:
-        post_build(python_bin, west_env)
-
-    from esphome.build_helpers.idedata import warn_if_idedata_missing
-
-    from .toolchain import get_idedata
+        post_build(python_executable, env)
 
     warn_if_idedata_missing(get_idedata)
     return True

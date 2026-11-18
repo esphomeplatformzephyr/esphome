@@ -30,6 +30,7 @@ from esphome.framework_helpers import (
 )
 from esphome.types import ConfigType
 
+from .build_zephyr import add_ccache_env
 from .const import COMMIT_SHA_RE, KEY_SDK_SOURCE_RESOLVED_REF
 from .framework_helpers import (
     ensure_venv,
@@ -96,6 +97,38 @@ def get_zephyr_base() -> Path:
     if source is not None and source[CONF_TYPE] == TYPE_LOCAL:
         return source[CONF_PATH]
     return _get_framework_path(*build_workspace(), source) / "zephyr"
+
+
+def get_build_paths(
+    sdk: ZephyrSDK, version: str, source: ConfigType | None = None
+) -> tuple[Path, Path]:
+    """The venv's python and the workspace a build runs west in."""
+    python_executable = get_python_env_executable_path(
+        _get_python_env_path(version), "python"
+    )
+    if source is not None and source[CONF_TYPE] == TYPE_LOCAL:
+        # A local checkout's parent folder is its workspace (install_local_framework)
+        return python_executable, Path(source[CONF_PATH]).parent
+    return python_executable, _get_framework_path(sdk, version, source)
+
+
+def get_build_env(
+    python_executable: Path,
+    framework_path: Path,
+    sdk_path: Path,
+    ccache: str | None,
+    zephyr_base: Path | None = None,
+) -> dict[str, str]:
+    """The environment west builds in, as on nrf52; ``zephyr_base`` for a local
+    checkout, which need not be named zephyr."""
+    env = os.environ.copy()
+    env["PATH"] = str(python_executable.parent) + os.pathsep + env.get("PATH", "")
+    env["ZEPHYR_BASE"] = str(zephyr_base or framework_path / "zephyr")
+    # The SDK sits in the esphome cache, off CMake's search path
+    env["ZEPHYR_SDK_INSTALL_DIR"] = str(sdk_path)
+    env["ZEPHYR_TOOLCHAIN_VARIANT"] = "zephyr"
+    add_ccache_env(env, ccache, ZEPHYR_TOOLS_CACHE)
+    return env
 
 
 def _source_cache_key(

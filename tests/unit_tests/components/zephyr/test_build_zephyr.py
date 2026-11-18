@@ -12,13 +12,14 @@ import pytest
 
 from esphome.build_helpers.tools_cache import ZEPHYR_TOOLS_CACHE, tools_cache_path
 from esphome.components.zephyr.build_zephyr import (
-    _ccache_env,
     _runner_supports_dev_id,
+    add_ccache_env,
     check_bootloader_built,
+    clean_changed_build,
     generate_cmake_lists,
     resolve_dev_id,
     run_west_blobs_fetch,
-    run_west_build,
+    west_build_command,
 )
 from esphome.core import CORE, EsphomeError
 
@@ -201,7 +202,7 @@ def test_blobs_always_fetched_when_revision_unknown(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# _ccache_env
+# add_ccache_env
 # ---------------------------------------------------------------------------
 
 _CCACHE_KEYS = (
@@ -221,12 +222,15 @@ def clean_ccache_env(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.usefixtures("clean_ccache_env")
-def test_ccache_env_disabled_turns_zephyr_ccache_off(tmp_path: Path) -> None:
+def test_ccache_env_disabled_turns_zephyr_ccache_off() -> None:
     """Without a resolved ccache, Zephyr's self-enabled ccache must not cache."""
-    with patch("esphome.build_helpers.ccache.resolve_ccache_path", return_value=None):
-        assert _ccache_env({}, tmp_path / "zephyr") == {"CCACHE_DISABLE": "1"}
-        # A caller-supplied value is left alone
-        assert _ccache_env({"CCACHE_DISABLE": "0"}, tmp_path / "zephyr") == {}
+    env: dict[str, str] = {}
+    add_ccache_env(env, None, ZEPHYR_TOOLS_CACHE)
+    assert env == {"CCACHE_DISABLE": "1"}
+    # A caller-supplied value is left alone
+    env = {"CCACHE_DISABLE": "0"}
+    add_ccache_env(env, None, ZEPHYR_TOOLS_CACHE)
+    assert env == {"CCACHE_DISABLE": "0"}
 
 
 @pytest.mark.usefixtures("clean_ccache_env")
@@ -234,11 +238,8 @@ def test_ccache_env_enabled_uses_managed_settings(tmp_path: Path) -> None:
     """A resolved ccache gets the shared settings and the zephyr cache dir."""
     CORE.build_path = tmp_path / "build"
     source_dir = tmp_path / "build" / "zephyr"
-    with patch(
-        "esphome.build_helpers.ccache.resolve_ccache_path",
-        return_value="/usr/bin/ccache",
-    ):
-        env = _ccache_env({}, source_dir)
+    env: dict[str, str] = {}
+    add_ccache_env(env, "/usr/bin/ccache", ZEPHYR_TOOLS_CACHE)
     assert env["CCACHE_DIR"] == str(tools_cache_path(*ZEPHYR_TOOLS_CACHE) / "ccache")
     assert env["CCACHE_DEPEND"] == "1"
     assert env["CCACHE_BASEDIR"] == str((tmp_path / "build").resolve())
@@ -252,11 +253,8 @@ def test_ccache_env_enabled_uses_managed_settings(tmp_path: Path) -> None:
 def test_ccache_env_skips_the_map_entry_on_whitespace(tmp_path: Path) -> None:
     """The ignore list splits on spaces, so a spaced path stays hashed."""
     CORE.build_path = tmp_path / "with space" / "build"
-    with patch(
-        "esphome.build_helpers.ccache.resolve_ccache_path",
-        return_value="/usr/bin/ccache",
-    ):
-        env = _ccache_env({}, tmp_path / "with space" / "build" / "zephyr")
+    env: dict[str, str] = {}
+    add_ccache_env(env, "/usr/bin/ccache", ZEPHYR_TOOLS_CACHE)
     assert "CCACHE_IGNOREOPTIONS" not in env
 
 
@@ -265,25 +263,21 @@ def test_ccache_env_skips_the_map_entry_on_whitespace(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("skip", [True, False])
-def test_run_west_build_skip_bootloader_builds_only_the_app(
-    tmp_path: Path, skip: bool
-) -> None:
-    """--skip-bootloader limits west to the app domain; MCUboot is still configured."""
-    CORE.build_path = tmp_path
-    CORE.skip_bootloader = skip
-    mod = "esphome.components.zephyr.build_zephyr"
-    with (
-        patch(f"{mod}.run_command_ok", return_value=True) as run,
-        patch(f"{mod}._ccache_env", return_value={}),
-        patch(f"{mod}.pch.pch_enabled", return_value=False),
-        patch(f"{mod}.log_available_runners"),
-    ):
-        run_west_build(Path("/py"), tmp_path / "fw", "board", {}, tmp_path / "sdk")
+def test_west_build_command_places_the_extra_arguments() -> None:
+    """West options go before "--", CMake options after the build type."""
+    cmd = west_build_command(
+        Path("/py"),
+        "board",
+        Path("/build/.west_build"),
+        Path("/build/zephyr"),
+        sysbuild=True,
+        west_args=["--domain", "zephyr"],
+        cmake_args=["-DSHIELD=x"],
+    )
 
-    cmd = run.call_args.args[0]
-    assert (cmd[-2:] == ["--domain", "zephyr"]) is skip
-    assert "--sysbuild" in cmd
+    split = cmd.index("--")
+    assert {"--sysbuild", "--domain"} <= set(cmd[:split])
+    assert cmd[split + 1 :] == ["-DCMAKE_BUILD_TYPE=MinSizeRel", "-DSHIELD=x"]
 
 
 def _domains(build_dir: Path, *names: str) -> None:
@@ -323,8 +317,7 @@ def _cmake_lists(tmp_path: Path, build_flags: set[str]) -> str:
     CORE.build_path = tmp_path / "build"
     CORE.name = "livingroom"
     CORE.build_flags = build_flags
-    with patch("esphome.build_helpers.pch.pch_enabled", return_value=False):
-        generate_cmake_lists()
+    generate_cmake_lists("Zephyr", False)
     return (tmp_path / "build" / "zephyr" / "CMakeLists.txt").read_text()
 
 
@@ -358,3 +351,31 @@ def test_build_flag_with_semicolon_is_dropped(
     assert "-DLIST" not in text
     assert '"-DKEEP=1"' in text
     assert "CMake splits arguments at ';'" in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("has_cache", "cmake_lists_changed", "wiped"),
+    [
+        pytest.param(True, False, False, id="unchanged"),
+        pytest.param(True, True, True, id="cmake_lists_changed"),
+        pytest.param(False, False, True, id="cache_dropped"),
+    ],
+)
+def test_clean_changed_build(
+    tmp_path: Path, has_cache: bool, cmake_lists_changed: bool, wiped: bool
+) -> None:
+    build_dir = tmp_path / "build"
+    (build_dir / "zephyr").mkdir(parents=True)
+    if has_cache:
+        (build_dir / "CMakeCache.txt").write_text("")
+
+    clean_changed_build(build_dir, cmake_lists_changed)
+
+    assert build_dir.exists() is not wiped
+
+
+def test_clean_changed_build_without_a_build(tmp_path: Path) -> None:
+    """A first build has nothing to clean."""
+    clean_changed_build(tmp_path / "build", True)
+
+    assert not (tmp_path / "build").exists()

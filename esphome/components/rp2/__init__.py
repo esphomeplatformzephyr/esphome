@@ -696,7 +696,7 @@ def copy_files() -> None:
     if CORE.using_toolchain_zephyr:
         from esphome.components import zephyr
 
-        zephyr.zephyr_toolchain_copy_files()
+        zephyr.copy_files()
         return
     dir = Path(__file__).parent
     post_build_file = dir / "post_build.py.script"
@@ -717,7 +717,7 @@ def copy_files() -> None:
         write_file_if_changed(path, content + '\n#include "pio_includes.h"\n')
 
 
-def run_compile(args, config: ConfigType) -> bool:
+def run_compile(args: object, config: ConfigType) -> bool:
     if not CORE.using_toolchain_zephyr:
         return False
     from esphome.components import zephyr

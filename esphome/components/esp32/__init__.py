@@ -4090,7 +4090,7 @@ def copy_files():
     if CORE.using_toolchain_zephyr:
         from esphome.components import zephyr
 
-        zephyr.zephyr_toolchain_copy_files()
+        zephyr.copy_files()
         return
     _write_sdkconfig()
     _write_idf_component_yml()
@@ -4218,7 +4218,7 @@ STACKTRACE_ESP32_BACKTRACE_PC_RE = re.compile(r"4[0-9a-f]{7}")
 STACKTRACE_ESP32_CRASH_BT_RE = re.compile(r"BT\d+:\s*0x([0-9a-fA-F]{8})")
 
 
-def run_compile(args, config: ConfigType) -> bool:
+def run_compile(args: object, config: ConfigType) -> bool:
     if not CORE.using_toolchain_zephyr:
         return False
     from esphome.components import zephyr
