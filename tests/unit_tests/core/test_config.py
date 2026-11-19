@@ -17,19 +17,19 @@ from esphome.const import (
     CONF_BUILD_PATH,
     CONF_DEVICES,
     CONF_ESPHOME,
+    CONF_FRIENDLY_NAME,
     CONF_INCLUDES,
     CONF_INCLUDES_C,
     CONF_NAME,
     CONF_NAME_ADD_MAC_SUFFIX,
-    CONF_WATCHDOG_TIMEOUT,
     KEY_CORE,
     KEY_TARGET_FRAMEWORK,
     KEY_TARGET_PLATFORM,
-    PLATFORM_NRF,
     Toolchain,
 )
 from esphome.core import CORE, ID, KEY_CONTROLLER_REGISTRY_CONTROLLERS, config
 from esphome.core.config import (
+    CONF_FRIENDLY_NAME_SEPARATOR,
     CONF_LOOP_INTERVAL,
     CONF_RELATION,
     CONF_SUSPEND_LOOP,
@@ -44,8 +44,8 @@ from esphome.core.config import (
     valid_include,
     valid_project_name,
     validate_area_config,
+    validate_friendly_name_with_suffix,
     validate_hostname,
-    validate_loop_interval,
 )
 import esphome.final_validate as fv
 
@@ -158,27 +158,26 @@ def test_multiple_areas_and_devices(yaml_file: Callable[[str], str]) -> None:
 
 
 @pytest.mark.parametrize(
-    ("watchdog_timeout", "warns"),
-    [(cv.TimePeriod(seconds=0), False), (cv.TimePeriod(seconds=10), True)],
+    ("fixture", "warns"),
+    [
+        ("loop_interval_zephyr_watchdog_disabled.yaml", False),
+        ("loop_interval_zephyr.yaml", True),
+    ],
 )
 def test_loop_interval_zephyr_watchdog(
-    caplog: pytest.LogCaptureFixture, watchdog_timeout: cv.TimePeriod, warns: bool
+    yaml_file: Callable[[str], str],
+    caplog: pytest.LogCaptureFixture,
+    fixture: str,
+    warns: bool,
 ) -> None:
     """With the Zephyr watchdog disabled the loop sleep is not capped."""
-    CORE.data[KEY_CORE] = {
-        KEY_TARGET_PLATFORM: PLATFORM_NRF,
-        KEY_TARGET_FRAMEWORK: "zephyr",
-    }
-    CORE.toolchain = Toolchain.ZEPHYR
-    token = fv.full_config.set(
-        {PLATFORM_NRF: {CONF_WATCHDOG_TIMEOUT: watchdog_timeout}}
-    )
-    try:
-        validate_loop_interval({CONF_LOOP_INTERVAL: cv.TimePeriod(seconds=7)})
-    finally:
-        fv.full_config.reset(token)
+    result = load_config_from_fixture(yaml_file, fixture, FIXTURES_DIR)
+    assert result is not None
 
-    assert ("maximum sleep" in caplog.text) is warns
+    assert (
+        "loop_interval of 7s exceeds the 4000ms maximum sleep on this platform; the loop will still "
+        "wake every 4000ms. Raise nrf.watchdog_timeout to sleep longer." in caplog.text
+    ) is warns
 
 
 @pytest.mark.asyncio
@@ -355,6 +354,19 @@ def test_loop_interval_warn_esp32(
         "wake every 2400ms. Raise esp32.watchdog_timeout to sleep longer."
         in caplog.text
     )
+
+
+def test_loop_interval_no_warn_esp32_watchdog_disabled(
+    yaml_file: Callable[[str], str],
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """With the task watchdog disabled the loop sleep is not capped."""
+    result = load_config_from_fixture(
+        yaml_file, "loop_interval_esp32_watchdog_disabled.yaml", FIXTURES_DIR
+    )
+    assert result is not None
+
+    assert "maximum sleep" not in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -1714,6 +1726,68 @@ def test_make_app_name_cpp_mac_suffix_space_sep() -> None:
     assert byte_len == len("My Device XXXXXX")
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("separator_line", "expected"),
+    [
+        ("", "my device XXXXXX"),
+        ('  friendly_name_separator: "-"\n', "my device-XXXXXX"),
+        ('  friendly_name_separator: ""\n', "my deviceXXXXXX"),
+    ],
+)
+async def test_friendly_name_separator(
+    yaml_file: Callable[[str], Path], separator_line: str, expected: str
+) -> None:
+    """The friendly name joins the MAC suffix with a space unless told otherwise."""
+    result = load_config_from_yaml(
+        yaml_file,
+        "esphome:\n"
+        "  name: my-device\n"
+        "  friendly_name: my device\n"
+        "  name_add_mac_suffix: true\n" + separator_line + "host:\n",
+    )
+    assert result is not None
+
+    with patch("esphome.core.config.cg") as mock_cg:
+        mock_cg.RawStatement.side_effect = lambda *args, **kwargs: MagicMock()
+        mock_cg.RawExpression.side_effect = lambda *args, **kwargs: MagicMock()
+        await config.to_code(result[CONF_ESPHOME])
+
+    statements = [c.args[0] for c in mock_cg.RawStatement.call_args_list]
+    assert f'static char esphome_app_friendly_name_buf[] = "{expected}";' in statements
+    assert 'static char esphome_app_name_buf[] = "my-device-XXXXXX";' in statements
+
+
+@pytest.mark.asyncio
+async def test_friendly_name_separator_without_mac_suffix(
+    yaml_file: Callable[[str], Path],
+) -> None:
+    """Without the MAC suffix the separator is ignored, as when a device is adopted."""
+    result = load_config_from_yaml(
+        yaml_file,
+        "esphome:\n"
+        "  name: my-device\n"
+        "  friendly_name: my device\n"
+        "  name_add_mac_suffix: false\n"
+        '  friendly_name_separator: "-"\n'
+        "host:\n",
+    )
+    assert result is not None
+    assert result[CONF_ESPHOME][CONF_FRIENDLY_NAME_SEPARATOR] == "-"
+
+    with patch("esphome.core.config.cg") as mock_cg:
+        mock_cg.RawStatement.side_effect = lambda *args, **kwargs: MagicMock()
+        mock_cg.RawExpression.side_effect = lambda *args, **kwargs: MagicMock()
+        await config.to_code(result[CONF_ESPHOME])
+
+    assert not [
+        c
+        for c in mock_cg.RawStatement.call_args_list
+        if "esphome_app_friendly_name_buf" in c.args[0]
+    ]
+    assert '"my device"' in [c.args[0] for c in mock_cg.RawExpression.call_args_list]
+
+
 def test_make_app_name_cpp_non_ascii_utf8_length() -> None:
     """Test non-ASCII characters use UTF-8 byte length."""
     _, global_decl, byte_len = make_app_name_cpp(
@@ -2029,3 +2103,31 @@ def test_filter_source_files_drops_util_cpp_without_mqtt() -> None:
 
     CORE.defines = {core.Define("USE_API"), core.Define("USE_MQTT")}
     assert "util.cpp" not in config.FILTER_SOURCE_FILES()
+
+
+@pytest.mark.parametrize(
+    ("friendly_name", "separator", "valid"),
+    [
+        ("a" * 120, " ", True),  # 127 bytes, the most an API short string holds
+        ("a" * 120, " - ", False),
+        ("a" * 118, " - ", True),
+        ("\u00e9" * 60, " ", True),  # 120 bytes in UTF-8
+        ("\u00e9" * 60, "--", False),
+    ],
+)
+def test_validate_friendly_name_with_suffix(
+    friendly_name: str, separator: str, valid: bool
+) -> None:
+    config = {
+        CONF_NAME_ADD_MAC_SUFFIX: True,
+        CONF_FRIENDLY_NAME: friendly_name,
+        CONF_FRIENDLY_NAME_SEPARATOR: separator,
+    }
+    if valid:
+        assert validate_friendly_name_with_suffix(config) == config
+    else:
+        with pytest.raises(cv.Invalid, match="at most 127 fit"):
+            validate_friendly_name_with_suffix(config)
+    # Without the suffix nothing is appended
+    config[CONF_NAME_ADD_MAC_SUFFIX] = False
+    assert validate_friendly_name_with_suffix(config) == config

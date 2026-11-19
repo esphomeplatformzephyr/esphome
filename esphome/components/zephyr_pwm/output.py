@@ -5,6 +5,8 @@ from typing import Any
 from esphome import pins
 import esphome.codegen as cg
 from esphome.components import output
+from esphome.components.nrf52.const import DEFAULT_PWM, VARIANT_PWM, VariantPWM
+from esphome.components.nrf52.framework import get_nrf52_variant
 from esphome.components.output import DOMAIN as OUTPUT_DOMAIN
 from esphome.components.zephyr import (
     VARIANTS,
@@ -43,15 +45,37 @@ def _pin_schema(value: Any) -> ConfigType:
     return value
 
 
+def _get_variant_pwm() -> VariantPWM:
+    return VARIANT_PWM.get(get_nrf52_variant(), DEFAULT_PWM)
+
+
+def _validate_variant(config: ConfigType) -> ConfigType:
+    """Reject chips without PWM, and nRF54L pins outside the power domain of the PWM instances."""
+    if not CORE.is_nrf52:
+        return config
+    variant_pwm = _get_variant_pwm()
+    if not variant_pwm.labels:
+        raise cv.Invalid(f"{get_nrf52_variant()} has no PWM peripheral")
+    if (ports := variant_pwm.ports) is None:
+        return config
+    port, pin = divmod(config[CONF_PIN][CONF_NUMBER], 32)
+    if port not in ports:
+        allowed = " or ".join(f"P{p}" for p in ports)
+        raise cv.Invalid(
+            f"P{port}.{pin:02d} is not in the power domain of the PWM peripherals; "
+            f"use a pin on {allowed}",
+            [CONF_PIN],
+        )
+    return config
+
+
 def _pwm_node_labels() -> list[str]:
     """Devicetree node labels of this target's PWM peripheral instances.
 
-    platform: nrf52 predates the variant registry and always targets nRF52840, so its
-    labels are hardcoded here rather than looked up in VARIANTS (same precedent as
-    this component's own gain/pin handling elsewhere in the codebase).
+    platform: nrf52 predates the variant registry and takes them from its own VARIANT_PWM.
     """
     if CORE.is_nrf52:
-        return ["pwm0", "pwm1", "pwm2", "pwm3"]
+        return list(_get_variant_pwm().labels)
     return VARIANTS[zephyr_variant()].pwm_node_labels
 
 
@@ -88,6 +112,7 @@ CONFIG_SCHEMA = cv.All(
         }
     ).extend(cv.COMPONENT_SCHEMA),
     _only_on_pwm_hardware,
+    _validate_variant,
 )
 
 
@@ -132,7 +157,10 @@ def _rpi_pico_pwm_slice_channel(pin: int) -> tuple[int, int]:
 
 
 def _allocate_blocks_free(
-    zephyr_pwm_conf: list[ConfigType], block_count: int, channels_per_block: int
+    zephyr_pwm_conf: list[ConfigType],
+    block_count: int,
+    channels_per_block: int,
+    one_port_per_block: bool,
 ) -> list[PWMBlock]:
     """Nordic-style allocation: any pin can be wired to any channel on any
     instance, so pack pins sharing a frequency into the same block greedily."""
@@ -144,14 +172,17 @@ def _allocate_blocks_free(
             (
                 block
                 for block in pwm_blocks
-                if block.period_ns == period_ns and len(block.pins) < channels_per_block
+                if block.period_ns == period_ns
+                and len(block.pins) < channels_per_block
+                and (not one_port_per_block or block.pins[0] // 32 == pin_number // 32)
             ),
             None,
         )
         if pwm_block is None:
             if len(pwm_blocks) >= block_count:
+                same_port = " and GPIO port" if one_port_per_block else ""
                 raise cv.Invalid(
-                    f"Only {block_count} PWM blocks with a distinct frequency and "
+                    f"Only {block_count} PWM blocks with a distinct frequency{same_port} and "
                     f"{channels_per_block} channels each are supported on this hardware"
                 )
             pwm_block = PWMBlock(id=len(pwm_blocks), period_ns=period_ns, pins=[])
@@ -201,8 +232,12 @@ def _allocate_blocks() -> None:
     elif CORE.using_zephyr and zephyr_variant_family() == "renesas":
         pwm_blocks = _allocate_blocks_fixed(zephyr_pwm_conf, _pwm_pin_map().get)
     else:
+        # The nRF54L GPIO chapter says a peripheral cannot mix pins from different ports
         pwm_blocks = _allocate_blocks_free(
-            zephyr_pwm_conf, len(_pwm_node_labels()), _pwm_channels_per_block()
+            zephyr_pwm_conf,
+            len(_pwm_node_labels()),
+            _pwm_channels_per_block(),
+            CORE.is_nrf52 and _get_variant_pwm().ports is not None,
         )
 
     _get_data().pwm_blocks = pwm_blocks

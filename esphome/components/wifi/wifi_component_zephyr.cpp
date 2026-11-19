@@ -348,11 +348,13 @@ void collect_ipv6(net_if *iface, net_if_addr *addr, void *user_data) {
   }
 }
 
+#if USE_NETWORK_MIN_IPV6_ADDR_COUNT > 0
 void count_ipv6(net_if *iface, net_if_addr *addr, void *user_data) {
   if (addr->addr_state == NET_ADDR_PREFERRED) {
     (*static_cast<uint8_t *>(user_data))++;
   }
 }
+#endif
 #endif
 
 struct FirstIpv4 {
@@ -737,7 +739,7 @@ bool WiFiComponent::wifi_sta_connect_(const WiFiAP &ap) {
 #if USE_NETWORK_IPV4
   this->got_ipv4_address_ = false;
 #endif
-#if USE_NETWORK_IPV6
+#if USE_NETWORK_IPV6 && (USE_NETWORK_MIN_IPV6_ADDR_COUNT > 0)
   this->num_ipv6_addresses_ = 0;
 #endif
   int ret;
@@ -1138,7 +1140,7 @@ bool WiFiComponent::wifi_loop_() {
 #endif
             net_dhcpv4_start(sta_iface);
           }
-#if USE_NETWORK_IPV6
+#if USE_NETWORK_IPV6 && (USE_NETWORK_MIN_IPV6_ADDR_COUNT > 0)
           // Addresses kept from before this link raise no event
           this->num_ipv6_addresses_ = 0;
           net_if_ipv6_addr_foreach(sta_iface, count_ipv6, &this->num_ipv6_addresses_);
@@ -1184,7 +1186,7 @@ bool WiFiComponent::wifi_loop_() {
 #if USE_NETWORK_IPV4
         this->got_ipv4_address_ = false;
 #endif
-#if USE_NETWORK_IPV6
+#if USE_NETWORK_IPV6 && (USE_NETWORK_MIN_IPV6_ADDR_COUNT > 0)
         this->num_ipv6_addresses_ = 0;
 #endif
         this->update_connected_state_();
@@ -1247,9 +1249,11 @@ bool WiFiComponent::wifi_loop_() {
       }
 #if USE_NETWORK_IPV6
       case ZephyrWiFiEvent::Type::IPV6_ADDRS_CHANGED:
+#if USE_NETWORK_MIN_IPV6_ADDR_COUNT > 0
         this->num_ipv6_addresses_ = 0;
         net_if_ipv6_addr_foreach(sta_iface, count_ipv6, &this->num_ipv6_addresses_);
         this->update_connected_state_();
+#endif
 #ifdef USE_WIFI_IP_STATE_LISTENERS
         this->notify_ip_state_listeners_();
 #endif

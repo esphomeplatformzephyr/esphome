@@ -1052,8 +1052,8 @@ def _watchdog_to_code(config: ConfigType) -> None:
     else:
         zephyr_add_prj_conf("WATCHDOG", True)
         zephyr_add_prj_conf("WDT_DISABLE_AT_BOOT", False)
-        cg.add_define("USE_WATCHDOG")
-        cg.add_define("USE_ZEPHYR_WATCHDOG_TIMEOUT_MS", timeout_ms)
+        cg.add_define("USE_ZEPHYR_WDT")
+        cg.add_define("USE_ZEPHYR_WDT_MS", timeout_ms)
         # hal.cpp needs DT_ALIAS(watchdog0); some boards never define it
         # themselves -- found generically, not per-family, so new vendors
         # with the same gap are covered without new code here.

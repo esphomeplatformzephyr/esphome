@@ -1,0 +1,15 @@
+esphome:
+  name: test
+
+esp32:
+  variant: ESP32C3
+  framework:
+    type: zephyr
+
+network:
+  enable_ipv6: true
+  enable_ipv4: false
+
+wifi:
+  ssid: "test_ssid"
+  password: "test_password"

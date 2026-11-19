@@ -162,5 +162,13 @@ FILTER_SOURCE_FILES = filter_source_files_from_platform(
             PlatformFramework.SILABS_ZEPHYR,
             PlatformFramework.STM32_ZEPHYR,
         },
+        "debug_nrf52.cpp": {
+            PlatformFramework.NRF52_ZEPHYR,
+            PlatformFramework.NRF_ZEPHYR,
+        },
+        "debug_nrf54l.cpp": {
+            PlatformFramework.NRF52_ZEPHYR,
+            PlatformFramework.NRF_ZEPHYR,
+        },
     }
 )

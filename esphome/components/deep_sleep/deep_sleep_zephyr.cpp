@@ -14,7 +14,7 @@ ESPHOME_LOG_TAG(TAG, "deep_sleep");
 // WDT_OPT_PAUSE_IN_SLEEP only pauses it during true hardware sleep — not while a
 // radio thread (e.g. the Zigbee stack) keeps the CPU busy in k_sem_take(). Feed
 // it at least this often while waiting so it does not reset the device.
-#if defined(USE_NRF52) || defined(USE_WATCHDOG)
+#if defined(USE_NRF52) || defined(USE_ZEPHYR_WDT)
 static constexpr uint32_t WDT_FEED_INTERVAL_MS = 1000;
 #else
 // No watchdog (watchdog_timeout: 0): one wait for the whole duration

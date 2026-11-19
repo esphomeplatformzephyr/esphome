@@ -1,0 +1,8 @@
+# IPv6 with the default min_ipv6_addr_count of 0, where the station keeps no IPv6 address count
+network:
+  enable_ipv6: true
+
+wifi:
+  networks:
+    - ssid: MySSID
+      password: password1

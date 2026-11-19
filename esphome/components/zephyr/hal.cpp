@@ -26,7 +26,7 @@ namespace esphome {
 
 // Armed only when ESPHome configured it: platform: nrf52 always, Zephyr RTOS builds unless
 // watchdog_timeout: 0. A user-enabled CONFIG_WATCHDOG alone must not arm a fallback timeout.
-#if defined(CONFIG_WATCHDOG) && (defined(USE_WATCHDOG) || defined(USE_NRF52))
+#if defined(CONFIG_WATCHDOG) && (defined(USE_ZEPHYR_WDT) || defined(USE_NRF52))
 #define ESPHOME_ZEPHYR_ARM_WATCHDOG
 #endif
 
@@ -38,7 +38,7 @@ static const device *const WDT = DEVICE_DT_GET(DT_ALIAS(watchdog0));
 // (wdt_silabs_siwx91x.c) reject callback + WDT_FLAG_RESET_SOC together (-ENOTSUP),
 // leaving the watchdog unarmed -- their single-channel watchdogs only support
 // callback or hardware reset, not both.
-#if defined(USE_ZEPHYR_WATCHDOG_TIMEOUT_MS) && defined(USE_LOGGER) && !defined(USE_ZEPHYR_VARIANT_FAMILY_RENESAS) && \
+#if defined(USE_ZEPHYR_WDT_MS) && defined(USE_LOGGER) && !defined(USE_ZEPHYR_VARIANT_FAMILY_RENESAS) && \
     !defined(USE_ZEPHYR_VARIANT_FAMILY_SILABS) && !defined(USE_ZEPHYR_VARIANT_FAMILY_SILABS_SIWX91X)
 // Zephyr compiles arch_stack_walk() only where the architecture has it (not Xtensa;
 // on Arm only with EXTRA_EXCEPTION_INFO).
@@ -69,7 +69,7 @@ static void wdt_warning_cb(const device *dev, int channel_id) {
   arch_stack_walk(wdt_log_stack_frame, nullptr, current, nullptr);
 #endif
 }
-#endif  // USE_ZEPHYR_WATCHDOG_TIMEOUT_MS && USE_LOGGER
+#endif  // USE_ZEPHYR_WDT_MS && USE_LOGGER
 #endif
 
 // yield(), delay(), millis(), millis_64(), delayMicroseconds(), micros() except the cycle-counter one,
@@ -143,8 +143,8 @@ void arch_init() {
     wdt_config.flags = WDT_FLAG_RESET_SOC;
     // Timeout value is a codegen decision (see each variant's to_code()), not a platform
     // #ifdef here -- except platform: nrf52/__init__.py sets a longer one for zigbee.
-#ifdef USE_ZEPHYR_WATCHDOG_TIMEOUT_MS
-    wdt_config.window.max = USE_ZEPHYR_WATCHDOG_TIMEOUT_MS;
+#ifdef USE_ZEPHYR_WDT_MS
+    wdt_config.window.max = USE_ZEPHYR_WDT_MS;
     // some families can't handle the callback, review periodically for correctness
     // since this is behavior is driven by zephyr
 #if defined(USE_LOGGER) && !defined(USE_ZEPHYR_VARIANT_FAMILY_RENESAS) && \

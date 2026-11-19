@@ -1746,8 +1746,8 @@ def test_watchdog_to_code_zero_forces_watchdog_off() -> None:
         False,
         True,
     )
-    assert not _defined("USE_WATCHDOG")
-    assert not _defined("USE_ZEPHYR_WATCHDOG_TIMEOUT_MS")
+    assert not _defined("USE_ZEPHYR_WDT")
+    assert not _defined("USE_ZEPHYR_WDT_MS")
 
 
 def test_watchdog_to_code_timeout_arms_watchdog() -> None:
@@ -1758,8 +1758,8 @@ def test_watchdog_to_code_timeout_arms_watchdog() -> None:
     ):
         _watchdog_to_code({"watchdog_timeout": cv.TimePeriod(seconds=10)})
     assert CORE.data[KEY_ZEPHYR]["prj_conf"][""]["CONFIG_WATCHDOG"] == (True, True)
-    assert _defined("USE_WATCHDOG")
-    assert _defined("USE_ZEPHYR_WATCHDOG_TIMEOUT_MS")
+    assert _defined("USE_ZEPHYR_WDT")
+    assert _defined("USE_ZEPHYR_WDT_MS")
 
 
 def _stack() -> tuple:
