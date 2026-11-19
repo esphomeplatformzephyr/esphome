@@ -40,7 +40,8 @@ from ..const import VARIANT_STM32C5
 # The largest C5 Nucleo (1M flash, 256K RAM).
 _DEFAULT_BOARD: str = "nucleo_c5a3zg"
 
-# MCUboot is opt-in: the C5 Nucleo boards have slot partitions but no zephyr,code-partition.
+# MCUboot is opt-in: the C5 Nucleo boards point zephyr,code-partition at slot0, but without MCUboot
+# CONFIG_USE_DT_CODE_PARTITION stays off and the app links at offset 0.
 _ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(BOOTLOADER_SCHEMA)
 
 # Registry entries — collected by variants/__init__.py
