@@ -25,6 +25,7 @@ from esphome.const import CONF_WAKEUP_PIN, PlatformFramework
 from esphome.core import CORE
 from tests.unit_tests.components.zephyr.zephyr_state import (
     VARIANTS,
+    variant_resolved,
     zephyr_platform_framework,
 )
 
@@ -334,9 +335,7 @@ def test_deep_sleep_zephyr_wakeup_pin(
 def _set_zephyr_variant(set_core_config: SetCoreConfigCallable, variant: str) -> None:
     set_core_config(zephyr_platform_framework(variant))
     CORE.data[KEY_ZEPHYR] = {
-        "variant": variant,
-        "variant_info": VARIANTS[variant],
-        "family": VARIANTS[variant].family_module.FAMILY,
+        "variant_resolved": variant_resolved(variant),
     }
 
 

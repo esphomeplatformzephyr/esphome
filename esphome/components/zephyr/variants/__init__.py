@@ -41,8 +41,6 @@ from ..const import (
     KEY_CPP_PATH,
     KEY_DTS_INCLUDE_PATHS,
     KEY_EXTRA_BUILD_FILES,
-    KEY_FAMILY,
-    KEY_FRAMEWORK_TYPE,
     KEY_KCONFIG,
     KEY_MODULE_OVERRIDES,
     KEY_MODULE_REQUESTS,
@@ -59,8 +57,7 @@ from ..const import (
     KEY_SNIPPETS,
     KEY_SYSBUILD_CONF,
     KEY_USER,
-    KEY_VARIANT,
-    KEY_VARIANT_INFO,
+    KEY_VARIANT_RESOLVED,
     KEY_ZEPHYR,
     VERSION_RECOMMENDED,
 )
@@ -532,13 +529,7 @@ def set_variant_core_data(
     from .. import zephyr_data, zephyr_set_core_data
 
     zephyr_set_core_data({**config, KEY_BOOTLOADER: bootloader})
-    variant = resolved.variant
-    zephyr_data()[KEY_VARIANT] = variant.name
-    zephyr_data()[KEY_VARIANT_INFO] = variant
-    zephyr_data()[KEY_FAMILY] = (
-        variant.family_module.FAMILY if variant.family_module else None
-    )
-    zephyr_data()[KEY_FRAMEWORK_TYPE] = resolved.manifest.framework_type
+    zephyr_data()[KEY_VARIANT_RESOLVED] = resolved
     # The devicetree caches, filled as code generation reads the board
     zephyr_data()[KEY_CPP_PATH] = ""
     zephyr_data()[KEY_DTS_INCLUDE_PATHS] = None
@@ -550,7 +541,9 @@ def set_variant_core_data(
     zephyr_data()["fake_board_manifest"] = None
     zephyr_data()["blobs"] = []
     zephyr_data()[KEY_RUNNER] = runner
-    zephyr_data()[KEY_BOOT_LAYOUT] = board_boot_layout(variant, config[CONF_BOARD])
+    zephyr_data()[KEY_BOOT_LAYOUT] = board_boot_layout(
+        resolved.variant, config[CONF_BOARD]
+    )
     zephyr_data()[KEY_SYSBUILD_CONF] = {}
     framework = config.get(CONF_FRAMEWORK, {})
     advanced = framework.get(CONF_ADVANCED, {})

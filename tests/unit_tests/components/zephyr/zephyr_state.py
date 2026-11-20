@@ -16,10 +16,8 @@ from esphome.components.silabs import zephyr_variants as silabs_variants
 from esphome.components.stm32 import zephyr_variants as stm32_variants
 from esphome.components.zephyr import ZephyrData, dts_lookup
 from esphome.components.zephyr.const import (
-    KEY_FAMILY,
-    KEY_VARIANT,
-    KEY_VARIANT_INFO,
     KEY_VARIANT_MODULE,
+    KEY_VARIANT_RESOLVED,
     KEY_ZEPHYR,
 )
 from esphome.components.zephyr.variants import (
@@ -49,6 +47,14 @@ VARIANT_MODULES: dict[str, ModuleType] = {
 VARIANTS: dict[str, ZephyrVariant] = {
     name: mod.VARIANT for name, mod in VARIANT_MODULES.items()
 }
+
+
+def variant_resolved(variant: str) -> ZephyrVariantResolved:
+    """The ZephyrVariantResolved of variant on its own manifest's default version."""
+    info = VARIANTS[variant]
+    return ZephyrVariantResolved(
+        info, info.manifest, cv.Version.parse(info.manifest.default_version)
+    )
 
 
 def zephyr_platform_framework(variant: str) -> PlatformFramework:
@@ -89,15 +95,9 @@ def empty_zephyr_data(
     if previous is not None:
         CORE.data[KEY_ZEPHYR] = previous
     assert set(data) == ZephyrData.__required_keys__ | ZephyrData.__optional_keys__
-    variant_info = VARIANTS.get(variant) if variant is not None else None
-    data[KEY_VARIANT] = variant
-    data[KEY_VARIANT_INFO] = variant_info
+    if variant not in VARIANTS:
+        data[KEY_VARIANT_RESOLVED] = None
     data[KEY_VARIANT_MODULE] = VARIANT_MODULES.get(variant)
-    data[KEY_FAMILY] = (
-        variant_info.family_module.FAMILY
-        if variant_info is not None and variant_info.family_module
-        else None
-    )
     data.update(overrides)
     return data
 

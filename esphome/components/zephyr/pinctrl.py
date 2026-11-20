@@ -11,7 +11,6 @@ import logging
 
 from esphome.core import EsphomeError
 
-from .const import KEY_VARIANT, KEY_VARIANT_INFO
 from .gpio import pin_summary
 from .variants import ZephyrVariant
 
@@ -310,15 +309,15 @@ def zephyr_setup_uart_pinctrl(
     from . import (  # noqa: PLC0415 -- avoids circular import at module load
         _require_zephyr_toolchain,
         zephyr_add_overlay,
-        zephyr_data,
         zephyr_family_module,
         zephyr_variant,
+        zephyr_variant_info,
     )
 
     _require_zephyr_toolchain("zephyr_setup_uart_pinctrl")
 
-    tx_display = _pin_display(tx_pin, zephyr_data().get(KEY_VARIANT_INFO))
-    rx_display = _pin_display(rx_pin, zephyr_data().get(KEY_VARIANT_INFO))
+    tx_display = _pin_display(tx_pin, zephyr_variant_info())
+    rx_display = _pin_display(rx_pin, zephyr_variant_info())
 
     if tx_pin is None and rx_pin is None:
         if not node_known:
@@ -377,7 +376,7 @@ def zephyr_setup_uart_pinctrl(
     )
     zephyr_add_overlay(
         _build_uart_pinctrl_states_overlay(
-            states, property_name, zephyr_data()[KEY_VARIANT_INFO].pinctrl_node_label
+            states, property_name, zephyr_variant_info().pinctrl_node_label
         )
     )
     # A board whose stock node already declares >1 pinctrl state (e.g. "sleep" for
@@ -423,15 +422,16 @@ def zephyr_setup_i2c_pinctrl(
     from . import (  # noqa: PLC0415 -- avoids circular import at module load
         _require_zephyr_toolchain,
         zephyr_add_overlay,
-        zephyr_data,
         zephyr_family_module,
+        zephyr_variant,
+        zephyr_variant_info,
     )
 
     _require_zephyr_toolchain("zephyr_setup_i2c_pinctrl")
 
-    variant_name = zephyr_data().get(KEY_VARIANT) or ""
-    sda_display = _pin_display(sda, zephyr_data().get(KEY_VARIANT_INFO))
-    scl_display = _pin_display(scl, zephyr_data().get(KEY_VARIANT_INFO))
+    variant_name = zephyr_variant() or ""
+    sda_display = _pin_display(sda, zephyr_variant_info())
+    scl_display = _pin_display(scl, zephyr_variant_info())
 
     if sda is None and scl is None:
         # Bus is already enabled unconditionally by the caller -- board's own
@@ -471,7 +471,7 @@ def zephyr_setup_i2c_pinctrl(
         property_name,
         role_values,
         value_role_decoder,
-        zephyr_data()[KEY_VARIANT_INFO].pinctrl_node_label,
+        zephyr_variant_info().pinctrl_node_label,
     )
     if (extra_overlay := getattr(family_module, "i2c_extra_overlay", None)) is not None:
         pinctrl_overlay += extra_overlay(bus_label, sda, scl, variant_name)

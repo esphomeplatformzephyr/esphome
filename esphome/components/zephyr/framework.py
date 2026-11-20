@@ -12,16 +12,8 @@ import time
 import yaml
 
 from esphome.build_helpers.tools_cache import ZEPHYR_TOOLS_CACHE, tools_cache_path
-from esphome.const import (
-    CONF_PATH,
-    CONF_REF,
-    CONF_TYPE,
-    CONF_URL,
-    KEY_CORE,
-    KEY_FRAMEWORK_VERSION,
-    TYPE_LOCAL,
-)
-from esphome.core import CORE, EsphomeError
+from esphome.const import CONF_PATH, CONF_REF, CONF_TYPE, CONF_URL, TYPE_LOCAL
+from esphome.core import EsphomeError
 from esphome.framework_helpers import (
     get_python_env_executable_path,
     install_lock,
@@ -84,10 +76,10 @@ def build_workspace() -> tuple[ZephyrManifest, str]:
     """The manifest this build installs and the version its workspace is installed at;
     the install and every reader of the workspace take it from here."""
     # deferred: zephyr's __init__ may import this module
-    from . import zephyr_framework_type, zephyr_variant_info
+    from . import zephyr_variant_resolved
 
-    manifest = zephyr_variant_info().manifest_for(zephyr_framework_type())
-    return manifest, f"v{CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]}"
+    resolved = zephyr_variant_resolved()
+    return resolved.manifest, f"v{resolved.version}"
 
 
 def get_zephyr_base() -> Path:

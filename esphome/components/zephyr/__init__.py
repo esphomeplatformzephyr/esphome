@@ -72,8 +72,6 @@ from .const import (
     KEY_BOOT_LAYOUT,
     KEY_BOOTLOADER,
     KEY_EXTRA_BUILD_FILES,
-    KEY_FAMILY,
-    KEY_FRAMEWORK_TYPE,
     KEY_KCONFIG,
     KEY_MODULE_OVERRIDES,
     KEY_MODULE_REQUESTS,
@@ -92,9 +90,8 @@ from .const import (
     KEY_SYSBUILD,
     KEY_SYSBUILD_CONF,
     KEY_USER,
-    KEY_VARIANT,
-    KEY_VARIANT_INFO,
     KEY_VARIANT_MODULE,
+    KEY_VARIANT_RESOLVED,
     KEY_ZEPHYR,
     zephyr_ns,
 )
@@ -219,14 +216,10 @@ class ZephyrData(TypedDict):
     board_root: NotRequired[Path | None]
     # Resolved framework: source:, or None if unset
     sdk_source: NotRequired[ConfigType | None]
-    variant: NotRequired[str | None]
-    # The active variant's ZephyrVariant and its module (config_schema, to_code, hooks)
-    variant_info: NotRequired[ZephyrVariant]
+    # The active variant with its resolved manifest and version, and the variant's
+    # module (config_schema, to_code, hooks)
+    variant_resolved: NotRequired[ZephyrVariantResolved]
     variant_module: NotRequired[ModuleType]
-    # Variant's family name (e.g. "esp32"), or None if unfamilied
-    family: NotRequired[str | None]
-    # Resolved framework: type: (e.g. "zephyr", "ncs")
-    framework_type: NotRequired[str]
     sysbuild_conf: NotRequired[dict[str, tuple[PrjConfValueType, bool]]]
     # (label, reason) partitions components need; see partitions.zephyr_require_partition()
     partition_requirements: NotRequired[list[tuple[str, str]]]
@@ -754,24 +747,34 @@ def _variant_data() -> ZephyrData | dict[str, object]:
 def zephyr_variant() -> str | None:
     """The active Zephyr variant name; None off the Zephyr toolchain or on a
     platform that also builds without Zephyr. Raises when read too early."""
-    return _variant_data().get(KEY_VARIANT)
+    resolved = zephyr_variant_resolved()
+    return resolved.variant.name if resolved is not None else None
 
 
 def zephyr_framework_type() -> str | None:
     """The active `framework: type:` (e.g. "zephyr", "ncs"); None as for
     zephyr_variant()."""
-    return _variant_data().get(KEY_FRAMEWORK_TYPE)
+    resolved = zephyr_variant_resolved()
+    return resolved.manifest.framework_type if resolved is not None else None
 
 
 def zephyr_variant_family() -> str | None:
     """The active variant's family (e.g. "esp32"); None without one, or as for
     zephyr_variant()."""
-    return _variant_data().get(KEY_FAMILY)
+    family = zephyr_family_module()
+    return family.FAMILY if family is not None else None
+
+
+def zephyr_variant_resolved() -> ZephyrVariantResolved | None:
+    """The active variant with the manifest and version its `framework:` block resolved
+    to; None as for zephyr_variant()."""
+    return _variant_data().get(KEY_VARIANT_RESOLVED)
 
 
 def zephyr_variant_info() -> ZephyrVariant | None:
     """The active variant's ZephyrVariant; None as for zephyr_variant()."""
-    return _variant_data().get(KEY_VARIANT_INFO)
+    resolved = zephyr_variant_resolved()
+    return resolved.variant if resolved is not None else None
 
 
 def zephyr_variant_module() -> ModuleType | None:
@@ -842,7 +845,7 @@ def request_zephyr_module(capability: str) -> None:
     `framework: modules:` override may still apply, so failing on a missing default
     version has to wait until resolve_zephyr_modules() (see there for why)."""
     _require_zephyr_toolchain("request_zephyr_module")
-    manifest = zephyr_variant_info().manifest_for(zephyr_framework_type())
+    manifest = zephyr_variant_resolved().manifest
     template = manifest.modules.get(capability)
     if template is None:
         raise EsphomeError(
@@ -2069,8 +2072,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
         from .framework import check_and_install as west_install
 
         version = str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION])
-        variant_data = zephyr_variant_info()
-        manifest = variant_data.manifest_for(zephyr_framework_type())
+        manifest = zephyr_variant_resolved().manifest
         python_bin, framework_path, west_env = west_install(
             manifest,
             version,
@@ -2108,8 +2110,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
     from .framework import check_and_install as west_install
 
     version = str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION])
-    variant_data = zephyr_variant_info()
-    manifest = variant_data.manifest_for(zephyr_framework_type())
+    manifest = zephyr_variant_resolved().manifest
     python_bin, framework_path, west_env = west_install(
         manifest,
         version,

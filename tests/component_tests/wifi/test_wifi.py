@@ -17,7 +17,7 @@ from esphome.const import (
 from esphome.core import CORE
 from tests.component_tests.types import SetCoreConfigCallable
 from tests.unit_tests.components.zephyr.zephyr_state import (
-    VARIANTS,
+    variant_resolved,
     zephyr_platform_framework,
 )
 
@@ -67,8 +67,7 @@ def _set_zephyr_with_ap(set_core_config: SetCoreConfigCallable, variant: str) ->
         full_config={"wifi": {CONF_AP: {}}},
     )
     CORE.data[KEY_ZEPHYR] = {
-        "variant": variant,
-        "variant_info": VARIANTS[variant],
+        "variant_resolved": variant_resolved(variant),
         "board": "some_board",
     }
 

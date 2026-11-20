@@ -7,7 +7,7 @@ import esphome.config_validation as cv
 from esphome.const import CONF_ID, CONF_INVERTED, CONF_MODE, CONF_NUMBER
 from esphome.core import EsphomeError
 
-from .const import KEY_VARIANT_INFO, zephyr_ns
+from .const import zephyr_ns
 
 if TYPE_CHECKING:
     from .variants import ZephyrVariant
@@ -32,9 +32,9 @@ def _pin_notation(variant_info: "ZephyrVariant | None") -> str | None:
 def _check_lettered_port(pin: int) -> int:
     """Codegen indexes gpio_port_labels by port, so a flat pin past the last port
     must be rejected here."""
-    from . import zephyr_data
+    from . import zephyr_variant_info
 
-    variant_info = zephyr_data().get(KEY_VARIANT_INFO)
+    variant_info = zephyr_variant_info()
     if variant_info is None or variant_info.gpio_port_labels is None:
         return pin
     if pin < 0 or pin // variant_info.gpio_port_width >= len(
@@ -64,9 +64,9 @@ def _validate_gpio_pin(value):
             except ValueError as exc:
                 raise cv.Invalid(f"Invalid pin: {value}") from exc
         if (m := _LETTERED_PIN_RE.fullmatch(value)) is not None:
-            from . import zephyr_data
+            from . import zephyr_variant_info
 
-            variant_info = zephyr_data().get(KEY_VARIANT_INFO)
+            variant_info = zephyr_variant_info()
             port_labels = (
                 variant_info.gpio_port_labels if variant_info is not None else None
             )
@@ -89,9 +89,9 @@ def _validate_gpio_pin(value):
 
             return port_labels.index(letter) * variant_info.gpio_port_width + pin
         if (m := _DOTTED_PIN_RE.fullmatch(value)) is not None:
-            from . import zephyr_data
+            from . import zephyr_variant_info
 
-            variant_info = zephyr_data().get(KEY_VARIANT_INFO)
+            variant_info = zephyr_variant_info()
             if _pin_notation(variant_info) != "dotted":
                 raise cv.Invalid(
                     f"'{value}' is not a valid pin: this variant does not use "
@@ -105,9 +105,9 @@ def _validate_gpio_pin(value):
                 )
             return port * variant_info.gpio_port_width + pin
         if (m := _CONCAT_PIN_RE.fullmatch(value)) is not None:
-            from . import zephyr_data
+            from . import zephyr_variant_info
 
-            variant_info = zephyr_data().get(KEY_VARIANT_INFO)
+            variant_info = zephyr_variant_info()
             if _pin_notation(variant_info) != "concat":
                 raise cv.Invalid(
                     f"'{value}' is not a valid pin: this variant does not use "
@@ -121,9 +121,9 @@ def _validate_gpio_pin(value):
                 )
             return port * variant_info.gpio_port_width + pin
         if (m := _UNDERSCORE_PIN_RE.fullmatch(value)) is not None:
-            from . import zephyr_data
+            from . import zephyr_variant_info
 
-            variant_info = zephyr_data().get(KEY_VARIANT_INFO)
+            variant_info = zephyr_variant_info()
             if _pin_notation(variant_info) != "underscore":
                 raise cv.Invalid(
                     f"'{value}' is not a valid pin: this variant does not use "
@@ -186,11 +186,11 @@ def pin_summary(variant_info: "ZephyrVariant", num: int) -> str:
 
 
 async def zephyr_pin_to_code(config):
-    from . import zephyr_add_prj_conf, zephyr_data
+    from . import zephyr_add_prj_conf, zephyr_data, zephyr_variant_info
     from .dts_lookup import get_gpio_port_size
 
     num = config[CONF_NUMBER]
-    variant_info = zephyr_data()[KEY_VARIANT_INFO]
+    variant_info = zephyr_variant_info()
     gpio_port_width = variant_info.gpio_port_width
     port = num // gpio_port_width
     port_labels = variant_info.gpio_port_labels

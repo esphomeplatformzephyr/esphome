@@ -615,8 +615,10 @@ def test_zephyr_setup_i2c_pinctrl_rp2040_requires_both_pins_together() -> None:
 
 def test_zephyr_setup_i2c_pinctrl_uses_variants_pinctrl_node_label() -> None:
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant="RP2040")
-    CORE.data[KEY_ZEPHYR]["variant_info"] = dataclasses.replace(
-        VARIANTS["RP2040"], pinctrl_node_label="pinctrl0"
+    resolved = CORE.data[KEY_ZEPHYR]["variant_resolved"]
+    CORE.data[KEY_ZEPHYR]["variant_resolved"] = dataclasses.replace(
+        resolved,
+        variant=dataclasses.replace(resolved.variant, pinctrl_node_label="pinctrl0"),
     )
     with (
         patch(
@@ -1170,8 +1172,10 @@ def test_zephyr_setup_uart_pinctrl_rpi_pico_uses_p_suffix_and_position() -> None
 
 def test_zephyr_setup_uart_pinctrl_uses_variants_pinctrl_node_label() -> None:
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant="RP2040")
-    CORE.data[KEY_ZEPHYR]["variant_info"] = dataclasses.replace(
-        VARIANTS["RP2040"], pinctrl_node_label="pinctrl0"
+    resolved = CORE.data[KEY_ZEPHYR]["variant_resolved"]
+    CORE.data[KEY_ZEPHYR]["variant_resolved"] = dataclasses.replace(
+        resolved,
+        variant=dataclasses.replace(resolved.variant, pinctrl_node_label="pinctrl0"),
     )
     with (
         patch(
@@ -1972,9 +1976,7 @@ def test_upload_program_resolves_variant_and_flashes(tmp_path: Path) -> None:
 
 
 _UPLOAD_FIELDS = (
-    "variant",
-    "family",
-    "framework_type",
+    "variant_resolved",
     "bootloader",
     "runner",
     "west_version",

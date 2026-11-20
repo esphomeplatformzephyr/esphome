@@ -18,7 +18,7 @@ from esphome.config_validation import Invalid
 from esphome.const import PlatformFramework
 from esphome.core import CORE
 from tests.component_tests.types import SetCoreConfigCallable
-from tests.unit_tests.components.zephyr.zephyr_state import VARIANTS
+from tests.unit_tests.components.zephyr.zephyr_state import variant_resolved
 
 
 def test_logger_pre_setup_before_other_components(generate_main):
@@ -184,9 +184,7 @@ def test_any_uart_number_accepted_on_zephyr(
 ) -> None:
     set_core_config(PlatformFramework.NRF_ZEPHYR)
     CORE.data[KEY_ZEPHYR] = {
-        "variant": VARIANT_NRF52,
-        "variant_info": VARIANTS[VARIANT_NRF52],
-        "family": "nordic",
+        "variant_resolved": variant_resolved(VARIANT_NRF52),
     }
     assert uart_selection("uart3") == "UART3"
     assert uart_selection("UART12") == "UART12"
@@ -218,9 +216,7 @@ def test_debug_probe_outputs_accepted_on_zephyr(
 ) -> None:
     set_core_config(PlatformFramework.NRF_ZEPHYR)
     CORE.data[KEY_ZEPHYR] = {
-        "variant": VARIANT_NRF52,
-        "variant_info": VARIANTS[VARIANT_NRF52],
-        "family": "nordic",
+        "variant_resolved": variant_resolved(VARIANT_NRF52),
     }
     assert uart_selection(value) == value.upper()
 
@@ -230,9 +226,7 @@ def test_rtt_rejected_on_family_without_rtt(
 ) -> None:
     set_core_config(PlatformFramework.ESP32_ZEPHYR)
     CORE.data[KEY_ZEPHYR] = {
-        "variant": "ESP32",
-        "variant_info": VARIANTS["ESP32"],
-        "family": "esp32",
+        "variant_resolved": variant_resolved("ESP32"),
     }
     with pytest.raises(Invalid, match="esp32 does not support"):
         uart_selection("RTT0")
@@ -251,9 +245,7 @@ def test_semihost_warns(
 ) -> None:
     set_core_config(PlatformFramework.NRF_ZEPHYR)
     CORE.data[KEY_ZEPHYR] = {
-        "variant": VARIANT_NRF52,
-        "variant_info": VARIANTS[VARIANT_NRF52],
-        "family": "nordic",
+        "variant_resolved": variant_resolved(VARIANT_NRF52),
     }
     uart_selection("SEMIHOST")
     assert "no debugger is attached" in caplog.text
@@ -317,9 +309,7 @@ def test_rtt3_not_a_logger_keyword(set_core_config: SetCoreConfigCallable) -> No
     """Channel 3 needs SEGGER's buffer counts raised; it is only reachable as "&rtt3"."""
     set_core_config(PlatformFramework.NRF_ZEPHYR)
     CORE.data[KEY_ZEPHYR] = {
-        "variant": VARIANT_NRF52,
-        "variant_info": VARIANTS[VARIANT_NRF52],
-        "family": "nordic",
+        "variant_resolved": variant_resolved(VARIANT_NRF52),
     }
     with pytest.raises(Invalid):
         uart_selection("RTT3")
