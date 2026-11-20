@@ -739,8 +739,10 @@ def _variant_data() -> ZephyrData | dict[str, object]:
     before the platform schema, which sets the target framework, has run."""
     if (data := CORE.data.get(KEY_ZEPHYR)) is not None:
         return data if CORE.using_toolchain_zephyr else {}
-    if CORE.data.get(KEY_CORE, {}).get(KEY_TARGET_FRAMEWORK) is None:
+    if (framework := CORE.data.get(KEY_CORE, {}).get(KEY_TARGET_FRAMEWORK)) is None:
         raise RuntimeError("Zephyr variant read before the platform schema set it")
+    if framework == KEY_ZEPHYR:
+        raise RuntimeError("Zephyr build without Zephyr data")
     return {}
 
 

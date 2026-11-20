@@ -186,6 +186,19 @@ def test_variant_read_before_the_platform_schema_is_rejected(
         lookup()
 
 
+@pytest.mark.parametrize("lookup", _VARIANT_READERS)
+def test_variant_read_on_zephyr_without_zephyr_data_is_rejected(
+    lookup: Callable[[], str | None],
+) -> None:
+    CORE.data.pop(KEY_ZEPHYR, None)
+    CORE.data[KEY_CORE] = {
+        KEY_TARGET_PLATFORM: PLATFORM_STM32,
+        KEY_TARGET_FRAMEWORK: "zephyr",
+    }
+    with pytest.raises(RuntimeError, match="without Zephyr data"):
+        lookup()
+
+
 @pytest.mark.parametrize(
     ("platform", "framework"),
     [(PLATFORM_ESP32, "esp-idf"), (PLATFORM_RP2, "arduino")],
