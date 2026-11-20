@@ -54,6 +54,7 @@ _ZEPHYR_PLATFORMS: tuple[str, ...] = (
 
 _DEFAULT_MANIFEST: ZephyrManifest = ZephyrManifest(
     framework_type="default",
+    workspace_prefix="default",
     source=FrameworkSource(
         name="Test", url="http://dummy-default", optional=(), required=frozenset()
     ),
@@ -62,6 +63,7 @@ _DEFAULT_MANIFEST: ZephyrManifest = ZephyrManifest(
 )
 _ALT_MANIFEST: ZephyrManifest = ZephyrManifest(
     framework_type="alt",
+    workspace_prefix="alt",
     source=FrameworkSource(
         name="Test", url="http://dummy-alt", optional=(), required=frozenset()
     ),
@@ -166,6 +168,7 @@ def test_resolve_variant_rejects_prerelease_of_min() -> None:
 def test_resolve_variant_release_meets_prerelease_min() -> None:
     manifest = ZephyrManifest(
         framework_type="default",
+        workspace_prefix="default",
         source=_DEFAULT_MANIFEST.source,
         default_version="1.0.0",
         min_version=cv.Version(1, 0, 0, "rc2"),

@@ -50,7 +50,11 @@ _SOURCE: FrameworkSource = FrameworkSource(
     required=frozenset({"hal_common"}),
 )
 _MANIFEST: ZephyrManifest = ZephyrManifest(
-    framework_type="zephyr", source=_SOURCE, workspace_prefix="zephyr"
+    framework_type="zephyr",
+    source=_SOURCE,
+    workspace_prefix="zephyr",
+    default_version="4.5.0",
+    min_version=cv.Version(4, 5, 0),
 )
 
 
@@ -319,6 +323,8 @@ def test_manifest_without_optional_projects_filters_nothing(tmp_path: Path) -> N
             required=frozenset(),
         ),
         workspace_prefix="zephyr-silabs",
+        default_version="4.5.0",
+        min_version=cv.Version(4, 5, 0),
     )
 
     calls, _ = _install(tmp_path, projects=frozenset(), manifest=manifest)
@@ -343,6 +349,8 @@ def test_source_cache_key_differs_across_manifests() -> None:
             required=frozenset(),
         ),
         workspace_prefix="a",
+        default_version="4.5.0",
+        min_version=cv.Version(4, 5, 0),
     )
     ncs = ZephyrManifest(
         framework_type="ncs",
@@ -353,6 +361,8 @@ def test_source_cache_key_differs_across_manifests() -> None:
             required=frozenset(),
         ),
         workspace_prefix="b",
+        default_version="4.5.0",
+        min_version=cv.Version(4, 5, 0),
     )
 
     assert _source_cache_key(mainline, "v1.0.0", None) != _source_cache_key(

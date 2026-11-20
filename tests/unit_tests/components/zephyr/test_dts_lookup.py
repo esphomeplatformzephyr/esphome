@@ -49,6 +49,7 @@ from esphome.components.zephyr.dts_lookup import (
 )
 from esphome.components.zephyr.framework_helpers import FrameworkSource
 from esphome.components.zephyr.variants import ZephyrManifest, ZephyrVariant
+import esphome.config_validation as cv
 from esphome.core import CORE, EsphomeError
 from tests.unit_tests.components.zephyr.zephyr_state import (
     empty_zephyr_data,
@@ -966,6 +967,9 @@ _FAKE_MANIFEST = ZephyrManifest(
         optional=(),
         required=frozenset(),
     ),
+    workspace_prefix="zephyr",
+    default_version="4.5.0",
+    min_version=cv.Version(4, 5, 0),
 )
 
 _BOARD_QUERIES = (

@@ -71,18 +71,18 @@ _LOGGER = logging.getLogger(__name__)
 FAMILY_DEFAULT: Final = "family default"
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class ZephyrManifest:
     """The west manifest repository a build starts from (Zephyr, NCS, etc.)."""
 
     # The `framework: type:` value that selects this manifest
     framework_type: str
     source: FrameworkSource
-    manifest_rev: str = "recommended"
     # Prefix of the workspace folder, so manifests with the same version string don't share one
-    workspace_prefix: str | None = None
-    default_version: str = "4.5.0"
-    min_version: cv.Version = cv.Version(4, 5, 0)
+    workspace_prefix: str
+    default_version: str
+    min_version: cv.Version
+    manifest_rev: str = "recommended"
     # Set when this manifest has no tagged release usable as a default -- framework: source:
     # is then mandatory; explains why in the raised error.
     requires_source_reason: str | None = None
@@ -625,6 +625,8 @@ ZEPHYR_MAINLINE: ZephyrManifest = ZephyrManifest(
         ),
     ),
     workspace_prefix="zephyr",
+    default_version="4.5.0",
+    min_version=cv.Version(4, 5, 0),
 )
 
 # Nordic's ZBOSS Zigbee stack, split out of sdk-nrf into this separate add-on repo as of
