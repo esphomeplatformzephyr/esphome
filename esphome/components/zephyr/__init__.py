@@ -743,10 +743,10 @@ def _require_zephyr_toolchain(name: str) -> None:
 
 def _variant_data() -> ZephyrData | dict[str, object]:
     """The Zephyr data of a Zephyr toolchain build, else {}. Raises when a read comes
-    before any platform is set."""
+    before the platform schema, which sets the target framework, has run."""
     if (data := CORE.data.get(KEY_ZEPHYR)) is not None:
         return data if CORE.using_toolchain_zephyr else {}
-    if CORE.data.get(KEY_CORE, {}).get(KEY_TARGET_PLATFORM) is None:
+    if CORE.data.get(KEY_CORE, {}).get(KEY_TARGET_FRAMEWORK) is None:
         raise RuntimeError("Zephyr variant read before the platform schema set it")
     return {}
 

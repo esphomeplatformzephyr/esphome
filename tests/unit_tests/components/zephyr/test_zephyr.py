@@ -98,7 +98,6 @@ from esphome.const import (
     KEY_TARGET_PLATFORM,
     PLATFORM_ESP32,
     PLATFORM_NRF,
-    PLATFORM_NRF52,
     PLATFORM_RP2,
     PLATFORM_STM32,
     TYPE_GIT,
@@ -175,24 +174,32 @@ def test_zephyr_variant_family_returns_family_for_esp32c6() -> None:
 _VARIANT_READERS = [zephyr_variant, zephyr_variant_family, zephyr_framework_type]
 
 
+@pytest.mark.parametrize("platform", [None, PLATFORM_ESP32, PLATFORM_STM32])
 @pytest.mark.parametrize("lookup", _VARIANT_READERS)
 def test_variant_read_before_the_platform_schema_is_rejected(
-    lookup: Callable[[], str | None],
+    lookup: Callable[[], str | None], platform: str | None
 ) -> None:
+    """Until the platform schema sets the target framework, even esp32 may be Zephyr."""
     CORE.data.pop(KEY_ZEPHYR, None)
-    CORE.data[KEY_CORE] = {}
+    CORE.data[KEY_CORE] = {} if platform is None else {KEY_TARGET_PLATFORM: platform}
     with pytest.raises(RuntimeError, match="before the platform schema set it"):
         lookup()
 
 
-@pytest.mark.parametrize("platform", [PLATFORM_ESP32, PLATFORM_RP2, PLATFORM_NRF52])
+@pytest.mark.parametrize(
+    ("platform", "framework"),
+    [(PLATFORM_ESP32, "esp-idf"), (PLATFORM_RP2, "arduino")],
+)
 @pytest.mark.parametrize("lookup", _VARIANT_READERS)
 def test_variant_read_without_zephyr_data_is_none(
-    lookup: Callable[[], str | None], platform: str
+    lookup: Callable[[], str | None], platform: str, framework: str
 ) -> None:
-    """esp32 and rp2 also build without Zephyr; nrf52 sets no variant."""
+    """esp32 and rp2 also build without Zephyr."""
     CORE.data.pop(KEY_ZEPHYR, None)
-    CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: platform}
+    CORE.data[KEY_CORE] = {
+        KEY_TARGET_PLATFORM: platform,
+        KEY_TARGET_FRAMEWORK: framework,
+    }
     assert lookup() is None
 
 
