@@ -188,13 +188,13 @@ def validate_zephyr_config(config):
                 "TX and RX pins are not used by an RTT port; it runs over the debug probe"
             )
         from esphome.components.zephyr import (
-            VARIANTS,  # noqa: PLC0415
             zephyr_variant,  # noqa: PLC0415
+            zephyr_variant_info,  # noqa: PLC0415
         )
 
         # Only esp32-family UART pins go through the GPIO matrix and can use any pin.
         variant = zephyr_variant()
-        variant_info = VARIANTS.get(variant)
+        variant_info = zephyr_variant_info()
         valid_pins = variant_info.uart_valid_pins if variant_info is not None else {}
         valid_pins_by_instance = (
             variant_info.uart_valid_pins_by_instance if variant_info is not None else {}
@@ -552,7 +552,6 @@ async def to_code(config):
     if CONF_PORT in config:
         if CORE.using_toolchain_zephyr:
             from esphome.components.zephyr import (
-                VARIANTS,
                 claim_rtt_channel,
                 enable_rtt_node,
                 resolve_uart_node_label,
@@ -562,7 +561,7 @@ async def to_code(config):
                 zephyr_add_prj_conf,
                 zephyr_data,
                 zephyr_setup_uart_pinctrl,
-                zephyr_variant,
+                zephyr_variant_info,
             )
             from esphome.components.zephyr.const import KEY_BOARD
 
@@ -592,7 +591,7 @@ async def to_code(config):
                 port_label = resolve_uart_node_label(
                     zephyr_data()[KEY_BOARD],
                     port_value,
-                    VARIANTS[zephyr_variant()].uart_node_labels,
+                    zephyr_variant_info().uart_node_labels,
                 )
             cg.add(
                 var.set_configured_device(

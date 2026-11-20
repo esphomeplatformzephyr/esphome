@@ -455,15 +455,15 @@ def validate_variant(_):
             )
     if CORE.using_toolchain_zephyr:
         from esphome.components.zephyr import (
-            VARIANTS,
-            get_family_module,
             zephyr_data,
+            zephyr_family_module,
             zephyr_variant,
+            zephyr_variant_info,
         )
         from esphome.components.zephyr.const import KEY_BOARD
 
         variant_name = zephyr_variant()
-        variant = VARIANTS.get(variant_name)
+        variant = zephyr_variant_info()
         if variant is None or "wifi" not in variant.transports:
             raise cv.Invalid(
                 f"wifi is not supported on Zephyr variant '{variant_name}'"
@@ -494,9 +494,7 @@ def validate_variant(_):
                 f"eap is not supported on Zephyr variant '{variant_name}'",
                 [CONF_NETWORKS],
             )
-        family_module = (
-            get_family_module(variant.family) if variant.family is not None else None
-        )
+        family_module = zephyr_family_module()
         if (
             check_board := getattr(family_module, "wifi_check_board", None)
         ) is not None:
@@ -1128,11 +1126,11 @@ async def to_code(config):
         cg.add_library("WiFi", None)
     elif CORE.using_toolchain_zephyr:
         from esphome.components.zephyr import (
-            VARIANTS,
             zephyr_add_blobs,
             zephyr_add_overlay,
             zephyr_add_prj_conf,
             zephyr_variant,
+            zephyr_variant_info,
         )
 
         zephyr_add_prj_conf("WIFI", True)
@@ -1140,7 +1138,7 @@ async def to_code(config):
         # Pin single-threaded net_mgmt dispatch -- the event queue in
         # wifi_component_zephyr.cpp is single-producer only.
         zephyr_add_prj_conf("NET_MGMT_EVENT_THREAD", True)
-        variant = VARIANTS[zephyr_variant()]
+        variant = zephyr_variant_info()
         transport_driver = variant.transport_drivers.get("wifi")
         if transport_driver is None:
             raise EsphomeError(

@@ -15,7 +15,7 @@ from esphome.components.esp32.const import (
     VARIANT_ESP32S3,
 )
 from esphome.components.renesas.const import VARIANT_RA4M1
-from esphome.components.zephyr.variants import VARIANTS
+from tests.unit_tests.components.zephyr.zephyr_state import VARIANTS
 
 
 @pytest.mark.parametrize(

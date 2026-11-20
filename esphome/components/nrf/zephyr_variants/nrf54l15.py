@@ -31,6 +31,7 @@ from esphome.core import CORE, CoroPriority, coroutine_with_priority
 from esphome.types import ConfigType
 
 from ..const import VARIANT_NRF54L15
+from . import nordic_family
 
 _DEFAULT_BOARD: str = "nrf54l15dk"
 # qualify_board() expands this to "nrf54l15dk/nrf54l15/cpuapp" via soc=/qualifier= below --
@@ -91,7 +92,7 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     sdk=NCS,
     sdk_name="ncs",
     alt_sdks={"zephyr": ZEPHYR_MAINLINE},
-    family="nordic",
+    family=nordic_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     # Untested on hardware as of 2026-08-04.
@@ -135,6 +136,7 @@ def config_schema(config: ConfigType) -> ConfigType:
     )
     set_core_data(
         VARIANT_NAME,
+        VARIANT,
         config,
         framework_ver,
         framework_type=sdk_name,

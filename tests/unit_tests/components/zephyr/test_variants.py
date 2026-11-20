@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
 from importlib import import_module
-import sys
+import pkgutil
 from types import ModuleType
 from typing import Any
 
@@ -19,13 +18,11 @@ from esphome.components.zephyr import (
 from esphome.components.zephyr.const import KEY_BOOTLOADER, VERSION_RECOMMENDED
 from esphome.components.zephyr.framework_helpers import FrameworkSource
 from esphome.components.zephyr.variants import (
-    VARIANTS,
     ZEPHYR_MAINLINE,
     ZephyrModule,
     ZephyrModuleTemplate,
     ZephyrSDK,
     ZephyrVariant,
-    get_family_module,
     resolve_framework_version,
     resolve_sdk,
     set_core_data,
@@ -44,6 +41,17 @@ from esphome.const import (
     KEY_TARGET_FRAMEWORK,
 )
 from esphome.core import CORE, EsphomeError
+from tests.unit_tests.components.zephyr.zephyr_state import VARIANTS
+
+_ZEPHYR_PLATFORMS: tuple[str, ...] = (
+    "esp32",
+    "nrf",
+    "nxp",
+    "renesas",
+    "rp2",
+    "silabs",
+    "stm32",
+)
 
 _DEFAULT_SDK = ZephyrSDK(
     source=FrameworkSource(
@@ -356,99 +364,9 @@ def test_simg301_rejects_an_unknown_advanced_key() -> None:
 
 def test_every_family_names_its_vendor_hals() -> None:
     for family in {v.family for v in VARIANTS.values() if v.family}:
-        hals = get_family_module(family).ADDITIONAL_FRAMEWORK_PROJECTS
+        hals = family.ADDITIONAL_FRAMEWORK_PROJECTS
         assert hals
         assert all(h.startswith("hal_") for h in hals)
-
-
-def test_registry_read_while_loading_is_rejected(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    package = "esphome.components.fakeplatform.zephyr_variants"
-    registry = variants._LazyVariants()
-    # VARIANT_NAME is missing, so reading it calls __getattr__, which reads the registry
-    chip = ModuleType(f"{package}.chip1")
-    chip.__getattr__ = lambda name: registry.get("chip1")
-    platform = ModuleType(package)
-    platform.VARIANT_MODULES = ["chip1"]
-    monkeypatch.setitem(sys.modules, package, platform)
-    monkeypatch.setitem(sys.modules, chip.__name__, chip)
-    monkeypatch.setattr(variants, "_ZEPHYR_PLATFORMS", ("fakeplatform",))
-
-    for _ in range(2):
-        with pytest.raises(RuntimeError, match="read VARIANTS while it loaded"):
-            registry.get("chip1")
-
-
-_PACKAGE: str = "esphome.components.fakeplatform.zephyr_variants"
-
-
-def _module(name: str, **attrs: object) -> ModuleType:
-    module = ModuleType(name)
-    module.__dict__.update(attrs)
-    return module
-
-
-@pytest.fixture
-def fake_platform(monkeypatch: pytest.MonkeyPatch) -> ModuleType:
-    """A platform whose zephyr_variants package lists one chip of the chipfam family."""
-    variant = ZephyrVariant(sdk=_DEFAULT_SDK, sdk_name="default", family="chipfam")
-    chip = _module(f"{_PACKAGE}.chip1", VARIANT_NAME="chip1", VARIANT=variant)
-    family = _module(f"{_PACKAGE}.chipfam_family")
-    monkeypatch.setitem(
-        sys.modules, _PACKAGE, _module(_PACKAGE, VARIANT_MODULES=["chip1"])
-    )
-    monkeypatch.setitem(sys.modules, chip.__name__, chip)
-    monkeypatch.setitem(sys.modules, family.__name__, family)
-    monkeypatch.setattr(variants, "_ZEPHYR_PLATFORMS", ("fakeplatform",))
-    return chip
-
-
-def test_registry_loads_variants_and_families(fake_platform: ModuleType) -> None:
-    registry = variants._LazyVariants()
-
-    assert dict(registry.items()) == {"chip1": fake_platform.VARIANT}
-    assert registry.module("chip1") is fake_platform
-    assert (
-        registry.family_module("chipfam") is sys.modules[f"{_PACKAGE}.chipfam_family"]
-    )
-
-
-@pytest.mark.parametrize(
-    "access",
-    [
-        lambda r, v: r["chip1"],
-        lambda r, v: r.get("chip1"),
-        lambda r, v: next(iter(r.values())),
-        lambda r, v: v if "chip1" in r else None,
-        lambda r, v: v if list(r) == ["chip1"] else None,
-        lambda r, v: v if list(r.keys()) == ["chip1"] else None,
-        lambda r, v: v if r == {"chip1": v} else None,
-        lambda r, v: dict(r)["chip1"],
-    ],
-)
-def test_each_lookup_loads_the_registry(
-    fake_platform: ModuleType,
-    access: Callable[[Mapping[str, ZephyrVariant], ZephyrVariant], object],
-) -> None:
-    variant = fake_platform.VARIANT
-    assert access(variants._LazyVariants(), variant) is variant
-
-
-def test_module_lookups(
-    fake_platform: ModuleType, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(variants, "_variants_instance", variants._LazyVariants())
-
-    assert variants.get_variant_module("chip1") is fake_platform
-    assert variants.get_family_module("chipfam").__name__.endswith("chipfam_family")
-
-
-def test_stm32_variants_load() -> None:
-    registry = variants._LazyVariants()
-
-    assert "STM32C5" in registry
-    assert registry.family_module("stm32").__name__.endswith(".stm32_family")
 
 
 def test_stm32c5_default_is_its_minimum() -> None:
@@ -457,15 +375,16 @@ def test_stm32c5_default_is_its_minimum() -> None:
     ) == variants._sdk_min_version(VARIANTS["STM32C5"], "zephyr", ZEPHYR_MAINLINE)
 
 
-def test_set_core_data(
-    fake_platform: ModuleType, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.setattr(variants, "VARIANTS", {"chip1": fake_platform.VARIANT})
+def test_set_core_data() -> None:
+    family = ModuleType("chipfam_family")
+    family.FAMILY = "chipfam"
+    variant = ZephyrVariant(sdk=_DEFAULT_SDK, sdk_name="default", family=family)
     CORE.data[KEY_CORE] = {}
 
     config = {CONF_BOARD: "chip1_dk", CONF_FRAMEWORK: {}}
     set_core_data(
         "chip1",
+        variant,
         config,
         cv.Version(4, 5, 0),
         framework_type="vendor",
@@ -481,32 +400,6 @@ def test_set_core_data(
     assert CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION] == cv.Version(4, 5, 0)
 
 
-def test_failed_variant_import_is_raised_on_every_lookup(
-    fake_platform: ModuleType,
-) -> None:
-    sys.modules[_PACKAGE].VARIANT_MODULES = ["chip1", "missing"]
-    registry = variants._LazyVariants()
-
-    for _ in range(2):
-        with pytest.raises(ModuleNotFoundError):
-            registry.get("chip1")
-    assert registry._variants == {}
-
-
-def test_duplicate_variant_name_is_rejected(fake_platform: ModuleType) -> None:
-    sys.modules[_PACKAGE].VARIANT_MODULES = ["chip1", "chip1"]
-    registry = variants._LazyVariants()
-
-    for _ in range(2):
-        with pytest.raises(ValueError, match="are both 'chip1'"):
-            registry.get("chip1")
-
-
-def test_registry_rejects_an_unknown_family(fake_platform: ModuleType) -> None:
-    with pytest.raises(ValueError, match="Unknown Zephyr family"):
-        variants._LazyVariants().family_module("other")
-
-
 @pytest.mark.parametrize("version", ["v1.0.0", "1.0.0-rc1a"])
 def test_resolve_framework_version_rejects_a_version_that_is_not_a_number(
     version: str,
@@ -515,3 +408,18 @@ def test_resolve_framework_version_rejects_a_version_that_is_not_a_number(
     with pytest.raises(cv.Invalid, match=f"'{version}' is not a version number") as err:
         resolve_framework_version(_fake_variant(), "fake", config, "test")
     assert err.value.path == [CONF_FRAMEWORK, CONF_VERSION]
+
+
+@pytest.mark.parametrize("platform", _ZEPHYR_PLATFORMS)
+def test_variant_names_are_unique_and_listed_within_a_platform(platform: str) -> None:
+    """VARIANT_MODULES is a dict, so a duplicate name would silently replace a variant."""
+    package = import_module(f"esphome.components.{platform}.zephyr_variants")
+    names = [
+        mod.VARIANT_NAME
+        for info in pkgutil.iter_modules(package.__path__)
+        if hasattr(
+            mod := import_module(f"{package.__name__}.{info.name}"), "VARIANT_NAME"
+        )
+    ]
+    assert len(names) == len(set(names))
+    assert set(names) == set(package.VARIANT_MODULES)

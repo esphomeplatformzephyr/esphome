@@ -69,6 +69,8 @@ KEY_SYSBUILD_CONF: Final = "sysbuild_conf"
 KEY_USER: Final = "user"
 KEY_ZEPHYR = "zephyr"
 KEY_VARIANT: Final = "variant"
+KEY_VARIANT_INFO: Final = "variant_info"
+KEY_VARIANT_MODULE: Final = "variant_module"
 KEY_FRAMEWORK_TYPE: Final = "framework_type"
 KEY_FAMILY: Final = "family"
 # The devicetree caches dts_lookup fills during code generation

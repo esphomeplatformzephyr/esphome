@@ -22,6 +22,7 @@ from esphome.components.zephyr import (
     zephyr_add_prj_conf,
     zephyr_variant,
     zephyr_variant_family,
+    zephyr_variant_info,
 )
 from esphome.config_helpers import filter_source_files_from_platform
 import esphome.config_validation as cv
@@ -206,7 +207,7 @@ _WAKEUP_PIN_MODE_BOTH_LEVELS = (
 
 def validate_config(config: ConfigType) -> ConfigType:
     if CORE.using_toolchain_zephyr and not variant_value(
-        zephyr_variant(), "has_poweroff"
+        zephyr_variant_info(), "has_poweroff"
     ):
         raise cv.Invalid(
             f"deep_sleep is not supported on the Zephyr {zephyr_variant()} variant"

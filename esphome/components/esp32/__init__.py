@@ -108,8 +108,6 @@ _LOGGER = logging.getLogger(__name__)
 CODEOWNERS = ["@esphome/core"]
 DOMAIN = "esp32"
 IS_TARGET_PLATFORM = True
-# The variant families zephyr builds for framework: type: zephyr
-ZEPHYR_FAMILIES = frozenset({"esp32"})
 
 
 def _uses_zephyr(config: ConfigType) -> bool:
@@ -2596,7 +2594,9 @@ def CONFIG_SCHEMA(config: ConfigType) -> ConfigType:
     if _uses_zephyr(config):
         from esphome.components.zephyr import zephyr_config_schema
 
-        return zephyr_config_schema(config, ZEPHYR_FAMILIES, PLATFORM_ESP32)
+        from .zephyr_variants import VARIANT_MODULES
+
+        return zephyr_config_schema(config, VARIANT_MODULES, PLATFORM_ESP32)
     return _ESP32_SCHEMA(config)
 
 

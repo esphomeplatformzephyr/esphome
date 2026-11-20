@@ -28,6 +28,7 @@ from esphome.const import (
 from esphome.types import ConfigType
 
 from ..const import VARIANT_MCXN236
+from . import nxp_family
 
 _DEFAULT_BOARD: str = "frdm_mcxn236"
 
@@ -48,7 +49,7 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     boot=BootLayout(0x0),
     sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
-    family="nxp",
+    family=nxp_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     transports=frozenset(),
@@ -76,6 +77,7 @@ def config_schema(config: ConfigType) -> ConfigType:
     )
     set_core_data(
         VARIANT_NAME,
+        VARIANT,
         config,
         framework_ver,
         framework_type=sdk_name,

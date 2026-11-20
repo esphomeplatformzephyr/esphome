@@ -5,10 +5,10 @@ from esphome.components import sensor
 from esphome.components.esp32 import get_esp32_variant, include_builtin_idf_component
 from esphome.components.esp32.const import VARIANT_ESP32
 from esphome.components.zephyr import (
-    VARIANTS,
     zephyr_add_overlay,
     zephyr_add_prj_conf,
     zephyr_variant,
+    zephyr_variant_info,
 )
 from esphome.config_helpers import filter_source_files_from_platform
 import esphome.config_validation as cv
@@ -73,7 +73,7 @@ async def to_code(config: ConfigType) -> None:
     elif CORE.using_toolchain_zephyr:
         # Every Zephyr sensor driver needs it; the driver itself follows its node's status
         zephyr_add_prj_conf("SENSOR", True)
-        if nodes := VARIANTS[zephyr_variant()].die_temp_nodes:
+        if nodes := zephyr_variant_info().die_temp_nodes:
             for label in nodes:
                 zephyr_add_overlay(f'&{label} {{ status = "okay"; }};')
             cg.add_define("INTERNAL_TEMPERATURE_NODE_LABEL", cg.RawExpression(nodes[0]))

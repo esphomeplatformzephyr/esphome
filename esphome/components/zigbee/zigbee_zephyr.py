@@ -4,13 +4,12 @@ import random
 import esphome.codegen as cg
 from esphome.components.const import CONF_MANUFACTURER
 from esphome.components.zephyr import (
-    VARIANTS,
     request_zephyr_module,
     resolve_sdk,
     zephyr_add_prj_conf,
     zephyr_framework_type,
     zephyr_require_partition,
-    zephyr_variant,
+    zephyr_variant_info,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -82,7 +81,7 @@ def zigbee_zephyr_supported() -> bool:
         return True
     if not CORE.using_toolchain_zephyr:
         return False
-    variant = VARIANTS.get(zephyr_variant())
+    variant = zephyr_variant_info()
     if variant is None or "zigbee" not in variant.transports:
         return False
     _, sdk = resolve_sdk(variant, zephyr_framework_type())

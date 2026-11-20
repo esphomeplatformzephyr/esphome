@@ -15,6 +15,8 @@ from ..const import (
     VARIANT_ESP32S3,
 )
 
+FAMILY: str = "esp32"
+
 # Devicetree property esp32-family pinctrl groups pack all their signal macros into.
 PROPERTY_NAME: str = "pinmux"
 
@@ -42,7 +44,7 @@ def to_code(config: ConfigType) -> None:
     """REQUIRES_FULL_LIBCPP selects GLIBCXX_LIBCPP; without it Zephyr defaults
     to MINIMAL_LIBCPP, which has no STL and breaks ESPHome's C++ headers."""
     import esphome.codegen as cg  # noqa: PLC0415
-    from esphome.components.zephyr import zephyr_add_prj_conf, zephyr_variant  # noqa: PLC0415 -- avoids circular import at module load
+    from esphome.components.zephyr import zephyr_add_prj_conf, zephyr_variant_info  # noqa: PLC0415 -- avoids circular import at module load
     from esphome.components.zephyr.variants import variant_value  # noqa: PLC0415
     from esphome.const import CONF_AP, CONF_FRAMEWORK, CONF_LOG_LEVEL, CONF_WIFI  # noqa: PLC0415
     from esphome.core import CORE  # noqa: PLC0415
@@ -51,7 +53,7 @@ def to_code(config: ConfigType) -> None:
     zephyr_add_prj_conf("REQUIRES_FULL_LIBCPP", True)
     # Original ESP32 (LX6) and S3 (LX7) have a hardware FPU; esp32_h2/c6/c5/c3 are
     # RV32IMAC/RV32IMC, none of which do.
-    xtensa = variant_value(zephyr_variant(), "cpu_arch") == "xtensa"
+    xtensa = variant_value(zephyr_variant_info(), "cpu_arch") == "xtensa"
     if xtensa:
         zephyr_add_prj_conf("FPU", True)
     # random_bytes() uses sys_rand_get(), which requires the entropy subsystem.
@@ -290,19 +292,19 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
     from esphome.components.zephyr import (  # noqa: PLC0415
         zephyr_additional_framework_projects,
         zephyr_data,
-        zephyr_variant,
+        zephyr_variant_info,
     )
     from esphome.components.zephyr.build_zephyr import run_west_flash  # noqa: PLC0415
     from esphome.components.zephyr.const import KEY_FRAMEWORK_TYPE, KEY_RUNNER  # noqa: PLC0415
     from esphome.components.zephyr.framework import check_and_install as west_install  # noqa: PLC0415
-    from esphome.components.zephyr.variants import VARIANTS, resolve_sdk  # noqa: PLC0415
+    from esphome.components.zephyr.variants import resolve_sdk  # noqa: PLC0415
     from esphome.const import KEY_CORE, KEY_FRAMEWORK_VERSION  # noqa: PLC0415
     from esphome.core import CORE, EsphomeError  # noqa: PLC0415
 
     check_permissions(host)
 
     version = str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION])
-    variant_data = VARIANTS[zephyr_variant()]
+    variant_data = zephyr_variant_info()
     _, sdk = resolve_sdk(variant_data, zephyr_data().get(KEY_FRAMEWORK_TYPE))
     python_bin, framework_path, west_env = west_install(
         sdk,

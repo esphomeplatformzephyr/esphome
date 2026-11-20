@@ -18,11 +18,16 @@ from esphome.const import (
 )
 from esphome.core import CORE, EsphomeError
 from tests.component_tests.types import SetCoreConfigCallable
+from tests.unit_tests.components.zephyr.zephyr_state import VARIANTS
 
 
 def _zephyr(set_core_config: SetCoreConfigCallable, variant: str) -> None:
     set_core_config(PlatformFramework.NRF_ZEPHYR)
-    CORE.data[KEY_ZEPHYR] = {"variant": variant, "family": "nordic"}
+    CORE.data[KEY_ZEPHYR] = {
+        "variant": variant,
+        "variant_info": VARIANTS[variant],
+        "family": "nordic",
+    }
 
 
 @pytest.mark.parametrize("port", ["rtt0", "RTT1", "Rtt2"])
@@ -41,7 +46,11 @@ def test_rtt_port_rejected_on_family_without_rtt(
     set_core_config: SetCoreConfigCallable,
 ) -> None:
     set_core_config(PlatformFramework.ESP32_ZEPHYR)
-    CORE.data[KEY_ZEPHYR] = {"variant": "ESP32", "family": "esp32"}
+    CORE.data[KEY_ZEPHYR] = {
+        "variant": "ESP32",
+        "variant_info": VARIANTS["ESP32"],
+        "family": "esp32",
+    }
     with pytest.raises(Invalid, match="esp32 does not support"):
         uart.validate_port("RTT1")
 
@@ -52,9 +61,10 @@ def test_rtt_port_rejected_on_family_without_rtt(
 )
 def test_every_rtt_family_declares_it(family: str) -> None:
     from esphome.components.zephyr.const import SEGGER_RTT_UART  # noqa: PLC0415
-    from esphome.components.zephyr.variants import get_family_module  # noqa: PLC0415
+    from tests.unit_tests.components.zephyr.zephyr_state import VARIANTS  # noqa: PLC0415
 
-    assert SEGGER_RTT_UART in get_family_module(family).UART_DRIVERS
+    modules = {v.family.FAMILY: v.family for v in VARIANTS.values()}
+    assert SEGGER_RTT_UART in modules[family].UART_DRIVERS
 
 
 def test_rtt_port_rejects_pins(set_core_config: SetCoreConfigCallable) -> None:

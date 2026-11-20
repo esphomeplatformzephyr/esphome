@@ -27,6 +27,7 @@ from esphome.const import (
 from esphome.types import ConfigType
 
 from ..const import VARIANT_RA4M1
+from . import renesas_family
 
 # RA4M1 is single-core -- soc= is left unset (that field exists to disambiguate
 # multi-core chips like esp32_c6's HP/LP split, not to pin a single package variant;
@@ -92,7 +93,7 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     },
     sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
-    family="renesas",
+    family=renesas_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     transports=frozenset(),
@@ -135,6 +136,7 @@ def config_schema(config: ConfigType) -> ConfigType:
     )
     set_core_data(
         VARIANT_NAME,
+        VARIANT,
         config,
         framework_ver,
         framework_type=sdk_name,

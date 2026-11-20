@@ -47,6 +47,7 @@ from esphome.framework_helpers import run_command_ok
 from esphome.types import ConfigType
 
 from ..const import VARIANT_NRF52
+from . import nordic_family
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -180,7 +181,7 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     sdk=NCS,
     sdk_name="ncs",
     alt_sdks={"zephyr": ZEPHYR_MAINLINE},
-    family="nordic",
+    family=nordic_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     # OpenThread included: issue #11's tracked entanglement was specifically about
@@ -226,6 +227,7 @@ def config_schema(config: ConfigType) -> ConfigType:
     )
     set_core_data(
         VARIANT_NAME,
+        VARIANT,
         config,
         framework_ver,
         framework_type=sdk_name,
@@ -476,18 +478,16 @@ def upload_serial_dfu(host: str) -> bool:
     from esphome.components.zephyr import (  # noqa: PLC0415
         zephyr_additional_framework_projects,
         zephyr_data,
-        zephyr_variant,
+        zephyr_variant_info,
     )
     from esphome.components.zephyr.const import KEY_FRAMEWORK_TYPE  # noqa: PLC0415
     from esphome.components.zephyr.framework import check_and_install as west_install  # noqa: PLC0415
-    from esphome.components.zephyr.variants import VARIANTS, resolve_sdk  # noqa: PLC0415
+    from esphome.components.zephyr.variants import resolve_sdk  # noqa: PLC0415
 
     package = CORE.relative_build_path(_DFU_PACKAGE)
     if not package.is_file():
         raise EsphomeError("Firmware not found. Please compile first.")
-    _, sdk = resolve_sdk(
-        VARIANTS[zephyr_variant()], zephyr_data().get(KEY_FRAMEWORK_TYPE)
-    )
+    _, sdk = resolve_sdk(zephyr_variant_info(), zephyr_data().get(KEY_FRAMEWORK_TYPE))
     python_bin, _, env = west_install(
         sdk,
         str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]),

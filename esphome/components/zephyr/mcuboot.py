@@ -44,13 +44,12 @@ def validate_swap_method(config: ConfigType) -> ConfigType:
     """Reject a swap_method the current variant's port doesn't support."""
     if not CORE.using_toolchain_zephyr:
         return reject_swap_method_off_zephyr(config)
-    from . import zephyr_variant
-    from .variants import VARIANTS
+    from . import zephyr_variant_info
 
-    variant = zephyr_variant()
+    variant = zephyr_variant_info()
     if variant is None:
         return config
-    allowed = VARIANTS[variant].swap_methods
+    allowed = variant.swap_methods
     method = config[CONF_SWAP_METHOD]
     if method not in allowed:
         raise cv.Invalid(

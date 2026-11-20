@@ -6,6 +6,8 @@ from esphome.components.zephyr.const import SEGGER_RTT_UART
 from esphome.components.zephyr.variants import mcuboot_or_none
 from esphome.types import ConfigType
 
+FAMILY: str = "nxp"
+
 # Software UART drivers (devicetree compatible strings) that work on this family,
 # on top of its hardware UARTs.
 UART_DRIVERS: frozenset[str] = frozenset({SEGGER_RTT_UART})

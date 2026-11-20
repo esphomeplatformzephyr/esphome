@@ -839,7 +839,6 @@ async def _late_logger_init(config: ConfigType) -> None:
                 zephyr_add_prj_conf("UART_LINE_CTRL", True)
     if CORE.using_toolchain_zephyr and has_serial_logging:
         from esphome.components.zephyr import (
-            VARIANTS,
             claim_rtt_channel,
             enable_rtt_node,
             rtt_channel,
@@ -848,7 +847,7 @@ async def _late_logger_init(config: ConfigType) -> None:
             zephyr_add_prj_conf,
             zephyr_cdc_acm_label,
             zephyr_data,
-            zephyr_variant,
+            zephyr_variant_info,
         )
         from esphome.components.zephyr.const import KEY_BOARD
 
@@ -877,7 +876,7 @@ async def _late_logger_init(config: ConfigType) -> None:
                 node = resolve_uart_node_label(
                     zephyr_data()[KEY_BOARD],
                     hw_uart,
-                    VARIANTS[zephyr_variant()].uart_node_labels,
+                    zephyr_variant_info().uart_node_labels,
                 )
                 node_known = True
             if node_known:

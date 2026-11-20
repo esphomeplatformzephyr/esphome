@@ -27,6 +27,7 @@ from esphome.const import (
 from esphome.types import ConfigType
 
 from ..const import VARIANT_ESP32S3
+from . import esp32_family
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -49,7 +50,7 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     boot=BootLayout(0x0),
     sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
-    family="esp32",
+    family=esp32_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="xtensa-espressif_esp32s3_zephyr-elf",
     # See esp32_h2.py's blobs= comment. Sentinel shared with the other esp32-family
@@ -97,6 +98,7 @@ def config_schema(config: ConfigType) -> ConfigType:
     )
     set_core_data(
         VARIANT_NAME,
+        VARIANT,
         config,
         framework_ver,
         framework_type=sdk_name,

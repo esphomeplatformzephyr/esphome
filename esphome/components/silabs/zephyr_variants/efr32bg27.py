@@ -26,6 +26,7 @@ from esphome.const import (
 from esphome.types import ConfigType
 
 from ..const import VARIANT_EFR32BG27
+from . import silabs_family
 
 # xG27-DK2602A (BRD2602A), Silicon Labs' EFR32xG27 Dev Kit. Bare name; no
 # SoC/qualifier segment needed -- upstream's board.yml declares a single SoC
@@ -66,7 +67,7 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
     alt_sdks={"silabs": SILABS},
-    family="silabs",
+    family=silabs_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     # BLE only -- EFR32BG27 is a Blue Gecko part, its radio node (efr32xg27.dtsi) only
@@ -117,6 +118,7 @@ def config_schema(config: ConfigType) -> ConfigType:
         )
     set_core_data(
         VARIANT_NAME,
+        VARIANT,
         config,
         framework_ver,
         framework_type=sdk_name,

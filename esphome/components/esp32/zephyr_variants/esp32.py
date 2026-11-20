@@ -27,6 +27,7 @@ from esphome.const import (
 from esphome.types import ConfigType
 
 from ..const import VARIANT_ESP32
+from . import esp32_family
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -79,7 +80,7 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     boot=BootLayout(0x1000),
     sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
-    family="esp32",
+    family=esp32_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     # Original ESP32 is Xtensa (dual-core PRO_CPU/APP_CPU), unlike H2/C6's RISC-V --
     # a completely separate Zephyr SDK toolchain.
@@ -130,6 +131,7 @@ def config_schema(config: ConfigType) -> ConfigType:
     )
     set_core_data(
         VARIANT_NAME,
+        VARIANT,
         config,
         framework_ver,
         framework_type=sdk_name,

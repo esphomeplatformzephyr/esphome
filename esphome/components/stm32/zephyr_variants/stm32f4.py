@@ -27,6 +27,7 @@ from esphome.const import (
 from esphome.types import ConfigType
 
 from ..const import VARIANT_STM32F4
+from . import stm32_family
 
 # Bare name; no SoC/qualifier segment needed -- upstream's board.yml declares a single
 # SoC for this board (stm32f401xe), so qualify_board() is a no-op here (soc= is left
@@ -55,7 +56,7 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     boot=BootLayout(0x0),
     sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
-    family="stm32",
+    family=stm32_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     transports=frozenset(),
@@ -98,6 +99,7 @@ def config_schema(config: ConfigType) -> ConfigType:
     )
     set_core_data(
         VARIANT_NAME,
+        VARIANT,
         config,
         framework_ver,
         framework_type=sdk_name,

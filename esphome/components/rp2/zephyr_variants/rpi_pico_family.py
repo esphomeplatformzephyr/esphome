@@ -9,7 +9,6 @@ from typing import Any
 
 import esphome.codegen as cg
 from esphome.components.zephyr.const import (
-    KEY_VARIANT,
     SEGGER_RTT_UART,
     declare_component_id,
     zephyr_ns,
@@ -19,6 +18,8 @@ import esphome.config_validation as cv
 from esphome.const import CONF_ADVANCED, CONF_FRAMEWORK
 from esphome.core import CORE, CoroPriority, coroutine_with_priority
 from esphome.types import ConfigType
+
+FAMILY: str = "rpi_pico"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -111,10 +112,9 @@ def uart_pinctrl(
     real UART instance valid-pins table, or None if unresolvable -- rp2040/
     rp2350 have no group-role resolver (group_role_resolver is always None,
     falling back to the generic positional guess)."""
-    from esphome.components.zephyr import zephyr_data  # noqa: PLC0415 -- avoids circular import at module load
-    from esphome.components.zephyr.variants import VARIANTS  # noqa: PLC0415
+    from esphome.components.zephyr import zephyr_variant_info  # noqa: PLC0415
 
-    variant_info = VARIANTS.get(zephyr_data().get(KEY_VARIANT) or "")
+    variant_info = zephyr_variant_info()
     instance_pins = (
         variant_info.uart_valid_pins_by_instance.get(port_label.upper())
         if variant_info is not None
@@ -441,7 +441,7 @@ def bootloader(advanced: ConfigType) -> str:
 def i2c_check_pins(
     bus_label: str, sda: int | None, scl: int | None, variant: str
 ) -> None:
-    from esphome.components.zephyr.variants import VARIANTS  # noqa: PLC0415
+    from esphome.components.zephyr import zephyr_variant_info  # noqa: PLC0415
     from esphome.core import EsphomeError  # noqa: PLC0415
 
     # Each pin is tied to one fixed I2C instance+role -- both are needed
@@ -452,7 +452,9 @@ def i2c_check_pins(
             f"({variant}) -- its GPIO mux ties each pin to a fixed "
             "instance+role pair."
         )
-    instance_pins = VARIANTS[variant].i2c_valid_pins_by_instance.get(bus_label.upper())
+    instance_pins = zephyr_variant_info().i2c_valid_pins_by_instance.get(
+        bus_label.upper()
+    )
     if (
         instance_pins is None
         or sda not in instance_pins.get("sda", frozenset())

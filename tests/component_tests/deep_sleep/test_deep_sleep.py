@@ -21,10 +21,12 @@ from esphome.components.esp32 import (
     VARIANT_ESP32S31,
 )
 from esphome.components.zephyr.const import KEY_ZEPHYR
-from esphome.components.zephyr.variants import VARIANTS
 from esphome.const import CONF_WAKEUP_PIN, PlatformFramework
 from esphome.core import CORE
-from tests.unit_tests.components.zephyr.zephyr_state import zephyr_platform_framework
+from tests.unit_tests.components.zephyr.zephyr_state import (
+    VARIANTS,
+    zephyr_platform_framework,
+)
 
 from ..types import SetCoreConfigCallable
 
@@ -333,7 +335,8 @@ def _set_zephyr_variant(set_core_config: SetCoreConfigCallable, variant: str) ->
     set_core_config(zephyr_platform_framework(variant))
     CORE.data[KEY_ZEPHYR] = {
         "variant": variant,
-        "family": VARIANTS[variant].family,
+        "variant_info": VARIANTS[variant],
+        "family": VARIANTS[variant].family.FAMILY,
     }
 
 
@@ -365,7 +368,7 @@ def test_deep_sleep_zephyr_verdict_follows_the_family_for_every_variant(
 ) -> None:
     """A new variant must land on the right side of the family rule, not go untested."""
     _set_zephyr_variant(set_core_config, variant)
-    if VARIANTS[variant].family in _POWEROFF_FAMILIES:
+    if VARIANTS[variant].family.FAMILY in _POWEROFF_FAMILIES:
         assert deep_sleep.validate_config({}) == {}
     else:
         with pytest.raises(cv.Invalid, match="deep_sleep is not supported"):

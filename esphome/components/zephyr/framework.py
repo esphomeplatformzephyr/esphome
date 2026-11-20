@@ -43,7 +43,7 @@ from .framework_helpers import (
     refresh_framework,
 )
 from .sdk_install import ensure_sdk
-from .variants import VARIANTS, ZephyrModule, ZephyrSDK, resolve_sdk
+from .variants import ZephyrModule, ZephyrSDK, resolve_sdk
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -82,9 +82,9 @@ def build_workspace() -> tuple[ZephyrSDK, str]:
     """The SDK this build installs and the version its workspace is installed at;
     the install and every reader of the workspace take it from here."""
     # deferred: zephyr's __init__ may import this module
-    from . import zephyr_framework_type, zephyr_variant
+    from . import zephyr_framework_type, zephyr_variant_info
 
-    _, sdk = resolve_sdk(VARIANTS[zephyr_variant()], zephyr_framework_type())
+    _, sdk = resolve_sdk(zephyr_variant_info(), zephyr_framework_type())
     return sdk, f"v{CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]}"
 
 

@@ -2,34 +2,56 @@
 
 from __future__ import annotations
 
-from types import SimpleNamespace
+from types import ModuleType, SimpleNamespace
 from typing import Any
 
 import pytest
 
-from esphome.components import esp32, nrf, nxp, renesas, rp2, silabs, stm32
+from esphome.components.esp32 import zephyr_variants as esp32_variants
+from esphome.components.nrf import zephyr_variants as nrf_variants
+from esphome.components.nxp import zephyr_variants as nxp_variants
+from esphome.components.renesas import zephyr_variants as renesas_variants
+from esphome.components.rp2 import zephyr_variants as rp2_variants
+from esphome.components.silabs import zephyr_variants as silabs_variants
+from esphome.components.stm32 import zephyr_variants as stm32_variants
 from esphome.components.zephyr import ZephyrData, dts_lookup
-from esphome.components.zephyr.const import KEY_FAMILY, KEY_VARIANT, KEY_ZEPHYR
-from esphome.components.zephyr.variants import VARIANTS, set_core_data
+from esphome.components.zephyr.const import (
+    KEY_FAMILY,
+    KEY_VARIANT,
+    KEY_VARIANT_INFO,
+    KEY_VARIANT_MODULE,
+    KEY_ZEPHYR,
+)
+from esphome.components.zephyr.variants import ZephyrVariant, set_core_data
 import esphome.config_validation as cv
 from esphome.const import CONF_BOARD, KEY_CORE, Framework, Platform, PlatformFramework
 from esphome.core import CORE
 
-_PLATFORM_FAMILIES = {
-    Platform.ESP32: esp32.ZEPHYR_FAMILIES,
-    Platform.NRF: nrf.ZEPHYR_FAMILIES,
-    Platform.NXP: nxp.ZEPHYR_FAMILIES,
-    Platform.RENESAS: renesas.ZEPHYR_FAMILIES,
-    Platform.RP2: rp2.ZEPHYR_FAMILIES,
-    Platform.SILABS: silabs.ZEPHYR_FAMILIES,
-    Platform.STM32: stm32.ZEPHYR_FAMILIES,
+_PLATFORM_VARIANT_MODULES: dict[Platform, dict[str, ModuleType]] = {
+    Platform.ESP32: esp32_variants.VARIANT_MODULES,
+    Platform.NRF: nrf_variants.VARIANT_MODULES,
+    Platform.NXP: nxp_variants.VARIANT_MODULES,
+    Platform.RENESAS: renesas_variants.VARIANT_MODULES,
+    Platform.RP2: rp2_variants.VARIANT_MODULES,
+    Platform.SILABS: silabs_variants.VARIANT_MODULES,
+    Platform.STM32: stm32_variants.VARIANT_MODULES,
+}
+# Every platform's variants, for tests that cover them all
+VARIANT_MODULES: dict[str, ModuleType] = {
+    name: mod
+    for modules in _PLATFORM_VARIANT_MODULES.values()
+    for name, mod in modules.items()
+}
+VARIANTS: dict[str, ZephyrVariant] = {
+    name: mod.VARIANT for name, mod in VARIANT_MODULES.items()
 }
 
 
 def zephyr_platform_framework(variant: str) -> PlatformFramework:
     """The <platform>_ZEPHYR pair whose platform builds variant."""
-    family = VARIANTS[variant].family
-    platform = next(p for p, fams in _PLATFORM_FAMILIES.items() if family in fams)
+    platform = next(
+        p for p, mods in _PLATFORM_VARIANT_MODULES.items() if variant in mods
+    )
     return PlatformFramework((platform, Framework.ZEPHYR))
 
 
@@ -46,21 +68,31 @@ def empty_zephyr_data(
     previous = CORE.data.get(KEY_ZEPHYR)
     previous_core = dict(CORE.data.get(KEY_CORE, {}))
     CORE.data.setdefault(KEY_CORE, {})
+    name = variant if variant in VARIANTS else next(iter(VARIANTS))
     set_core_data(
-        variant if variant in VARIANTS else next(iter(VARIANTS)),
+        name,
+        VARIANTS[name],
         {CONF_BOARD: "some_board"},
         cv.Version(4, 5, 0),
         framework_type=framework_type,
         bootloader="none",
     )
     data: dict[str, Any] = dict(CORE.data.pop(KEY_ZEPHYR))
+    # Set by the platform's schema, not set_core_data
+    data[KEY_VARIANT_MODULE] = VARIANT_MODULES[name]
     CORE.data[KEY_CORE] = previous_core
     if previous is not None:
         CORE.data[KEY_ZEPHYR] = previous
     assert set(data) == ZephyrData.__required_keys__ | ZephyrData.__optional_keys__
     variant_info = VARIANTS.get(variant) if variant is not None else None
     data[KEY_VARIANT] = variant
-    data[KEY_FAMILY] = variant_info.family if variant_info is not None else None
+    data[KEY_VARIANT_INFO] = variant_info
+    data[KEY_VARIANT_MODULE] = VARIANT_MODULES.get(variant)
+    data[KEY_FAMILY] = (
+        variant_info.family.FAMILY
+        if variant_info is not None and variant_info.family
+        else None
+    )
     data.update(overrides)
     return data
 

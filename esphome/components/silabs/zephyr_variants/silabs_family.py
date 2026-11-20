@@ -6,6 +6,8 @@ from collections.abc import Callable
 from esphome.components.zephyr.const import BOOTLOADER_MCUBOOT, SEGGER_RTT_UART
 from esphome.types import ConfigType
 
+FAMILY: str = "silabs"
+
 # Devicetree property silabs pinctrl groups pack all their signal macros into.
 PROPERTY_NAME: str = "pins"
 
@@ -65,9 +67,9 @@ _SILABS_SPI_SIGNAL_NAMES: dict[int, str] = {4: "mosi", 2: "miso", 3: "clk"}
 def pin_macro(prefix: str, signal: str, pin: int | None, variant: str) -> str | None:
     if pin is None:
         return None
-    from esphome.components.zephyr.variants import VARIANTS  # noqa: PLC0415 -- avoids circular import at module load
+    from esphome.components.zephyr import zephyr_variant_info  # noqa: PLC0415 -- avoids circular import at module load
 
-    port_width = VARIANTS[variant].gpio_port_width
+    port_width = zephyr_variant_info().gpio_port_width
     letter, num = chr(ord("A") + pin // port_width), pin % port_width
     return f"<{prefix}_{signal}_P{letter}{num}>"
 

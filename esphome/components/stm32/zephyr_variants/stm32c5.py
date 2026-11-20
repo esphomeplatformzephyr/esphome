@@ -36,6 +36,7 @@ from esphome.core import CORE, CoroPriority, EsphomeError, coroutine_with_priori
 from esphome.types import ConfigType
 
 from ..const import VARIANT_STM32C5
+from . import stm32_family
 
 # The largest C5 Nucleo (1M flash, 256K RAM).
 _DEFAULT_BOARD: str = "nucleo_c5a3zg"
@@ -54,7 +55,7 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     },
     sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
-    family="stm32",
+    family=stm32_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     transports=frozenset(),
@@ -86,6 +87,7 @@ def config_schema(config: ConfigType) -> ConfigType:
     )
     set_core_data(
         VARIANT_NAME,
+        VARIANT,
         config,
         framework_ver,
         framework_type=sdk_name,

@@ -11,7 +11,6 @@ from esphome.components.esp32 import (
 )
 from esphome.components.nrf52.const import AIN_TO_GPIO, EXTRA_ADC
 from esphome.components.zephyr import (
-    VARIANTS,
     zephyr_add_overlay,
     zephyr_add_overlay_builder,
     zephyr_add_prj_conf,
@@ -19,6 +18,7 @@ from esphome.components.zephyr import (
     zephyr_data,
     zephyr_variant,
     zephyr_variant_family,
+    zephyr_variant_info,
 )
 from esphome.components.zephyr.const import KEY_BOARD
 from esphome.config_helpers import filter_source_files_from_platform
@@ -397,7 +397,7 @@ async def to_code(config: ConfigType) -> None:
     elif CORE.using_zephyr and zephyr_variant_family() == "esp32":
         variant = zephyr_variant()
         pin_num = config[CONF_PIN][CONF_NUMBER]
-        channel_map = VARIANTS[variant].adc1_channel_map
+        channel_map = zephyr_variant_info().adc1_channel_map
         if pin_num not in channel_map:
             raise EsphomeError(f"Pin {pin_num} is not a valid ADC1 pin on {variant}")
         # channel_id addresses the channel within adc0's own silicon namespace; unrelated
@@ -437,7 +437,7 @@ async def to_code(config: ConfigType) -> None:
         zephyr_add_prj_conf("ADC", True)
         variant = zephyr_variant()
         pin_num = config[CONF_PIN][CONF_NUMBER]
-        ain_map = VARIANTS[variant].adc_ain_map
+        ain_map = zephyr_variant_info().adc_ain_map
         if pin_num not in ain_map:
             raise EsphomeError(f"Pin {pin_num} is not a valid ADC pin on {variant}")
         ain_name = ain_map[pin_num]
@@ -481,7 +481,7 @@ async def to_code(config: ConfigType) -> None:
         data.zephyr_adc_channel_id += 1
         zephyr_add_prj_conf("ADC", True)
         variant = zephyr_variant()
-        variant_info = VARIANTS[variant]
+        variant_info = zephyr_variant_info()
         pin_num = config[CONF_PIN][CONF_NUMBER]
         ain_map = variant_info.adc_ain_map
         if pin_num not in ain_map:
@@ -556,7 +556,7 @@ async def to_code(config: ConfigType) -> None:
         zephyr_add_prj_conf("ADC", True)
         variant = zephyr_variant()
         pin_num = config[CONF_PIN][CONF_NUMBER]
-        ain_map = VARIANTS[variant].adc_ain_map
+        ain_map = zephyr_variant_info().adc_ain_map
         if pin_num not in ain_map:
             raise EsphomeError(f"Pin {pin_num} is not a valid ADC pin on {variant}")
         ain_name = ain_map[pin_num]
@@ -600,7 +600,7 @@ async def to_code(config: ConfigType) -> None:
         data.zephyr_adc_channel_id += 1
         zephyr_add_prj_conf("ADC", True)
         variant = zephyr_variant()
-        variant_info = VARIANTS[variant]
+        variant_info = zephyr_variant_info()
         pin_num = config[CONF_PIN][CONF_NUMBER]
         ain_map = variant_info.adc_ain_map
         if pin_num not in ain_map:
@@ -650,7 +650,7 @@ async def to_code(config: ConfigType) -> None:
         # ADC_CHn_P2x macros (adc1_channel_map below encodes this).
         zephyr_add_prj_conf("ADC", True)
         variant = zephyr_variant()
-        variant_info = VARIANTS[variant]
+        variant_info = zephyr_variant_info()
         pin_num = config[CONF_PIN][CONF_NUMBER]
         channel_map = variant_info.adc1_channel_map
         if pin_num not in channel_map:

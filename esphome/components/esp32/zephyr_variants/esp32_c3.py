@@ -24,6 +24,7 @@ from esphome.const import (
 from esphome.types import ConfigType
 
 from ..const import VARIANT_ESP32C3
+from . import esp32_family
 
 # Bare name; qualify_board() expands it to "esp32c3_devkitm/esp32c3" using soc= below.
 # No hp/lpcore qualifier -- unlike esp32_c6/esp32_c5, this chip is single-core.
@@ -43,7 +44,7 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     boot=BootLayout(0x0),
     sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
-    family="esp32",
+    family=esp32_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="riscv64-zephyr-elf",
     # See esp32_h2.py's blobs= comment. Sentinel shared with esp32_h2/esp32_c6/esp32_c5
@@ -84,6 +85,7 @@ def config_schema(config: ConfigType) -> ConfigType:
     )
     set_core_data(
         VARIANT_NAME,
+        VARIANT,
         config,
         framework_ver,
         framework_type=sdk_name,

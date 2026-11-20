@@ -25,6 +25,7 @@ from esphome.const import (
 from esphome.types import ConfigType
 
 from ..const import VARIANT_SIWX917
+from . import silabs_siwx91x_family
 
 # SiWx917-DK2605A (BRD2605A), Silicon Labs' SiWx917 Wi-Fi 6 + BLE 5.4 dev kit. Bare
 # name; no SoC/qualifier segment needed -- upstream's board.yml declares a single
@@ -85,7 +86,7 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     # IP with its own dt-bindings header and devicetree shape. Reusing "silabs"
     # would misdirect adc/sensor.py's family-keyed codegen at EFR32's IADC overlay
     # shape, which doesn't apply to this chip's ADC driver.
-    family="silabs_siwx91x",
+    family=silabs_siwx91x_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     # Wi-Fi 6 + BLE 5.4 only -- no 802.15.4 radio on this chip.
@@ -180,6 +181,7 @@ def config_schema(config: ConfigType) -> ConfigType:
         )
     set_core_data(
         VARIANT_NAME,
+        VARIANT,
         config,
         framework_ver,
         framework_type=sdk_name,

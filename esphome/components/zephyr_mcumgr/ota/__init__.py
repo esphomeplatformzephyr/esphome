@@ -20,7 +20,6 @@ from esphome.components.ota import (
     ota_to_code,
 )
 from esphome.components.zephyr import (
-    VARIANTS,
     HexValue,
     apply_swap_method,
     validate_swap_method,
@@ -32,7 +31,8 @@ from esphome.components.zephyr import (
     zephyr_claim_cdc_acm,
     zephyr_data,
     zephyr_framework_type,
-    zephyr_variant,
+    zephyr_variant as zephyr_variant,
+    zephyr_variant_info,
 )
 from esphome.components.zephyr.const import (
     BOOTLOADER_MCUBOOT,
@@ -113,20 +113,17 @@ def _validate_platform(conf: ConfigType) -> ConfigType:
         CORE.is_nrf52
         or (
             CORE.using_toolchain_zephyr
-            and (variant := zephyr_variant()) is not None
-            and VARIANTS[variant].mcumgr_ota
+            and (variant := zephyr_variant_info()) is not None
+            and variant.mcumgr_ota
         )
     ):
-        supported = ", ".join(
-            name.lower() for name, info in VARIANTS.items() if info.mcumgr_ota
-        )
         raise cv.Invalid(
             "This feature is only available on platform: nrf52, or when using the zephyr "
-            f"framework with variant: {supported}."
+            "framework with a variant that supports MCUmgr OTA."
         )
     hw_uart = conf[CONF_TRANSPORT].get(CONF_HARDWARE_UART)
     if hw_uart in CDC_IDS and not (
-        CORE.is_nrf52 or variant_value(zephyr_variant(), "mcumgr_cdc")
+        CORE.is_nrf52 or variant_value(zephyr_variant_info(), "mcumgr_cdc")
     ):
         raise cv.Invalid(
             f"'{hw_uart}' is not available on this variant -- it has no USB "
@@ -303,7 +300,7 @@ async def to_code(config: ConfigType) -> None:
             uart_name = resolve_uart_node_label(
                 zephyr_data()[KEY_BOARD],
                 hw_uart,
-                VARIANTS[zephyr_variant()].uart_node_labels,
+                zephyr_variant_info().uart_node_labels,
             )
         zephyr_add_prj_conf("MCUMGR_TRANSPORT_UART", True)
         # The mcumgr serial driver; MCUMGR_TRANSPORT_UART depends on it and is dropped without it

@@ -30,6 +30,7 @@ from esphome.core import CORE
 from esphome.types import ConfigType
 
 from ..const import VARIANT_NRF5340
+from . import nordic_family
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -67,7 +68,7 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     sdk=NCS,
     sdk_name="ncs",
     alt_sdks={"zephyr": ZEPHYR_MAINLINE},
-    family="nordic",
+    family=nordic_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     transports=frozenset({"wifi"}),
@@ -115,6 +116,7 @@ def config_schema(config: ConfigType) -> ConfigType:
     )
     set_core_data(
         VARIANT_NAME,
+        VARIANT,
         config,
         framework_ver,
         framework_type=sdk_name,

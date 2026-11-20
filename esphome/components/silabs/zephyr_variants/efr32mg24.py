@@ -26,6 +26,7 @@ from esphome.const import (
 from esphome.types import ConfigType
 
 from ..const import VARIANT_EFR32MG24
+from . import silabs_family
 
 # xG24-EK2703A (PCB2703A), Silicon Labs' EFR32xG24 Explorer Kit. Bare name; no
 # SoC/qualifier segment needed -- upstream's board.yml declares a single SoC/core
@@ -64,7 +65,7 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
     alt_sdks={"silabs": SILABS},
-    family="silabs",
+    family=silabs_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     # BLE always available (bt_hci_silabs HCI node enabled upstream). OpenThread also
@@ -119,6 +120,7 @@ def config_schema(config: ConfigType) -> ConfigType:
         )
     set_core_data(
         VARIANT_NAME,
+        VARIANT,
         config,
         framework_ver,
         framework_type=sdk_name,

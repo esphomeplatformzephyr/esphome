@@ -9,10 +9,9 @@ import pytest
 from esphome.components.zephyr import dts_lookup
 from esphome.components.zephyr.const import KEY_ZEPHYR
 from esphome.components.zephyr.gpio import _validate_gpio_pin, pin_summary
-from esphome.components.zephyr.variants import VARIANTS
 import esphome.config_validation as cv
 from esphome.core import CORE
-from tests.unit_tests.components.zephyr.zephyr_state import empty_zephyr_data
+from tests.unit_tests.components.zephyr.zephyr_state import VARIANTS, empty_zephyr_data
 
 
 def _set_zephyr_variant(variant: str | None) -> None:

@@ -24,6 +24,7 @@ from esphome.const import (
 from esphome.types import ConfigType
 
 from ..const import VARIANT_SIMG301
+from . import silabs_family
 
 # SixG301 Explorer Kit (BRD2719A). Not in mainline Zephyr yet: set `board_source:` to
 # esphomeplatformzephyr/custom_zephyr_boards.
@@ -41,7 +42,7 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     boot=BootLayout(0x0),
     sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
-    family="silabs",
+    family=silabs_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     # The SoC has an ieee802154 node too, but it's untested on this chip.
@@ -74,6 +75,7 @@ def config_schema(config: ConfigType) -> ConfigType:
     )
     set_core_data(
         VARIANT_NAME,
+        VARIANT,
         config,
         framework_ver,
         framework_type=sdk_name,

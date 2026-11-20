@@ -29,6 +29,7 @@ from esphome.const import (
 from esphome.types import ConfigType
 
 from ..const import VARIANT_RP2350
+from . import rpi_pico_family
 from .rpi_pico_family import BOOTSEL_TOUCH_SCHEMA, declare_bootsel_touch
 
 _LOGGER = logging.getLogger(__name__)
@@ -58,7 +59,7 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     boot=BootLayout(0x0),
     sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
-    family="rpi_pico",
+    family=rpi_pico_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     transports=frozenset({"wifi"}),
@@ -133,6 +134,7 @@ def config_schema(config: ConfigType) -> ConfigType:
     )
     set_core_data(
         VARIANT_NAME,
+        VARIANT,
         config,
         framework_ver,
         framework_type=sdk_name,

@@ -24,6 +24,7 @@ from esphome.const import (
 from esphome.types import ConfigType
 
 from ..const import VARIANT_ESP32H2
+from . import esp32_family
 
 # Bare name; qualify_board() expands it to "esp32h2_devkitm/esp32h2" using soc= below.
 _DEFAULT_BOARD: str = "esp32h2_devkitm"
@@ -45,7 +46,7 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     boot=BootLayout(0x0),
     sdk=ZEPHYR_MAINLINE,
     sdk_name="zephyr",
-    family="esp32",
+    family=esp32_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="riscv64-zephyr-elf",
     # Zephyr's hal_espressif blob check verifies the HAL's entire manifest once BLE is
@@ -81,6 +82,7 @@ def config_schema(config: ConfigType) -> ConfigType:
     )
     set_core_data(
         VARIANT_NAME,
+        VARIANT,
         config,
         framework_ver,
         framework_type=sdk_name,

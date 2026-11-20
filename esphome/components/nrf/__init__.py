@@ -12,8 +12,6 @@ from .gpio import nrf_pin_to_code  # noqa: F401
 CODEOWNERS = ["@rwrozelle"]
 DOMAIN = "nrf"
 IS_TARGET_PLATFORM = True
-# The variant families zephyr builds for this platform
-ZEPHYR_FAMILIES = frozenset({"nordic"})
 
 # Zephyr is the only framework so far. Another one is chosen in CONFIG_SCHEMA by
 # framework: type:, and the functions below branch on CORE.toolchain, as rp2 does.
@@ -29,9 +27,11 @@ def AUTO_LOAD() -> list[str]:
 def CONFIG_SCHEMA(config: ConfigType) -> ConfigType:
     from esphome.components.zephyr import zephyr_config_schema, zephyr_toolchain_schema
 
+    from .zephyr_variants import VARIANT_MODULES
+
     if config is SCHEMA_EXTRACT:
-        return zephyr_toolchain_schema(ZEPHYR_FAMILIES)
-    return zephyr_config_schema(config, ZEPHYR_FAMILIES, PLATFORM_NRF)
+        return zephyr_toolchain_schema(VARIANT_MODULES)
+    return zephyr_config_schema(config, VARIANT_MODULES, PLATFORM_NRF)
 
 
 @coroutine_with_priority(CoroPriority.PLATFORM)

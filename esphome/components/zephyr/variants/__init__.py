@@ -1,6 +1,4 @@
-from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
-import importlib
 import logging
 from pathlib import Path
 import re
@@ -20,13 +18,6 @@ from esphome.const import (
     KEY_CORE,
     KEY_FRAMEWORK_VERSION,
     KEY_TARGET_FRAMEWORK,
-    PLATFORM_ESP32,
-    PLATFORM_NRF,
-    PLATFORM_NXP,
-    PLATFORM_RENESAS,
-    PLATFORM_RP2,
-    PLATFORM_SILABS,
-    PLATFORM_STM32,
     TYPE_GIT,
     Toolchain,
 )
@@ -69,6 +60,7 @@ from ..const import (
     KEY_SYSBUILD_CONF,
     KEY_USER,
     KEY_VARIANT,
+    KEY_VARIANT_INFO,
     KEY_ZEPHYR,
     VERSION_RECOMMENDED,
 )
@@ -181,8 +173,9 @@ class ZephyrVariant:
     alt_sdks: dict[str, "ZephyrSDK"] = field(default_factory=dict)
     # Groups sibling variants sharing the same silicon vendor (e.g. "esp32" for
     # esp32_h2/esp32_c6), so shared config/codegen can gate on family once instead
-    # of an ever-growing per-variant elif chain. None = no family.
-    family: str | None = None
+    # of an ever-growing per-variant elif chain. The family's module, whose FAMILY
+    # is its name; None = no family.
+    family: ModuleType | None = None
     boards: list[str] = field(default_factory=list)  # empty = accept any board
     # Toolchain identifiers supported by this variant (StrEnum values from esphome.const.Toolchain).
     valid_toolchains: tuple[str, ...] = ("platformio",)
@@ -534,6 +527,7 @@ def resolve_framework_version(
 
 def set_core_data(
     variant_name: str,
+    variant: ZephyrVariant,
     config: ConfigType,
     framework_ver: cv.Version,
     *,
@@ -567,7 +561,8 @@ def set_core_data(
 
     zephyr_set_core_data({**config, KEY_BOOTLOADER: bootloader})
     zephyr_data()[KEY_VARIANT] = variant_name
-    zephyr_data()[KEY_FAMILY] = VARIANTS[variant_name].family
+    zephyr_data()[KEY_VARIANT_INFO] = variant
+    zephyr_data()[KEY_FAMILY] = variant.family.FAMILY if variant.family else None
     zephyr_data()[KEY_FRAMEWORK_TYPE] = framework_type
     # The devicetree caches, filled as code generation reads the board
     zephyr_data()[KEY_CPP_PATH] = ""
@@ -580,9 +575,7 @@ def set_core_data(
     zephyr_data()["fake_board_manifest"] = None
     zephyr_data()["blobs"] = []
     zephyr_data()[KEY_RUNNER] = runner
-    zephyr_data()[KEY_BOOT_LAYOUT] = board_boot_layout(
-        VARIANTS[variant_name], config[CONF_BOARD]
-    )
+    zephyr_data()[KEY_BOOT_LAYOUT] = board_boot_layout(variant, config[CONF_BOARD])
     zephyr_data()[KEY_SYSBUILD_CONF] = {}
     framework = config.get(CONF_FRAMEWORK, {})
     advanced = framework.get(CONF_ADVANCED, {})
@@ -719,113 +712,12 @@ SILABS: ZephyrSDK = ZephyrSDK(
     min_version=cv.Version(2026, 6, 0),
 )
 
-# Platforms that keep Zephyr variants in a zephyr_variants package, which lists them
-# in VARIANT_MODULES. A family's module sits next to its variants as <family>_family.
-_ZEPHYR_PLATFORMS: tuple[str, ...] = (
-    PLATFORM_ESP32,
-    PLATFORM_NRF,
-    PLATFORM_SILABS,
-    PLATFORM_STM32,
-    PLATFORM_RP2,
-    PLATFORM_RENESAS,
-    PLATFORM_NXP,
-)
 
-
-class _LazyVariants(Mapping[str, ZephyrVariant]):
-    """Loads the variant modules on first use; they import this package."""
-
-    _built: bool = False
-    _loading: bool = False
-    _variants: dict[str, ZephyrVariant]
-    _modules: dict[str, ModuleType]
-    _families: dict[str, ModuleType]
-
-    def __init__(self) -> None:
-        self._variants = {}
-        self._modules = {}
-        self._families = {}
-
-    def _ensure(self) -> None:
-        if self._built:
-            return
-        if self._loading:
-            raise RuntimeError("A Zephyr variant module read VARIANTS while it loaded")
-        self._loading = True
-        try:
-            self._load()
-        except BaseException:
-            # Raise the import error again next time, not a KeyError on a partial registry
-            self._variants.clear()
-            self._modules.clear()
-            self._families.clear()
-            raise
-        finally:
-            self._loading = False
-        self._built = True
-
-    def _load(self) -> None:
-        for platform in _ZEPHYR_PLATFORMS:
-            package = importlib.import_module(
-                f"esphome.components.{platform}.zephyr_variants"
-            )
-            for mod_name in package.VARIANT_MODULES:
-                mod = importlib.import_module(f".{mod_name}", package.__name__)
-                if (other := self._modules.get(mod.VARIANT_NAME)) is not None:
-                    raise ValueError(
-                        f"{mod.__name__} and {other.__name__} are both {mod.VARIANT_NAME!r}"
-                    )
-                self._variants[mod.VARIANT_NAME] = mod.VARIANT
-                self._modules[mod.VARIANT_NAME] = mod
-                if (family := mod.VARIANT.family) and family not in self._families:
-                    self._families[family] = importlib.import_module(
-                        f".{family}_family", package.__name__
-                    )
-
-    def module(self, key: str) -> ModuleType:
-        self._ensure()
-        return self._modules[key]
-
-    def family_module(self, family: str) -> ModuleType:
-        self._ensure()
-        if (mod := self._families.get(family)) is None:
-            raise ValueError(f"Unknown Zephyr family: {family!r}")
-        return mod
-
-    def __getitem__(self, key: str) -> ZephyrVariant:
-        self._ensure()
-        return self._variants[key]
-
-    def __iter__(self) -> Iterator[str]:
-        self._ensure()
-        return iter(self._variants)
-
-    def __len__(self) -> int:
-        self._ensure()
-        return len(self._variants)
-
-
-_variants_instance: _LazyVariants = _LazyVariants()
-VARIANTS: Mapping[str, ZephyrVariant] = _variants_instance
-
-
-def get_variant_module(variant: str) -> ModuleType:
-    """The variant's own module (its config_schema/to_code live there) -- the
-    generic dispatch target so callers don't need a hardcoded per-variant chain."""
-    return _variants_instance.module(variant)
-
-
-def get_family_module(family: str) -> ModuleType:
-    """The family's own module, found next to its variants."""
-    return _variants_instance.family_module(family)
-
-
-def variant_value(variant: str, name: str) -> Any:
+def variant_value(info: ZephyrVariant, name: str) -> Any:
     """A ZephyrVariant field, with FAMILY_DEFAULT resolved to the family module's
     upper-case attribute of the same name (None when the family sets none)."""
-    info = VARIANTS[variant]
     if (value := getattr(info, name)) != FAMILY_DEFAULT:
         return value
     if info.family is None:
         return None
-    return getattr(get_family_module(info.family), name.upper(), None)
+    return getattr(info.family, name.upper(), None)

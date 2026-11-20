@@ -11,15 +11,14 @@ from esphome.components.canbus import (
     register_canbus,
 )
 from esphome.components.zephyr import (
-    VARIANTS,
     get_can_controller_labels,
     normalize_dts_label,
     validate_dts_label_exists,
     zephyr_add_overlay,
     zephyr_add_prj_conf,
     zephyr_data,
-    zephyr_variant,
     zephyr_variant_family,
+    zephyr_variant_info,
 )
 from esphome.components.zephyr.const import KEY_BOARD
 import esphome.config_validation as cv
@@ -122,7 +121,7 @@ def _resolve_instance(board: str) -> str:
 
 def _pin_name(pin: int) -> str:
     """Format a pin number the way STM32 pinctrl nodes spell it, e.g. 11 -> 'pa11'."""
-    variant = VARIANTS[zephyr_variant()]
+    variant = zephyr_variant_info()
     port_labels = variant.gpio_port_labels
     port = pin // variant.gpio_port_width
     if port >= len(port_labels):

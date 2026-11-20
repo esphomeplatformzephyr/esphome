@@ -11,10 +11,10 @@ from esphome.components.nrf52.framework import (
     include_west_project,
 )
 from esphome.components.zephyr import (
-    VARIANTS,
     zephyr_add_prj_conf,
     zephyr_framework_type,
     zephyr_variant,
+    zephyr_variant_info,
 )
 import esphome.config_validation as cv
 from esphome.const import CONF_ID, Framework
@@ -65,12 +65,12 @@ BLEServer = zephyr_ble_server_ns.class_("BLEServer", cg.Component)
 
 
 def _validate_variant(config):
-    # The standalone `platform: nrf52` target has no `variant`/VARIANTS entry --
+    # The standalone `platform: nrf52` target has no `variant` --
     # BLE is inherent to all its boards, so there's nothing to check.
     if CORE.is_nrf52:
         return config
     variant_name = zephyr_variant()
-    variant = VARIANTS.get(variant_name)
+    variant = zephyr_variant_info()
     if variant is None or "ble" not in variant.transports:
         raise cv.Invalid(f"ble is not supported on Zephyr variant '{variant_name}'")
     return config

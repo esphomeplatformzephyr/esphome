@@ -61,8 +61,6 @@ CODEOWNERS = ["@jesserockz"]
 DOMAIN = "rp2"
 IS_TARGET_PLATFORM = True
 FRAMEWORK_ZEPHYR = "zephyr"
-# The variant families zephyr builds for framework: type: zephyr
-ZEPHYR_FAMILIES = frozenset({"rpi_pico"})
 
 
 def _uses_zephyr(config: ConfigType) -> bool:
@@ -367,7 +365,9 @@ def CONFIG_SCHEMA(config: ConfigType) -> ConfigType:
     if _uses_zephyr(config):
         from esphome.components.zephyr import zephyr_config_schema
 
-        return zephyr_config_schema(config, ZEPHYR_FAMILIES, PLATFORM_RP2)
+        from .zephyr_variants import VARIANT_MODULES
+
+        return zephyr_config_schema(config, VARIANT_MODULES, PLATFORM_RP2)
     return _RP2_SCHEMA(config)
 
 

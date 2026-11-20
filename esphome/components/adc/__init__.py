@@ -16,7 +16,7 @@ from esphome.components.esp32 import (
     VARIANT_ESP32S31,
     get_esp32_variant,
 )
-from esphome.components.zephyr import VARIANTS, zephyr_variant
+from esphome.components.zephyr import zephyr_variant, zephyr_variant_info
 import esphome.config_validation as cv
 from esphome.const import CONF_ANALOG, CONF_INPUT, CONF_NUMBER, PLATFORM_ESP8266
 from esphome.core import CORE
@@ -312,7 +312,7 @@ def validate_adc_pin(value: Any) -> ConfigType | str:
         # (unlike nrf52/gpio.py's own pin schema above).
         conf = pins.internal_gpio_input_pin_schema(value)
         variant = zephyr_variant()
-        variant_info = VARIANTS.get(variant)
+        variant_info = zephyr_variant_info()
         # Espressif-shaped (real silicon channel) or Nordic-shaped (SAADC AIN name) --
         # whichever this variant actually defines. See ZephyrVariant's field comments.
         pin_map = {}

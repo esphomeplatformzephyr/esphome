@@ -1,7 +1,8 @@
-"""Zephyr variants of the renesas platform; the zephyr component loads them."""
+"""Zephyr variants of the renesas platform, which hands them to the zephyr component."""
 
-# Modules here that define a variant. Each exports VARIANT_NAME and a ZephyrVariant
-# named VARIANT; a family's module is <family>_family.
-VARIANT_MODULES: list[str] = [
-    "ra4m1",
-]
+from types import ModuleType
+
+from . import ra4m1
+
+# Variant name -> its module, which exports VARIANT_NAME and a ZephyrVariant named VARIANT
+VARIANT_MODULES: dict[str, ModuleType] = {mod.VARIANT_NAME: mod for mod in (ra4m1,)}

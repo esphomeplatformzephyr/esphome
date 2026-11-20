@@ -7,6 +7,8 @@ see siwx917.py's family= comment for why."""
 from esphome.components.zephyr.const import SEGGER_RTT_UART
 from esphome.types import ConfigType
 
+FAMILY: str = "silabs_siwx91x"
+
 # Devicetree property SiWx91x's pinctrl groups pack all their signal macros into.
 PROPERTY_NAME: str = "pinmux"
 
@@ -29,9 +31,9 @@ def pin_macro(prefix: str, signal: str, pin: int | None, variant: str) -> str | 
     a hardware signal name like the other families use)."""
     if pin is None:
         return None
-    from esphome.components.zephyr.variants import VARIANTS  # noqa: PLC0415 -- avoids circular import at module load
+    from esphome.components.zephyr import zephyr_variant_info  # noqa: PLC0415 -- avoids circular import at module load
 
-    return f"<{VARIANTS[variant].spi_pin_macros[signal][pin]}>"
+    return f"<{zephyr_variant_info().spi_pin_macros[signal][pin]}>"
 
 
 def spi_pinctrl(board: str, bus_label: str) -> None:

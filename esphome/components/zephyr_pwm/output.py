@@ -9,11 +9,10 @@ from esphome.components.nrf52.const import DEFAULT_PWM, VARIANT_PWM, VariantPWM
 from esphome.components.nrf52.framework import get_nrf52_variant
 from esphome.components.output import DOMAIN as OUTPUT_DOMAIN
 from esphome.components.zephyr import (
-    VARIANTS,
     zephyr_add_overlay_builder,
     zephyr_add_prj_conf,
-    zephyr_variant,
     zephyr_variant_family,
+    zephyr_variant_info,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -76,7 +75,7 @@ def _pwm_node_labels() -> list[str]:
     """
     if CORE.is_nrf52:
         return list(_get_variant_pwm().labels)
-    return VARIANTS[zephyr_variant()].pwm_node_labels
+    return zephyr_variant_info().pwm_node_labels
 
 
 def _pwm_pin_map() -> dict[int, tuple[int, int]]:
@@ -85,7 +84,7 @@ def _pwm_pin_map() -> dict[int, tuple[int, int]]:
     allocator instead (nrf52/nordic)."""
     if CORE.is_nrf52:
         return {}
-    return VARIANTS[zephyr_variant()].pwm_pin_map
+    return zephyr_variant_info().pwm_pin_map
 
 
 def _only_on_pwm_hardware(value):
@@ -125,7 +124,7 @@ def _pwm_channels_per_block() -> int:
     """
     if CORE.is_nrf52:
         return 4
-    return VARIANTS[zephyr_variant()].pwm_channels_per_block
+    return zephyr_variant_info().pwm_channels_per_block
 
 
 @dataclass

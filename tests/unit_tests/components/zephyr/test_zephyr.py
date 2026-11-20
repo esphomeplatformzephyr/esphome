@@ -21,6 +21,7 @@ from esphome.components.ota import reject_swap_method_off_zephyr
 from esphome.components.silabs.zephyr_variants.silabs_family import (
     uart_group_roles as _silabs_uart_group_roles,
 )
+from esphome.components.stm32 import zephyr_variants as stm32_variants
 from esphome.components.zephyr import (
     _MODULE_SCHEMA,
     ZephyrData,
@@ -63,7 +64,6 @@ from esphome.components.zephyr.const import (
     KEY_SYSBUILD_CONF,
     KEY_ZEPHYR,
 )
-from esphome.components.zephyr.framework_helpers import FrameworkSource
 from esphome.components.zephyr.mcuboot import zephyr_skip_bootloader_supported
 from esphome.components.zephyr.pinctrl import (
     _build_i2c_pinctrl_states_overlay,
@@ -76,13 +76,9 @@ from esphome.components.zephyr.pinctrl import (
 from esphome.components.zephyr.variants import (
     NCS,
     SILABS,
-    VARIANTS,
     ZEPHYR_MAINLINE,
     ZephyrModule,
     ZephyrModuleTemplate,
-    ZephyrSDK,
-    ZephyrVariant,
-    _variants_instance,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -111,6 +107,8 @@ from esphome.const import (
 )
 from esphome.core import CORE, ID, EsphomeError
 from tests.unit_tests.components.zephyr.zephyr_state import (
+    VARIANT_MODULES,
+    VARIANTS,
     empty_zephyr_data,
     use_empty_devicetree,
     zephyr_platform_framework,
@@ -122,17 +120,14 @@ def _devicetree(monkeypatch: pytest.MonkeyPatch) -> None:
     use_empty_devicetree(monkeypatch)
 
 
-_ALL_FAMILIES = frozenset(info.family for info in VARIANTS.values())
-
-
 def _validate(config: dict) -> dict:
     variant = config.get(CONF_VARIANT)
     platform = (
         zephyr_platform_framework(variant).value[0].value
-        if variant in VARIANTS and VARIANTS[variant].family is not None
+        if variant in VARIANTS
         else PLATFORM_NRF
     )
-    return zephyr_config_schema(config, _ALL_FAMILIES, platform)
+    return zephyr_config_schema(config, VARIANT_MODULES, platform)
 
 
 def test_empty_zephyr_data_has_every_zephyr_data_key() -> None:
@@ -180,14 +175,12 @@ def test_zephyr_variant_family_returns_family_for_esp32c6() -> None:
 _VARIANT_READERS = [zephyr_variant, zephyr_variant_family, zephyr_framework_type]
 
 
-@pytest.mark.parametrize("platform", [None, PLATFORM_STM32])
 @pytest.mark.parametrize("lookup", _VARIANT_READERS)
 def test_variant_read_before_the_platform_schema_is_rejected(
-    lookup: Callable[[], str | None], platform: str | None
+    lookup: Callable[[], str | None],
 ) -> None:
-    """stm32 only builds with Zephyr, so an early read is an ordering bug."""
     CORE.data.pop(KEY_ZEPHYR, None)
-    CORE.data[KEY_CORE] = {} if platform is None else {KEY_TARGET_PLATFORM: platform}
+    CORE.data[KEY_CORE] = {}
     with pytest.raises(RuntimeError, match="before the platform schema set it"):
         lookup()
 
@@ -479,11 +472,11 @@ def test_zephyr_setup_i2c_pinctrl_returns_per_pin_display_strings() -> None:
 def test_pin_display_uses_the_variants_own_pin_name(
     variant: str, pin: int, expected: str
 ) -> None:
-    assert _pin_display(pin, variant) == expected
+    assert _pin_display(pin, VARIANTS[variant]) == expected
 
 
 def test_pin_display_board_default_when_pin_not_given() -> None:
-    assert _pin_display(None, "EFR32MG24") == "board default"
+    assert _pin_display(None, VARIANTS["EFR32MG24"]) == "board default"
 
 
 # ESP32_PINMUX(gpio, sig_i, sig_o) for ESP32-H2's I2C0 signal IDs (scl=45, sda=46) --
@@ -615,9 +608,10 @@ def test_zephyr_setup_i2c_pinctrl_rp2040_requires_both_pins_together() -> None:
 
 def test_zephyr_setup_i2c_pinctrl_uses_variants_pinctrl_node_label() -> None:
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant="RP2040")
-    variant = dataclasses.replace(VARIANTS["RP2040"], pinctrl_node_label="pinctrl0")
+    CORE.data[KEY_ZEPHYR]["variant_info"] = dataclasses.replace(
+        VARIANTS["RP2040"], pinctrl_node_label="pinctrl0"
+    )
     with (
-        patch("esphome.components.zephyr.pinctrl.VARIANTS", {"RP2040": variant}),
         patch(
             "esphome.components.zephyr.dts_lookup.get_pinctrl_states",
             return_value=[("i2c1_default", ["group1"])],
@@ -1169,9 +1163,10 @@ def test_zephyr_setup_uart_pinctrl_rpi_pico_uses_p_suffix_and_position() -> None
 
 def test_zephyr_setup_uart_pinctrl_uses_variants_pinctrl_node_label() -> None:
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant="RP2040")
-    variant = dataclasses.replace(VARIANTS["RP2040"], pinctrl_node_label="pinctrl0")
+    CORE.data[KEY_ZEPHYR]["variant_info"] = dataclasses.replace(
+        VARIANTS["RP2040"], pinctrl_node_label="pinctrl0"
+    )
     with (
-        patch("esphome.components.zephyr.pinctrl.VARIANTS", {"RP2040": variant}),
         patch(
             "esphome.components.zephyr.dts_lookup.get_pinctrl_states",
             return_value=None,
@@ -1865,27 +1860,15 @@ def test_nrf52_dongle_dfu_off_has_no_reset_pin() -> None:
 def test_variant_config_schema_raises_for_unregistered_variant(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # CONF_VARIANT's cv.one_of(*VARIANTS) is built at import time, so monkeypatching
-    # VARIANTS alone can't get a fake key past it -- bypass that outer schema to
-    # exercise get_variant_module()'s lookup directly. VARIANTS and the module
-    # registry are built together by the same _ensure() pass, so a VARIANTS entry
-    # with no real module behind it only happens via this kind of direct monkeypatch.
+    # Bypass the outer schema's cv.one_of() to reach the platform table lookup.
     import esphome.components.zephyr as zephyr_module
 
     _init_variant_schema_core()
-    fake_variant = ZephyrVariant(
-        sdk=ZephyrSDK(
-            source=FrameworkSource(
-                name="Test", url="http://dummy", optional=(), required=frozenset()
-            )
-        )
-    )
-    monkeypatch.setitem(_variants_instance._variants, "FAKE_VARIANT", fake_variant)
     framework = zephyr_module._FRAMEWORK_SCHEMA({})
     monkeypatch.setattr(
         zephyr_module,
         "zephyr_toolchain_schema",
-        lambda families: lambda config: {**config, "framework": framework},
+        lambda variant_modules: lambda config: {**config, "framework": framework},
     )
     with pytest.raises(KeyError, match="FAKE_VARIANT"):
         _validate({"variant": "FAKE_VARIANT"})
@@ -2014,11 +1997,15 @@ def _restore_from_cache(validated: dict) -> tuple[dict, dict]:
 
     expected = {k: zephyr_data_snapshot()[k] for k in _UPLOAD_FIELDS}
     framework_version = CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]
+    platform = CORE.data[KEY_CORE][KEY_TARGET_PLATFORM]
     cached = json.loads(
         json.dumps(validated, default=_json_default), object_hook=_decode_object
     )
     CORE.data.pop(KEY_ZEPHYR)
-    CORE.data[KEY_CORE] = {KEY_FRAMEWORK_VERSION: framework_version}
+    CORE.data[KEY_CORE] = {
+        KEY_FRAMEWORK_VERSION: framework_version,
+        KEY_TARGET_PLATFORM: platform,
+    }
     _restore_upload_data(cached)
     return expected, {k: zephyr_data_snapshot()[k] for k in _UPLOAD_FIELDS}
 
@@ -2689,7 +2676,10 @@ def test_zephyr_toolchain_store() -> None:
 
 def test_zephyr_additional_framework_projects_mainline_takes_the_family_hals() -> None:
 
-    with patch("esphome.components.zephyr.zephyr_variant_family", return_value="stm32"):
+    with patch(
+        "esphome.components.zephyr.zephyr_family_module",
+        return_value=VARIANTS["STM32C5"].family,
+    ):
         assert zephyr_additional_framework_projects(ZEPHYR_MAINLINE) == frozenset(
             {"hal_stm32"}
         )
@@ -2733,7 +2723,7 @@ def test_toolchain_schema_caps_the_board_name() -> None:
     """At most BOARD_MAX_LENGTH bytes, as on nrf52."""
     from esphome.components.zephyr import zephyr_toolchain_schema
 
-    schema = zephyr_toolchain_schema(frozenset({"stm32"}))
+    schema = zephyr_toolchain_schema(stm32_variants.VARIANT_MODULES)
     assert schema({"variant": "stm32c5", "board": "b" * 127})["board"] == "b" * 127
     with pytest.raises(cv.Invalid):
         schema({"variant": "stm32c5", "board": "b" * 128})
@@ -2743,7 +2733,7 @@ def test_toolchain_schema_accepts_only_zephyr() -> None:
     """`toolchain: zephyr` is accepted, as on nrf52; no other toolchain builds here."""
     from esphome.components.zephyr import zephyr_toolchain_schema
 
-    schema = zephyr_toolchain_schema(frozenset({"stm32"}))
+    schema = zephyr_toolchain_schema(stm32_variants.VARIANT_MODULES)
     assert schema({"variant": "stm32c5", "toolchain": "zephyr"})["toolchain"] == (
         Toolchain.ZEPHYR
     )
