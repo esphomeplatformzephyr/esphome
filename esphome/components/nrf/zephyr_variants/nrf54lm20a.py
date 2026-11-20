@@ -14,8 +14,8 @@ from esphome.components.zephyr.variants import (
     ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
-    resolve_framework_version,
-    set_core_data,
+    resolve_variant,
+    set_variant_core_data,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -79,21 +79,19 @@ _GPIO_MATRIX_PINS: frozenset[int] = (
     | frozenset(range(96, 109))
 )
 
-# Collected into VARIANT_MODULES by this package's __init__.py
-VARIANT_NAME: str = VARIANT_NRF54LM20A
 VARIANT: ZephyrVariant = ZephyrVariant(
-    mcumgr_ota=True,
-    # Resets from the start of RRAM (nordic/nrf54lm20a_cpuapp_partition.dtsi).
-    boot=BootLayout(0x0),
+    name=VARIANT_NRF54LM20A,
+    family_module=nordic_family,
     # Same reasoning as nrf52/nrf54l15: NCS is Nordic's own SDK and where support for its
     # own newest silicon lands and gets tested first -- nrf54lm20dk is already in
     # nrfconnect/sdk-zephyr today. Mainline Zephyr (which also carries this SoC, plus
     # boards NCS doesn't have yet such as the Seeed xiao_nrf54lm20a) stays available as
     # an alternate.
-    sdk=NCS,
-    sdk_name="ncs",
-    alt_sdks={"zephyr": ZEPHYR_MAINLINE},
-    family=nordic_family,
+    manifest=NCS,
+    alt_manifests=(ZEPHYR_MAINLINE,),
+    mcumgr_ota=True,
+    # Resets from the start of RRAM (nordic/nrf54lm20a_cpuapp_partition.dtsi).
+    boot=BootLayout(0x0),
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     # Untested on hardware as of 2026-08-04.
@@ -137,15 +135,10 @@ def config_schema(config: ConfigType) -> ConfigType:
     )
     bootloader = config[CONF_FRAMEWORK][CONF_ADVANCED][CONF_BOOTLOADER]
     config[CONF_BOARD] = qualify_board(VARIANT, config[CONF_BOARD])
-    _, framework_ver, sdk_name, _ = resolve_framework_version(
-        VARIANT, "nrf54lm20a", config, "nRF54LM20A support"
-    )
-    set_core_data(
-        VARIANT_NAME,
-        VARIANT,
+    resolved = resolve_variant(VARIANT, config, "nRF54LM20A support")
+    set_variant_core_data(
+        resolved,
         config,
-        framework_ver,
-        framework_type=sdk_name,
         bootloader=bootloader if bootloader == BOOTLOADER_MCUBOOT else "",
         sdk_source=config[CONF_FRAMEWORK].get(CONF_SOURCE),
         runner=config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_RUNNER),

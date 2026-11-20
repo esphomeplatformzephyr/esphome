@@ -74,24 +74,24 @@ _LOGGER = logging.getLogger(__name__)
 FAMILY_DEFAULT: Final = "family default"
 
 
-@dataclass
-class ZephyrSDK:
-    """A framework distribution (Zephyr, NCS, etc.), not the Zephyr SDK toolchain."""
+@dataclass(frozen=True)
+class ZephyrManifest:
+    """The west manifest repository a build starts from (Zephyr, NCS, etc.)."""
 
+    # The `framework: type:` value that selects this manifest
+    framework_type: str
     source: FrameworkSource
     manifest_rev: str = "recommended"
-    # Prefix of the workspace folder, so SDKs with the same version string don't share one
+    # Prefix of the workspace folder, so manifests with the same version string don't share one
     workspace_prefix: str | None = None
-    # Default/minimum supported Zephyr version; a variant overrides these via its own
-    # *_version_override fields.
     default_version: str = "4.5.0"
     min_version: cv.Version = cv.Version(4, 5, 0)
-    # Set when this SDK has no tagged release usable as a default -- framework: source: is
-    # then mandatory; explains why in the raised error.
+    # Set when this manifest has no tagged release usable as a default -- framework: source:
+    # is then mandatory; explains why in the raised error.
     requires_source_reason: str | None = None
-    # capability -> module. A module is additive to this SDK (fetched into its own folder
-    # and added to the build, no boards/toolchain/version of its own) -- distinct from alt_sdks,
-    # which are competing SDK roots. See ZephyrModuleTemplate.
+    # capability -> module. A module is additive to this manifest (fetched into its own folder
+    # and added to the build, no boards/toolchain/version of its own) -- distinct from
+    # alt_manifests, which are competing roots. See ZephyrModuleTemplate.
     modules: dict[str, "ZephyrModuleTemplate"] = field(default_factory=dict)
 
 
@@ -106,13 +106,13 @@ class ZephyrModule:
     refresh: float | None = None  # seconds between checks of revision; None = never
 
 
-# Owned by the ZephyrSDK that can provide a capability; resolves to a concrete
-# ZephyrModule given the active root SDK's version.
+# Owned by the ZephyrManifest that can provide a capability; resolves to a concrete
+# ZephyrModule given the active root manifest's version.
 @dataclass
 class ZephyrModuleTemplate:
     name: str
     manifest_url: str
-    # root SDK's (major, minor) -> this module's matching version. Nordic pairs
+    # root manifest's (major, minor) -> this module's matching version. Nordic pairs
     # sdk-nrf and ncs-zigbee releases but the two use unrelated numbering schemes
     # (3.4.x vs 1.4.x) -- no formula, each pairing is a real entry, added as Nordic
     # ships new paired releases.
@@ -150,7 +150,7 @@ class ZephyrModuleTemplate:
             # default_versions/explicit_version are bare "X.Y.Z" (for the comparison
             # above and for a user typing framework: modules: version: without having to
             # know the tag scheme), but the actual git tag needs the "v" -- same
-            # normalization the root SDK's own ver_tag already does.
+            # normalization the root manifest's own ver_tag already does.
             if not tag.startswith("v"):
                 tag = f"v{tag}"
         return ZephyrModule(
@@ -160,22 +160,17 @@ class ZephyrModuleTemplate:
         )
 
 
-@dataclass
+@dataclass(frozen=True, kw_only=True)
 class ZephyrVariant:
-    sdk: ZephyrSDK
-    # `framework: type:` key naming this variant's default `sdk` above. Every
-    # variant needs one, even single-SDK ones -- it's what the framework: schema validates
-    # `type:` against.
-    sdk_name: str = "zephyr"
-    # Additional selectable `framework: type:` values, keyed by name -- e.g. nrf52's
-    # {"zephyr": ZEPHYR_MAINLINE} lets mainline Zephyr be chosen as an alternate to its NCS
-    # default. Empty for single-SDK variants.
-    alt_sdks: dict[str, "ZephyrSDK"] = field(default_factory=dict)
-    # Groups sibling variants sharing the same silicon vendor (e.g. "esp32" for
-    # esp32_h2/esp32_c6), so shared config/codegen can gate on family once instead
-    # of an ever-growing per-variant elif chain. The family's module, whose FAMILY
-    # is its name; None = no family.
-    family: ModuleType | None = None
+    """What zephyr needs to know to build one chip."""
+
+    # e.g. "STM32C5", the `variant:` value in the YAML
+    name: str
+    # The module sibling chips share, whose FAMILY is its name; None = no family
+    family_module: ModuleType | None = None
+    manifest: ZephyrManifest
+    # Other manifests `framework: type:` may select, e.g. mainline Zephyr beside NCS
+    alt_manifests: tuple[ZephyrManifest, ...] = ()
     boards: list[str] = field(default_factory=list)  # empty = accept any board
     # Toolchain identifiers supported by this variant (StrEnum values from esphome.const.Toolchain).
     valid_toolchains: tuple[str, ...] = ("platformio",)
@@ -237,10 +232,6 @@ class ZephyrVariant:
     # mapped to the Kconfig symbols each needs. Known values: "wpa", "wpa3", "eap". A mode with no
     # entry is rejected at validation.
     wifi_features: dict[str, tuple[str, ...]] = field(default_factory=dict)
-    # Per-variant override of the SDK's default version window (see ZephyrSDK); None uses
-    # the SDK's value unchanged.
-    default_version_override: str | None = None
-    min_version_override: cv.Version | None = None
     # West board target segments (e.g. "esp32c6"/"hpcore"), used by qualify_board() to
     # expand a bare `board:` name. None = no segment.
     soc: str | None = None
@@ -366,37 +357,25 @@ class ZephyrVariant:
     # FAMILY_DEFAULT takes the family module's HAS_POWEROFF.
     has_poweroff: bool = FAMILY_DEFAULT
 
+    @property
+    def manifests(self) -> tuple[ZephyrManifest, ...]:
+        """Its own manifest first, then the alternatives."""
+        return (self.manifest, *self.alt_manifests)
 
-def resolve_sdk(
-    variant: ZephyrVariant, framework_type: str | None
-) -> tuple[str, ZephyrSDK]:
-    """Resolve a `framework: type:` value to (type_name, ZephyrSDK).
-
-    None (framework: type: omitted) resolves to the variant's own default sdk/sdk_name.
-    Raises KeyError for an unknown type -- callers validate against
-    [variant.sdk_name, *variant.alt_sdks] via cv.one_of() beforehand, so this should never
-    actually miss in practice.
-    """
-    if framework_type is None or framework_type == variant.sdk_name:
-        return variant.sdk_name, variant.sdk
-    return framework_type, variant.alt_sdks[framework_type]
+    def manifest_for(self, framework_type: str | None) -> ZephyrManifest:
+        """The manifest a `framework: type:` selects; None selects its own."""
+        if framework_type is None:
+            return self.manifest
+        return {m.framework_type: m for m in self.manifests}[framework_type]
 
 
-def _sdk_default_version(variant: ZephyrVariant, sdk_name: str, sdk: ZephyrSDK) -> str:
-    # default_version_override only applies to the variant's own default sdk -- an alt
-    # sdk's version window is entirely its own (e.g. nrf52's alt "zephyr" sdk is just
-    # ZEPHYR_MAINLINE, unmodified).
-    if sdk_name == variant.sdk_name:
-        return variant.default_version_override or sdk.default_version
-    return sdk.default_version
+@dataclass(frozen=True)
+class ZephyrVariantResolved:
+    """A variant with the manifest and version its `framework:` block resolved to."""
 
-
-def _sdk_min_version(
-    variant: ZephyrVariant, sdk_name: str, sdk: ZephyrSDK
-) -> cv.Version:
-    if sdk_name == variant.sdk_name:
-        return variant.min_version_override or sdk.min_version
-    return sdk.min_version
+    variant: ZephyrVariant
+    manifest: ZephyrManifest
+    version: cv.Version
 
 
 def _release_order(version: cv.Version) -> tuple[int, int, int, bool, str, int]:
@@ -415,7 +394,7 @@ def _release_order(version: cv.Version) -> tuple[int, int, int, bool, str, int]:
 
 def mcuboot_or_none(advanced: dict) -> str:
     """Return MCUboot if advanced: bootloader: selects it, else "" -- the value
-    variants with an opt-in bootloader pass to set_core_data()."""
+    variants with an opt-in bootloader pass to set_variant_core_data()."""
     return (
         BOOTLOADER_MCUBOOT
         if advanced.get(CONF_BOOTLOADER) == BOOTLOADER_MCUBOOT
@@ -448,30 +427,26 @@ def qualify_board(
     return qualified
 
 
-def resolve_framework_version(
-    variant: ZephyrVariant, variant_name: str, config: ConfigType, requires_reason: str
-) -> tuple[str, cv.Version, str, ZephyrSDK]:
-    """Resolve and validate `framework:` for a variant's config_schema().
+def resolve_variant(
+    variant: ZephyrVariant, config: ConfigType, min_version_reason: str
+) -> ZephyrVariantResolved:
+    """Resolve `framework: type:`, `version:` and `source:` of a variant's config.
 
-    Handles `type:` selection (the variant's default sdk, or one of its alt_sdks),
-    `version:`/`source:` mutual exclusion, `source:` version discovery, and min_version
-    validation (requires_reason explains why, e.g. "mainline ESP32-C6 support"); only
-    warns (doesn't block) if the resolved version differs from the sdk's own
-    default_version. Returns (version_str, parsed_version, sdk_name, sdk) for the caller
-    to store via set_core_data().
+    ``min_version_reason`` says why the manifest's minimum exists, e.g. "mainline
+    ESP32-C6 support". A version other than the manifest's default only warns.
     """
     framework = config[CONF_FRAMEWORK]
-    type_names = [variant.sdk_name, *variant.alt_sdks]
+    framework_types = [m.framework_type for m in variant.manifests]
     framework_type = framework.get(CONF_TYPE)
-    if framework_type is not None and framework_type not in type_names:
+    if framework_type is not None and framework_type not in framework_types:
         raise cv.Invalid(
-            f"'{framework_type}' is not a valid framework type for {variant_name}. "
-            f"Valid: {type_names!r}",
+            f"'{framework_type}' is not a valid framework type for {variant.name}. "
+            f"Valid: {framework_types!r}",
             [CONF_FRAMEWORK, CONF_TYPE],
         )
-    sdk_name, sdk = resolve_sdk(variant, framework_type)
-    default_version = _sdk_default_version(variant, sdk_name, sdk)
-    min_version = _sdk_min_version(variant, sdk_name, sdk)
+    manifest = variant.manifest_for(framework_type)
+    default_version = manifest.default_version
+    min_version = manifest.min_version
 
     if CONF_VERSION in framework and CONF_SOURCE in framework:
         raise cv.Invalid(
@@ -481,10 +456,10 @@ def resolve_framework_version(
         )
 
     source = framework.get(CONF_SOURCE)
-    if source is None and sdk.requires_source_reason is not None:
+    if source is None and manifest.requires_source_reason is not None:
         raise cv.Invalid(
-            f"framework: type: {sdk_name} has no usable default version -- "
-            f"{sdk.requires_source_reason}. 'source:' is required.",
+            f"framework: type: {manifest.framework_type} has no usable default version -- "
+            f"{manifest.requires_source_reason}. 'source:' is required.",
             [CONF_FRAMEWORK, CONF_TYPE],
         )
 
@@ -494,7 +469,7 @@ def resolve_framework_version(
         )
 
         if source[CONF_TYPE] == TYPE_GIT and CONF_URL not in source:
-            source[CONF_URL] = sdk.source.url
+            source[CONF_URL] = manifest.source.url
         with cv.prepend_path([CONF_FRAMEWORK, CONF_SOURCE]):
             version_str = resolve_sdk_source_version(source, framework[CONF_REFRESH])
     else:
@@ -511,27 +486,24 @@ def resolve_framework_version(
         ) from err
     if framework_order < _release_order(min_version):
         raise cv.Invalid(
-            f"{variant_name} requires {sdk_name} >= {min_version} ({requires_reason}). "
-            f"Got {version_str}.",
+            f"{variant.name} requires {manifest.framework_type} >= {min_version} "
+            f"({min_version_reason}). Got {version_str}.",
             [CONF_FRAMEWORK, CONF_VERSION],
         )
     if source is None and framework_ver != cv.Version.parse(default_version):
         _LOGGER.warning(
             "The selected %s version is not the recommended one (%s). "
             "If there are connectivity or build issues please remove the manual version.",
-            sdk_name,
+            manifest.framework_type,
             default_version,
         )
-    return version_str, framework_ver, sdk_name, sdk
+    return ZephyrVariantResolved(variant, manifest, framework_ver)
 
 
-def set_core_data(
-    variant_name: str,
-    variant: ZephyrVariant,
+def set_variant_core_data(
+    resolved: ZephyrVariantResolved,
     config: ConfigType,
-    framework_ver: cv.Version,
     *,
-    framework_type: str,
     bootloader: str,
     runner: str | None = None,
     sdk_source: ConfigType | None = None,
@@ -560,17 +532,20 @@ def set_core_data(
     from .. import zephyr_data, zephyr_set_core_data
 
     zephyr_set_core_data({**config, KEY_BOOTLOADER: bootloader})
-    zephyr_data()[KEY_VARIANT] = variant_name
+    variant = resolved.variant
+    zephyr_data()[KEY_VARIANT] = variant.name
     zephyr_data()[KEY_VARIANT_INFO] = variant
-    zephyr_data()[KEY_FAMILY] = variant.family.FAMILY if variant.family else None
-    zephyr_data()[KEY_FRAMEWORK_TYPE] = framework_type
+    zephyr_data()[KEY_FAMILY] = (
+        variant.family_module.FAMILY if variant.family_module else None
+    )
+    zephyr_data()[KEY_FRAMEWORK_TYPE] = resolved.manifest.framework_type
     # The devicetree caches, filled as code generation reads the board
     zephyr_data()[KEY_CPP_PATH] = ""
     zephyr_data()[KEY_DTS_INCLUDE_PATHS] = None
     zephyr_data()[KEY_BOARD_DIR_CACHE] = {}
     zephyr_data()[KEY_BOARD_EDT_CACHE] = {}
     CORE.data[KEY_CORE][KEY_TARGET_FRAMEWORK] = KEY_ZEPHYR
-    CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION] = framework_ver
+    CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION] = resolved.version
     zephyr_data()[KEY_BOARD_YAML_CACHE] = {}
     zephyr_data()["fake_board_manifest"] = None
     zephyr_data()["blobs"] = []
@@ -632,7 +607,8 @@ def set_core_data(
     CORE.toolchain = Toolchain.ZEPHYR
 
 
-ZEPHYR_MAINLINE: ZephyrSDK = ZephyrSDK(
+ZEPHYR_MAINLINE: ZephyrManifest = ZephyrManifest(
+    framework_type="zephyr",
     source=FrameworkSource(
         name="Zephyr",
         url="https://github.com/zephyrproject-rtos/zephyr",
@@ -661,7 +637,7 @@ ZEPHYR_MAINLINE: ZephyrSDK = ZephyrSDK(
 # Nordic's ZBOSS Zigbee stack, split out of sdk-nrf into this separate add-on repo as of
 # NCS 3.4.0; see https://github.com/esphomeplatformzephyr/esphome/issues/31. Additive to
 # NCS (built on top of the sdk-nrf workspace, no boards/toolchain/version of its own) -- not a
-# competing SDK root, so it's a module, not an alt_sdks entry. sdk-nrf and ncs-zigbee are
+# competing root, so it's a module, not an alt_manifests entry. sdk-nrf and ncs-zigbee are
 # versioned independently by Nordic (3.4.x vs 1.4.x, no formula between the two), hence
 # the explicit per-pairing table rather than a single default_version.
 NCS_ZIGBEE_TEMPLATE: ZephyrModuleTemplate = ZephyrModuleTemplate(
@@ -686,7 +662,8 @@ NRF_CONNECT_SDK: FrameworkSource = FrameworkSource(
     required=frozenset({"cmsis", "hal_nordic", "nrfxlib", "zephyr"}),
 )
 
-NCS: ZephyrSDK = ZephyrSDK(
+NCS: ZephyrManifest = ZephyrManifest(
+    framework_type="ncs",
     source=NRF_CONNECT_SDK,
     workspace_prefix="sdk-nrf",
     default_version="3.4.1",
@@ -699,7 +676,8 @@ NCS: ZephyrSDK = ZephyrSDK(
 # around a bundled Zephyr fork (SiliconLabsSoftware/zephyr) pinned by raw commit SHA in
 # zephyr-silabs's own west.yml. Real board/DTS support for chips not yet upstreamed to
 # mainline Zephyr lives in that bundled fork.
-SILABS: ZephyrSDK = ZephyrSDK(
+SILABS: ZephyrManifest = ZephyrManifest(
+    framework_type="silabs",
     # Nothing left out: the manifest's own name-allowlist already limits the projects
     source=FrameworkSource(
         name="Silicon Labs SDK",
@@ -718,6 +696,6 @@ def variant_value(info: ZephyrVariant, name: str) -> Any:
     upper-case attribute of the same name (None when the family sets none)."""
     if (value := getattr(info, name)) != FAMILY_DEFAULT:
         return value
-    if info.family is None:
+    if info.family_module is None:
         return None
-    return getattr(info.family, name.upper(), None)
+    return getattr(info.family_module, name.upper(), None)

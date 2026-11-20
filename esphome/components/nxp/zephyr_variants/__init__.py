@@ -4,5 +4,5 @@ from types import ModuleType
 
 from . import mcxn236
 
-# Variant name -> its module, which exports VARIANT_NAME and a ZephyrVariant named VARIANT
-VARIANT_MODULES: dict[str, ModuleType] = {mod.VARIANT_NAME: mod for mod in (mcxn236,)}
+# Variant name -> its module, which exports a ZephyrVariant named VARIANT
+VARIANT_MODULES: dict[str, ModuleType] = {mod.VARIANT.name: mod for mod in (mcxn236,)}

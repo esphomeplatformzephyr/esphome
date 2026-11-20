@@ -43,7 +43,7 @@ from .framework_helpers import (
     refresh_framework,
 )
 from .sdk_install import ensure_sdk
-from .variants import ZephyrModule, ZephyrSDK, resolve_sdk
+from .variants import ZephyrManifest, ZephyrModule
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -71,21 +71,23 @@ def _get_toolchain_path(sdk_version: str, toolchain: str) -> Path:
 
 
 def _get_framework_path(
-    sdk: ZephyrSDK, version: str, source: ConfigType | None = None
+    manifest: ZephyrManifest, version: str, source: ConfigType | None = None
 ) -> Path:
     return (
-        get_zephyr_tools_path() / "frameworks" / _source_cache_key(sdk, version, source)
+        get_zephyr_tools_path()
+        / "frameworks"
+        / _source_cache_key(manifest, version, source)
     )
 
 
-def build_workspace() -> tuple[ZephyrSDK, str]:
-    """The SDK this build installs and the version its workspace is installed at;
+def build_workspace() -> tuple[ZephyrManifest, str]:
+    """The manifest this build installs and the version its workspace is installed at;
     the install and every reader of the workspace take it from here."""
     # deferred: zephyr's __init__ may import this module
     from . import zephyr_framework_type, zephyr_variant_info
 
-    _, sdk = resolve_sdk(zephyr_variant_info(), zephyr_framework_type())
-    return sdk, f"v{CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]}"
+    manifest = zephyr_variant_info().manifest_for(zephyr_framework_type())
+    return manifest, f"v{CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]}"
 
 
 def get_zephyr_base() -> Path:
@@ -100,7 +102,7 @@ def get_zephyr_base() -> Path:
 
 
 def get_build_paths(
-    sdk: ZephyrSDK, version: str, source: ConfigType | None = None
+    manifest: ZephyrManifest, version: str, source: ConfigType | None = None
 ) -> tuple[Path, Path]:
     """The venv's python and the workspace a build runs west in."""
     python_executable = get_python_env_executable_path(
@@ -109,7 +111,7 @@ def get_build_paths(
     if source is not None and source[CONF_TYPE] == TYPE_LOCAL:
         # A local checkout's parent folder is its workspace (install_local_framework)
         return python_executable, Path(source[CONF_PATH]).parent
-    return python_executable, _get_framework_path(sdk, version, source)
+    return python_executable, _get_framework_path(manifest, version, source)
 
 
 def get_build_env(
@@ -132,27 +134,27 @@ def get_build_env(
 
 
 def _source_cache_key(
-    sdk: ZephyrSDK,
+    manifest: ZephyrManifest,
     ver_tag: str,
     source: ConfigType | None,
 ) -> str:
     """Distinguish a custom framework: source: from the official ver_tag-keyed cache dir,
     and from other framework: source: configs sharing the same version: value.
 
-    sdk.workspace_prefix prefixes the key so ZEPHYR_MAINLINE/NCS/SILABS -- which now share one
+    manifest.workspace_prefix prefixes the key so ZEPHYR_MAINLINE/NCS/SILABS -- which now share one
     machine-global cache root -- can't collide on a matching version: string (e.g. NCS's
     bundled Zephyr fork tracks close to mainline's own numbering)."""
     if source is None:
-        key = f"{sdk.workspace_prefix}-{ver_tag}"
+        key = f"{manifest.workspace_prefix}-{ver_tag}"
     elif source[CONF_TYPE] == TYPE_LOCAL:
         path_hash = hashlib.sha1(str(source[CONF_PATH]).encode()).hexdigest()[:8]
-        key = f"{sdk.workspace_prefix}-{ver_tag}-local-{path_hash}"
+        key = f"{manifest.workspace_prefix}-{ver_tag}-local-{path_hash}"
     else:
         # TYPE_GIT
         ref = source.get(CONF_REF) or "HEAD"
         safe_ref = re.sub(r"[^A-Za-z0-9_.-]", "_", ref)
         url_hash = hashlib.sha1(source[CONF_URL].encode()).hexdigest()[:8]
-        key = f"{sdk.workspace_prefix}-{ver_tag}-{safe_ref}-{url_hash}"
+        key = f"{manifest.workspace_prefix}-{ver_tag}-{safe_ref}-{url_hash}"
     return key
 
 
@@ -294,7 +296,7 @@ def install_git_modules(modules: list[ZephyrModule], sdk_url: str) -> list[Path]
 
 
 def check_and_install(
-    sdk: ZephyrSDK,
+    manifest: ZephyrManifest,
     version: str,
     projects: frozenset[str],
     west_version: str | None = None,
@@ -305,14 +307,16 @@ def check_and_install(
     the same workspace at once (see install_lock)."""
     ver_tag = f"v{version}" if not version.startswith("v") else version
     # Named after the workspace folder, so other workspaces of this version don't wait
-    with install_lock(get_zephyr_tools_path(), _source_cache_key(sdk, ver_tag, source)):
+    with install_lock(
+        get_zephyr_tools_path(), _source_cache_key(manifest, ver_tag, source)
+    ):
         return _check_and_install(
-            sdk, version, west_version, ninja_version, source, projects
+            manifest, version, west_version, ninja_version, source, projects
         )
 
 
 def _check_and_install(
-    sdk: ZephyrSDK,
+    manifest: ZephyrManifest,
     version: str,
     west_version: str | None,
     ninja_version: str | None,
@@ -359,11 +363,13 @@ def _check_and_install(
                 "sdk_source: local: expects a path to a Zephyr checkout, e.g. a fork you're "
                 "developing on."
             )
-        framework = install_local_framework(python_bin, zephyr_dir, sdk.source.name)
+        framework = install_local_framework(
+            python_bin, zephyr_dir, manifest.source.name
+        )
     else:
-        framework = _get_framework_path(sdk, ver_tag, source)
+        framework = _get_framework_path(manifest, ver_tag, source)
         zephyr_dir = framework / "zephyr"
-        _install_workspace(python_bin, framework, sdk, ver_tag, source, projects)
+        _install_workspace(python_bin, framework, manifest, ver_tag, source, projects)
 
     with install_lock(get_zephyr_tools_path(), f"penv-{ver_tag}"):
         # One marker per workspace, since workspaces share the penv
@@ -387,17 +393,17 @@ def _check_and_install(
 def _install_workspace(
     python_bin: Path,
     framework: Path,
-    sdk: ZephyrSDK,
+    manifest: ZephyrManifest,
     ver_tag: str,
     source: ConfigType | None,
     projects: frozenset[str],
 ) -> None:
     """The official source, or a git source pinned to its resolved commit."""
-    framework_source = sdk.source
+    framework_source = manifest.source
     label = ver_tag
     pin: str | None = None
     if source is not None:
-        framework_source = replace(sdk.source, url=source[CONF_URL])
+        framework_source = replace(manifest.source, url=source[CONF_URL])
         rev = source.get(KEY_SDK_SOURCE_RESOLVED_REF, source.get(CONF_REF))
         label = source.get(CONF_REF) or "default branch"
         if _is_commit_sha(rev):

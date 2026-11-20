@@ -20,8 +20,8 @@ from esphome.components.zephyr.variants import (
     ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
-    resolve_framework_version,
-    set_core_data,
+    resolve_variant,
+    set_variant_core_data,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -45,17 +45,15 @@ _DEFAULT_BOARD: str = "nucleo_c5a3zg"
 # CONFIG_USE_DT_CODE_PARTITION stays off and the app links at offset 0.
 _ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(BOOTLOADER_SCHEMA)
 
-# Collected into VARIANT_MODULES by this package's __init__.py
-VARIANT_NAME: str = VARIANT_STM32C5
 VARIANT: ZephyrVariant = ZephyrVariant(
+    name=VARIANT_STM32C5,
+    family_module=stm32_family,
+    manifest=ZEPHYR_MAINLINE,
     boot=BootLayout(0x0),
     # Seeed's TinyUF2 bootloader keeps 0x0-0x8000.
     board_boot={
         "xiao_stm32c5": BootLayout(0x8000, ((0x0, 0x8000),)),
     },
-    sdk=ZEPHYR_MAINLINE,
-    sdk_name="zephyr",
-    family=stm32_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     transports=frozenset(),
@@ -82,15 +80,10 @@ def config_schema(config: ConfigType) -> ConfigType:
     bootloader = config[CONF_FRAMEWORK][CONF_ADVANCED][CONF_BOOTLOADER]
     config[CONF_BOARD] = qualify_board(VARIANT, config[CONF_BOARD])
     _xiao_config_schema(config)
-    _, framework_ver, sdk_name, _ = resolve_framework_version(
-        VARIANT, VARIANT_NAME, config, "mainline STM32 support"
-    )
-    set_core_data(
-        VARIANT_NAME,
-        VARIANT,
+    resolved = resolve_variant(VARIANT, config, "mainline STM32 support")
+    set_variant_core_data(
+        resolved,
         config,
-        framework_ver,
-        framework_type=sdk_name,
         bootloader=bootloader if bootloader == BOOTLOADER_MCUBOOT else "",
         sdk_source=config[CONF_FRAMEWORK].get(CONF_SOURCE),
         runner=config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_RUNNER),
@@ -111,7 +104,7 @@ async def to_code(config: ConfigType) -> None:
 
     cg.add_build_flag("-DUSE_ZEPHYR_VARIANT_STM32C5")
     cg.add_define("ESPHOME_BOARD", config[CONF_BOARD])
-    cg.add_define("ESPHOME_VARIANT", VARIANT_NAME)
+    cg.add_define("ESPHOME_VARIANT", VARIANT.name)
     cg.add_define(ThreadModel.MULTI_ATOMICS)
     zephyr_setup_preferences()
     zephyr_add_prj_conf("REBOOT", True)

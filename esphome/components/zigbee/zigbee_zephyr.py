@@ -5,7 +5,6 @@ import esphome.codegen as cg
 from esphome.components.const import CONF_MANUFACTURER
 from esphome.components.zephyr import (
     request_zephyr_module,
-    resolve_sdk,
     zephyr_add_prj_conf,
     zephyr_framework_type,
     zephyr_require_partition,
@@ -84,8 +83,7 @@ def zigbee_zephyr_supported() -> bool:
     variant = zephyr_variant_info()
     if variant is None or "zigbee" not in variant.transports:
         return False
-    _, sdk = resolve_sdk(variant, zephyr_framework_type())
-    return "zigbee" in sdk.modules
+    return "zigbee" in variant.manifest_for(zephyr_framework_type()).modules
 
 
 def requires_zigbee_zephyr_supported(value):

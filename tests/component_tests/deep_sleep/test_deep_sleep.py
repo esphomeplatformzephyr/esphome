@@ -336,7 +336,7 @@ def _set_zephyr_variant(set_core_config: SetCoreConfigCallable, variant: str) ->
     CORE.data[KEY_ZEPHYR] = {
         "variant": variant,
         "variant_info": VARIANTS[variant],
-        "family": VARIANTS[variant].family.FAMILY,
+        "family": VARIANTS[variant].family_module.FAMILY,
     }
 
 
@@ -368,7 +368,7 @@ def test_deep_sleep_zephyr_verdict_follows_the_family_for_every_variant(
 ) -> None:
     """A new variant must land on the right side of the family rule, not go untested."""
     _set_zephyr_variant(set_core_config, variant)
-    if VARIANTS[variant].family.FAMILY in _POWEROFF_FAMILIES:
+    if VARIANTS[variant].family_module.FAMILY in _POWEROFF_FAMILIES:
         assert deep_sleep.validate_config({}) == {}
     else:
         with pytest.raises(cv.Invalid, match="deep_sleep is not supported"):

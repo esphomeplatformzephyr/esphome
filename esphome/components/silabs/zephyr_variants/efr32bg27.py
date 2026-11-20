@@ -11,8 +11,8 @@ from esphome.components.zephyr.variants import (
     ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
-    resolve_framework_version,
-    set_core_data,
+    resolve_variant,
+    set_variant_core_data,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -56,18 +56,16 @@ _ADC_AIN_MAP: dict[int, str] = {
 # by every free-mux GPIO signal (UART, SPI).
 _GPIO_MATRIX_PINS: frozenset[int] = frozenset(_ADC_AIN_MAP)
 
-# Collected into VARIANT_MODULES by this package's __init__.py
-VARIANT_NAME: str = VARIANT_EFR32BG27
 VARIANT: ZephyrVariant = ZephyrVariant(
+    name=VARIANT_EFR32BG27,
+    family_module=silabs_family,
+    # Mainline stays default; Silicon Labs' vendor SDK (SILABS) is available as an alt
+    # (framework: type: silabs) pending real hardware testing.
+    manifest=ZEPHYR_MAINLINE,
+    alt_manifests=(SILABS,),
     mcumgr_ota=True,
     # Resets from the start of flash (xg27_dk2602a.dts boot_partition@0).
     boot=BootLayout(0x0),
-    # Mainline stays default; Silicon Labs' vendor SDK (SILABS) is available as an alt
-    # (framework: type: silabs) pending real hardware testing.
-    sdk=ZEPHYR_MAINLINE,
-    sdk_name="zephyr",
-    alt_sdks={"silabs": SILABS},
-    family=silabs_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     # BLE only -- EFR32BG27 is a Blue Gecko part, its radio node (efr32xg27.dtsi) only
@@ -104,24 +102,19 @@ def config_schema(config: ConfigType) -> ConfigType:
     config[CONF_FRAMEWORK][CONF_ADVANCED] = _ADVANCED_SCHEMA(
         config[CONF_FRAMEWORK].get(CONF_ADVANCED, {})
     )
-    _, framework_ver, sdk_name, _ = resolve_framework_version(
-        VARIANT, "efr32bg27", config, "EFR32BG27 support"
-    )
+    resolved = resolve_variant(VARIANT, config, "EFR32BG27 support")
     if (
         CONF_COMMANDER_VERSION in config[CONF_FRAMEWORK][CONF_ADVANCED]
-        and sdk_name != "silabs"
+        and resolved.manifest.framework_type != "silabs"
     ):
         raise cv.Invalid(
             f"'{CONF_COMMANDER_VERSION}' only applies with framework: type: silabs "
-            f"(current: {sdk_name!r})",
+            f"(current: {resolved.manifest.framework_type!r})",
             [CONF_FRAMEWORK, CONF_ADVANCED, CONF_COMMANDER_VERSION],
         )
-    set_core_data(
-        VARIANT_NAME,
-        VARIANT,
+    set_variant_core_data(
+        resolved,
         config,
-        framework_ver,
-        framework_type=sdk_name,
         bootloader=BOOTLOADER_MCUBOOT,
         sdk_source=config[CONF_FRAMEWORK].get(CONF_SOURCE),
         runner=config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_RUNNER),

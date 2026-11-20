@@ -9,8 +9,8 @@ from esphome.components.zephyr.variants import (
     ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
-    resolve_framework_version,
-    set_core_data,
+    resolve_variant,
+    set_variant_core_data,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -35,15 +35,13 @@ _ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA
 # GPIO0-28 minus 16-22 (SPI flash); same set for every free-mux signal (UART, SPI).
 _GPIO_MATRIX_PINS: frozenset[int] = frozenset(range(29)) - frozenset(range(16, 23))
 
-# Collected into VARIANT_MODULES by this package's __init__.py
-VARIANT_NAME: str = VARIANT_ESP32C5
 VARIANT: ZephyrVariant = ZephyrVariant(
+    name=VARIANT_ESP32C5,
+    family_module=esp32_family,
+    manifest=ZEPHYR_MAINLINE,
     mcumgr_ota=True,
     # ROM loads the first image at 0x2000 (espressif/partitions_0x2000_*.dtsi).
     boot=BootLayout(0x2000),
-    sdk=ZEPHYR_MAINLINE,
-    sdk_name="zephyr",
-    family=esp32_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="riscv64-zephyr-elf",
     # See esp32_h2.py's blobs= comment. Sentinel shared with esp32_h2/esp32_c6 (same SDK).
@@ -78,15 +76,10 @@ def config_schema(config: ConfigType) -> ConfigType:
         config[CONF_FRAMEWORK].get(CONF_ADVANCED, {})
     )
     config[CONF_BOARD] = qualify_board(VARIANT, config[CONF_BOARD])
-    _, framework_ver, sdk_name, _ = resolve_framework_version(
-        VARIANT, "esp32_c5", config, "mainline ESP32-C5 support"
-    )
-    set_core_data(
-        VARIANT_NAME,
-        VARIANT,
+    resolved = resolve_variant(VARIANT, config, "mainline ESP32-C5 support")
+    set_variant_core_data(
+        resolved,
         config,
-        framework_ver,
-        framework_type=sdk_name,
         bootloader=BOOTLOADER_MCUBOOT,
         sdk_source=config[CONF_FRAMEWORK].get(CONF_SOURCE),
         runner=config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_RUNNER),

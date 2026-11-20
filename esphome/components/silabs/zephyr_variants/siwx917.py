@@ -10,8 +10,8 @@ from esphome.components.zephyr.variants import (
     ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
-    resolve_framework_version,
-    set_core_data,
+    resolve_variant,
+    set_variant_core_data,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -69,24 +69,22 @@ _SPI_CLK_MACROS: dict[int, str] = {p: f"GSPI_CLK_HP{p}" for p in (8, 25, 46, 52)
 _SPI_MOSI_MACROS: dict[int, str] = {p: f"GSPI_MOSI_HP{p}" for p in (6, 12, 27, 48, 57)}
 _SPI_MISO_MACROS: dict[int, str] = {p: f"GSPI_MISO_HP{p}" for p in (11, 26, 47, 56)}
 
-# Collected into VARIANT_MODULES by this package's __init__.py
-VARIANT_NAME: str = VARIANT_SIWX917
 VARIANT: ZephyrVariant = ZephyrVariant(
-    # The ROM/TA bootloader and network processor firmware sit below 0x202000
-    # (siwx917_dk2605a.dts code_partition@202000).
-    boot=BootLayout(0x202000, ((0x0, 0x202000),)),
-    # Mainline stays default; Silicon Labs' vendor SDK (SILABS) is available as an
-    # alt, same reasoning as efr32mg24 -- pending real hardware testing either way.
-    sdk=ZEPHYR_MAINLINE,
-    sdk_name="zephyr",
-    alt_sdks={"silabs": SILABS},
+    name=VARIANT_SIWX917,
     # Deliberately its own family, not efr32mg24's "silabs": EFR32 Series 2 and
     # SiWx91x are unrelated silicon sharing only a vendor name -- different
     # GPIO/pinmux (crossbar vs. fixed-function here) and a completely different ADC
     # IP with its own dt-bindings header and devicetree shape. Reusing "silabs"
     # would misdirect adc/sensor.py's family-keyed codegen at EFR32's IADC overlay
     # shape, which doesn't apply to this chip's ADC driver.
-    family=silabs_siwx91x_family,
+    family_module=silabs_siwx91x_family,
+    # Mainline stays default; Silicon Labs' vendor SDK (SILABS) is available as an
+    # alt, same reasoning as efr32mg24 -- pending real hardware testing either way.
+    manifest=ZEPHYR_MAINLINE,
+    alt_manifests=(SILABS,),
+    # The ROM/TA bootloader and network processor firmware sit below 0x202000
+    # (siwx917_dk2605a.dts code_partition@202000).
+    boot=BootLayout(0x202000, ((0x0, 0x202000),)),
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     # Wi-Fi 6 + BLE 5.4 only -- no 802.15.4 radio on this chip.
@@ -167,24 +165,19 @@ def config_schema(config: ConfigType) -> ConfigType:
     config[CONF_FRAMEWORK][CONF_ADVANCED] = _ADVANCED_SCHEMA(
         config[CONF_FRAMEWORK].get(CONF_ADVANCED, {})
     )
-    _, framework_ver, sdk_name, _ = resolve_framework_version(
-        VARIANT, "siwx917", config, "SiWx917 support"
-    )
+    resolved = resolve_variant(VARIANT, config, "SiWx917 support")
     if (
         CONF_COMMANDER_VERSION in config[CONF_FRAMEWORK][CONF_ADVANCED]
-        and sdk_name != "silabs"
+        and resolved.manifest.framework_type != "silabs"
     ):
         raise cv.Invalid(
             f"'{CONF_COMMANDER_VERSION}' only applies with framework: type: silabs "
-            f"(current: {sdk_name!r})",
+            f"(current: {resolved.manifest.framework_type!r})",
             [CONF_FRAMEWORK, CONF_ADVANCED, CONF_COMMANDER_VERSION],
         )
-    set_core_data(
-        VARIANT_NAME,
-        VARIANT,
+    set_variant_core_data(
+        resolved,
         config,
-        framework_ver,
-        framework_type=sdk_name,
         bootloader="",
         sdk_source=config[CONF_FRAMEWORK].get(CONF_SOURCE),
         runner=config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_RUNNER),

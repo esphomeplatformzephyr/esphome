@@ -63,7 +63,7 @@ def test_every_rtt_family_declares_it(family: str) -> None:
     from esphome.components.zephyr.const import SEGGER_RTT_UART  # noqa: PLC0415
     from tests.unit_tests.components.zephyr.zephyr_state import VARIANTS  # noqa: PLC0415
 
-    modules = {v.family.FAMILY: v.family for v in VARIANTS.values()}
+    modules = {v.family_module.FAMILY: v.family_module for v in VARIANTS.values()}
     assert SEGGER_RTT_UART in modules[family].UART_DRIVERS
 
 

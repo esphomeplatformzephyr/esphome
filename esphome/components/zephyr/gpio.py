@@ -24,9 +24,9 @@ _UNDERSCORE_PIN_RE = re.compile(r"P(\d+)_(\d+)")
 
 
 def _pin_notation(variant_info: "ZephyrVariant | None") -> str | None:
-    if variant_info is None or variant_info.family is None:
+    if variant_info is None or variant_info.family_module is None:
         return None
-    return getattr(variant_info.family, "PIN_NOTATION", None)
+    return getattr(variant_info.family_module, "PIN_NOTATION", None)
 
 
 def _check_lettered_port(pin: int) -> int:

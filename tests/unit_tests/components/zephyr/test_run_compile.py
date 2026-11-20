@@ -1,6 +1,7 @@
 """Tests for the Zephyr toolchain build, run_compile()."""
 
 from collections.abc import Iterator
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -106,7 +107,10 @@ def test_fails_with_west(build: MagicMock) -> None:
 
 def test_needs_the_variant_toolchain(build: MagicMock) -> None:
     with (
-        patch.object(stm32c5.VARIANT, "toolchain", None),
+        patch(
+            "esphome.components.zephyr.zephyr_variant_info",
+            return_value=replace(stm32c5.VARIANT, toolchain=None),
+        ),
         pytest.raises(EsphomeError, match="names no Zephyr SDK toolchain"),
     ):
         run_compile(None, {})

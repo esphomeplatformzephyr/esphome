@@ -14,8 +14,8 @@ from esphome.components.zephyr.variants import (
     ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
-    resolve_framework_version,
-    set_core_data,
+    resolve_variant,
+    set_variant_core_data,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -76,9 +76,14 @@ _GPIO_MATRIX_PINS: frozenset[int] = (
     frozenset(range(7)) | frozenset(range(32, 49)) | frozenset(range(64, 75))
 )
 
-# Collected into VARIANT_MODULES by this package's __init__.py
-VARIANT_NAME: str = VARIANT_NRF54L15
 VARIANT: ZephyrVariant = ZephyrVariant(
+    name=VARIANT_NRF54L15,
+    family_module=nordic_family,
+    # Same reasoning as nrf52: NCS is Nordic's own SDK and where support for its own
+    # newest silicon lands and gets tested first. Mainline Zephyr (which already carries
+    # this board's definition too) stays available as an alternate.
+    manifest=NCS,
+    alt_manifests=(ZEPHYR_MAINLINE,),
     # No USB controller; the XIAO's USB port is a SAMD11 bridge to uart20
     usb_uart_type=None,
     mcumgr_ota=True,
@@ -86,13 +91,6 @@ VARIANT: ZephyrVariant = ZephyrVariant(
     mcumgr_cdc=False,
     # Resets from the start of RRAM (nordic/nrf54l15_cpuapp_partition.dtsi).
     boot=BootLayout(0x0),
-    # Same reasoning as nrf52: NCS is Nordic's own SDK and where support for its own
-    # newest silicon lands and gets tested first. Mainline Zephyr (which already carries
-    # this board's definition too) stays available as an alternate.
-    sdk=NCS,
-    sdk_name="ncs",
-    alt_sdks={"zephyr": ZEPHYR_MAINLINE},
-    family=nordic_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     # Untested on hardware as of 2026-08-04.
@@ -131,15 +129,10 @@ def config_schema(config: ConfigType) -> ConfigType:
     )
     bootloader = config[CONF_FRAMEWORK][CONF_ADVANCED][CONF_BOOTLOADER]
     config[CONF_BOARD] = qualify_board(VARIANT, config[CONF_BOARD])
-    _, framework_ver, sdk_name, _ = resolve_framework_version(
-        VARIANT, "nrf54l15", config, "nRF54L15 support"
-    )
-    set_core_data(
-        VARIANT_NAME,
-        VARIANT,
+    resolved = resolve_variant(VARIANT, config, "nRF54L15 support")
+    set_variant_core_data(
+        resolved,
         config,
-        framework_ver,
-        framework_type=sdk_name,
         bootloader=bootloader if bootloader == BOOTLOADER_MCUBOOT else "",
         sdk_source=config[CONF_FRAMEWORK].get(CONF_SOURCE),
         runner=config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_RUNNER),

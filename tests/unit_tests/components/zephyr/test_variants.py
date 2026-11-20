@@ -10,7 +10,6 @@ from typing import Any
 import pytest
 
 from esphome.components.zephyr import (
-    variants,
     zephyr_framework_type,
     zephyr_variant,
     zephyr_variant_family,
@@ -19,13 +18,13 @@ from esphome.components.zephyr.const import KEY_BOOTLOADER, VERSION_RECOMMENDED
 from esphome.components.zephyr.framework_helpers import FrameworkSource
 from esphome.components.zephyr.variants import (
     ZEPHYR_MAINLINE,
+    ZephyrManifest,
     ZephyrModule,
     ZephyrModuleTemplate,
-    ZephyrSDK,
     ZephyrVariant,
-    resolve_framework_version,
-    resolve_sdk,
-    set_core_data,
+    ZephyrVariantResolved,
+    resolve_variant,
+    set_variant_core_data,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -53,14 +52,16 @@ _ZEPHYR_PLATFORMS: tuple[str, ...] = (
     "stm32",
 )
 
-_DEFAULT_SDK = ZephyrSDK(
+_DEFAULT_MANIFEST: ZephyrManifest = ZephyrManifest(
+    framework_type="default",
     source=FrameworkSource(
         name="Test", url="http://dummy-default", optional=(), required=frozenset()
     ),
     default_version="1.0.0",
     min_version=cv.Version(1, 0, 0),
 )
-_ALT_SDK = ZephyrSDK(
+_ALT_MANIFEST: ZephyrManifest = ZephyrManifest(
+    framework_type="alt",
     source=FrameworkSource(
         name="Test", url="http://dummy-alt", optional=(), required=frozenset()
     ),
@@ -71,9 +72,7 @@ _ALT_SDK = ZephyrSDK(
 
 def _fake_variant() -> ZephyrVariant:
     return ZephyrVariant(
-        sdk=_DEFAULT_SDK,
-        sdk_name="default",
-        alt_sdks={"alt": _ALT_SDK},
+        name="fake", manifest=_DEFAULT_MANIFEST, alt_manifests=(_ALT_MANIFEST,)
     )
 
 
@@ -84,74 +83,56 @@ def _framework_config(**overrides: Any) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# resolve_sdk
+# ZephyrVariant.manifest_for
 # ---------------------------------------------------------------------------
 
 
-def test_resolve_sdk_none_type_returns_variant_default() -> None:
-    variant = _fake_variant()
-    assert resolve_sdk(variant, None) == ("default", _DEFAULT_SDK)
+@pytest.mark.parametrize(
+    ("framework_type", "manifest"),
+    [(None, _DEFAULT_MANIFEST), ("default", _DEFAULT_MANIFEST), ("alt", _ALT_MANIFEST)],
+)
+def test_manifest_for(framework_type: str | None, manifest: ZephyrManifest) -> None:
+    assert _fake_variant().manifest_for(framework_type) is manifest
 
 
-def test_resolve_sdk_explicit_default_type_returns_variant_default() -> None:
-    variant = _fake_variant()
-    assert resolve_sdk(variant, "default") == ("default", _DEFAULT_SDK)
-
-
-def test_resolve_sdk_alt_type_returns_alt_sdk() -> None:
-    variant = _fake_variant()
-    assert resolve_sdk(variant, "alt") == ("alt", _ALT_SDK)
-
-
-def test_resolve_sdk_unknown_type_raises_keyerror() -> None:
-    variant = _fake_variant()
+def test_manifest_for_unknown_type_raises_keyerror() -> None:
     with pytest.raises(KeyError):
-        resolve_sdk(variant, "bogus")
+        _fake_variant().manifest_for("bogus")
 
 
 # ---------------------------------------------------------------------------
-# resolve_framework_version
+# resolve_variant
 # ---------------------------------------------------------------------------
 
 
-def test_resolve_framework_version_defaults_to_variant_default_sdk() -> None:
+def test_resolve_variant_defaults_to_the_variant_manifest() -> None:
     variant = _fake_variant()
     config = {CONF_FRAMEWORK: _framework_config()}
 
-    version_str, parsed, sdk_name, sdk = resolve_framework_version(
-        variant, "fake", config, "test"
+    assert resolve_variant(variant, config, "test") == ZephyrVariantResolved(
+        variant, _DEFAULT_MANIFEST, cv.Version(1, 0, 0)
     )
 
-    assert version_str == "1.0.0"
-    assert parsed == cv.Version(1, 0, 0)
-    assert sdk_name == "default"
-    assert sdk is _DEFAULT_SDK
 
-
-def test_resolve_framework_version_rejects_unknown_type() -> None:
+def test_resolve_variant_rejects_unknown_type() -> None:
     variant = _fake_variant()
     config = {CONF_FRAMEWORK: _framework_config(**{CONF_TYPE: "bogus"})}
 
     with pytest.raises(cv.Invalid, match="not a valid framework type"):
-        resolve_framework_version(variant, "fake", config, "test")
+        resolve_variant(variant, config, "test")
 
 
-def test_resolve_framework_version_selects_alt_sdk_type() -> None:
+def test_resolve_variant_selects_alt_manifest_type() -> None:
     variant = _fake_variant()
     config = {CONF_FRAMEWORK: _framework_config(**{CONF_TYPE: "alt"})}
 
-    version_str, parsed, sdk_name, sdk = resolve_framework_version(
-        variant, "fake", config, "test"
+    # The alt manifest's own default_version, not the variant's own manifest's.
+    assert resolve_variant(variant, config, "test") == ZephyrVariantResolved(
+        variant, _ALT_MANIFEST, cv.Version(2, 0, 0)
     )
 
-    # The alt sdk's own default_version, not the variant's default sdk's.
-    assert version_str == "2.0.0"
-    assert parsed == cv.Version(2, 0, 0)
-    assert sdk_name == "alt"
-    assert sdk is _ALT_SDK
 
-
-def test_resolve_framework_version_rejects_version_and_source_together() -> None:
+def test_resolve_variant_rejects_version_and_source_together() -> None:
     variant = _fake_variant()
     config = {
         CONF_FRAMEWORK: _framework_config(
@@ -163,61 +144,57 @@ def test_resolve_framework_version_rejects_version_and_source_together() -> None
     }
 
     with pytest.raises(cv.Invalid, match="mutually exclusive"):
-        resolve_framework_version(variant, "fake", config, "test")
+        resolve_variant(variant, config, "test")
 
 
-def test_resolve_framework_version_rejects_version_below_min() -> None:
+def test_resolve_variant_rejects_version_below_min() -> None:
     variant = _fake_variant()
     config = {CONF_FRAMEWORK: _framework_config(**{CONF_VERSION: "0.5.0"})}
 
     with pytest.raises(cv.Invalid, match=">= 1.0.0"):
-        resolve_framework_version(variant, "fake", config, "test")
+        resolve_variant(variant, config, "test")
 
 
-def test_resolve_framework_version_rejects_prerelease_of_min() -> None:
+def test_resolve_variant_rejects_prerelease_of_min() -> None:
     variant = _fake_variant()
     config = {CONF_FRAMEWORK: _framework_config(**{CONF_VERSION: "1.0.0-rc1"})}
 
     with pytest.raises(cv.Invalid, match=">= 1.0.0"):
-        resolve_framework_version(variant, "fake", config, "test")
+        resolve_variant(variant, config, "test")
 
 
-def test_resolve_framework_version_release_meets_prerelease_min() -> None:
-    sdk = ZephyrSDK(
-        source=_DEFAULT_SDK.source,
+def test_resolve_variant_release_meets_prerelease_min() -> None:
+    manifest = ZephyrManifest(
+        framework_type="default",
+        source=_DEFAULT_MANIFEST.source,
         default_version="1.0.0",
         min_version=cv.Version(1, 0, 0, "rc2"),
     )
-    variant = ZephyrVariant(sdk=sdk, sdk_name="default")
+    variant = ZephyrVariant(name="fake", manifest=manifest)
     for version in ("1.0.0", "1.0.0-rc10"):
         config = {CONF_FRAMEWORK: _framework_config(**{CONF_VERSION: version})}
-        resolve_framework_version(variant, "fake", config, "test")
+        resolve_variant(variant, config, "test")
 
 
-def test_resolve_framework_version_accepts_recommended_literal() -> None:
+def test_resolve_variant_accepts_recommended_literal() -> None:
     variant = _fake_variant()
     config = {CONF_FRAMEWORK: _framework_config(**{CONF_VERSION: VERSION_RECOMMENDED})}
 
-    version_str, parsed, sdk_name, sdk = resolve_framework_version(
-        variant, "fake", config, "test"
-    )
+    resolved = resolve_variant(variant, config, "test")
 
-    assert version_str == "1.0.0"
-    assert sdk_name == "default"
+    assert resolved.version == cv.Version(1, 0, 0)
+    assert resolved.manifest is _DEFAULT_MANIFEST
 
 
-def test_resolve_framework_version_accepts_explicit_non_default_version(
+def test_resolve_variant_accepts_explicit_non_default_version(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     variant = _fake_variant()
     config = {CONF_FRAMEWORK: _framework_config(**{CONF_VERSION: "1.2.0"})}
 
-    version_str, parsed, sdk_name, sdk = resolve_framework_version(
-        variant, "fake", config, "test"
-    )
+    resolved = resolve_variant(variant, config, "test")
 
-    assert version_str == "1.2.0"
-    assert parsed == cv.Version(1, 2, 0)
+    assert resolved.version == cv.Version(1, 2, 0)
     assert "not the recommended one" in caplog.text
 
 
@@ -363,40 +340,39 @@ def test_simg301_rejects_an_unknown_advanced_key() -> None:
 
 
 def test_every_family_names_its_vendor_hals() -> None:
-    for family in {v.family for v in VARIANTS.values() if v.family}:
+    for family in {v.family_module for v in VARIANTS.values() if v.family_module}:
         hals = family.ADDITIONAL_FRAMEWORK_PROJECTS
         assert hals
         assert all(h.startswith("hal_") for h in hals)
 
 
 def test_stm32c5_default_is_its_minimum() -> None:
-    assert cv.Version.parse(
-        ZEPHYR_MAINLINE.default_version
-    ) == variants._sdk_min_version(VARIANTS["STM32C5"], "zephyr", ZEPHYR_MAINLINE)
+    manifest = VARIANTS["STM32C5"].manifest
+    assert cv.Version.parse(manifest.default_version) == manifest.min_version
+    assert manifest is ZEPHYR_MAINLINE
 
 
 @pytest.mark.parametrize("family", ["chipfam", None])
-def test_set_core_data(family: str | None) -> None:
+def test_set_variant_core_data(family: str | None) -> None:
     family_module = None
     if family is not None:
         family_module = ModuleType(f"{family}_family")
         family_module.FAMILY = family
-    variant = ZephyrVariant(sdk=_DEFAULT_SDK, sdk_name="default", family=family_module)
+    variant = ZephyrVariant(
+        name="chip1", family_module=family_module, manifest=_ALT_MANIFEST
+    )
     CORE.data[KEY_CORE] = {}
 
     config = {CONF_BOARD: "chip1_dk", CONF_FRAMEWORK: {}}
-    set_core_data(
-        "chip1",
-        variant,
+    set_variant_core_data(
+        ZephyrVariantResolved(variant, _ALT_MANIFEST, cv.Version(4, 5, 0)),
         config,
-        cv.Version(4, 5, 0),
-        framework_type="vendor",
         bootloader="mcuboot",
     )
 
     assert zephyr_variant() == "chip1"
     assert zephyr_variant_family() == family
-    assert zephyr_framework_type() == "vendor"
+    assert zephyr_framework_type() == "alt"
     assert CORE.data["zephyr"][CONF_BOARD] == "chip1_dk"
     assert CORE.data["zephyr"][KEY_BOOTLOADER] == "mcuboot"
     assert CORE.data[KEY_CORE][KEY_TARGET_FRAMEWORK] == "zephyr"
@@ -404,12 +380,12 @@ def test_set_core_data(family: str | None) -> None:
 
 
 @pytest.mark.parametrize("version", ["v1.0.0", "1.0.0-rc1a"])
-def test_resolve_framework_version_rejects_a_version_that_is_not_a_number(
+def test_resolve_variant_rejects_a_version_that_is_not_a_number(
     version: str,
 ) -> None:
     config = {CONF_FRAMEWORK: _framework_config(**{CONF_VERSION: version})}
     with pytest.raises(cv.Invalid, match=f"'{version}' is not a version number") as err:
-        resolve_framework_version(_fake_variant(), "fake", config, "test")
+        resolve_variant(_fake_variant(), config, "test")
     assert err.value.path == [CONF_FRAMEWORK, CONF_VERSION]
 
 
@@ -418,11 +394,9 @@ def test_variant_names_are_unique_and_listed_within_a_platform(platform: str) ->
     """VARIANT_MODULES is a dict, so a duplicate name would silently replace a variant."""
     package = import_module(f"esphome.components.{platform}.zephyr_variants")
     names = [
-        mod.VARIANT_NAME
+        mod.VARIANT.name
         for info in pkgutil.iter_modules(package.__path__)
-        if hasattr(
-            mod := import_module(f"{package.__name__}.{info.name}"), "VARIANT_NAME"
-        )
+        if hasattr(mod := import_module(f"{package.__name__}.{info.name}"), "VARIANT")
     ]
     assert len(names) == len(set(names))
     assert set(names) == set(package.VARIANT_MODULES)

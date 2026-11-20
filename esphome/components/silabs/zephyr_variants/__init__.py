@@ -4,7 +4,7 @@ from types import ModuleType
 
 from . import efr32bg27, efr32mg24, simg301, siwx917
 
-# Variant name -> its module, which exports VARIANT_NAME and a ZephyrVariant named VARIANT
+# Variant name -> its module, which exports a ZephyrVariant named VARIANT
 VARIANT_MODULES: dict[str, ModuleType] = {
-    mod.VARIANT_NAME: mod for mod in (efr32mg24, simg301, efr32bg27, siwx917)
+    mod.VARIANT.name: mod for mod in (efr32mg24, simg301, efr32bg27, siwx917)
 }

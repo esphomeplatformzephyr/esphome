@@ -22,7 +22,11 @@ from esphome.components.zephyr.const import (
     KEY_VARIANT_MODULE,
     KEY_ZEPHYR,
 )
-from esphome.components.zephyr.variants import ZephyrVariant, set_core_data
+from esphome.components.zephyr.variants import (
+    ZephyrVariant,
+    ZephyrVariantResolved,
+    set_variant_core_data,
+)
 import esphome.config_validation as cv
 from esphome.const import CONF_BOARD, KEY_CORE, Framework, Platform, PlatformFramework
 from esphome.core import CORE
@@ -69,16 +73,17 @@ def empty_zephyr_data(
     previous_core = dict(CORE.data.get(KEY_CORE, {}))
     CORE.data.setdefault(KEY_CORE, {})
     name = variant if variant in VARIANTS else next(iter(VARIANTS))
-    set_core_data(
-        name,
-        VARIANTS[name],
+    set_variant_core_data(
+        ZephyrVariantResolved(
+            VARIANTS[name],
+            VARIANTS[name].manifest_for(framework_type),
+            cv.Version(4, 5, 0),
+        ),
         {CONF_BOARD: "some_board"},
-        cv.Version(4, 5, 0),
-        framework_type=framework_type,
         bootloader="none",
     )
     data: dict[str, Any] = dict(CORE.data.pop(KEY_ZEPHYR))
-    # Set by the platform's schema, not set_core_data
+    # Set by the platform's schema, not set_variant_core_data
     data[KEY_VARIANT_MODULE] = VARIANT_MODULES[name]
     CORE.data[KEY_CORE] = previous_core
     if previous is not None:
@@ -89,8 +94,8 @@ def empty_zephyr_data(
     data[KEY_VARIANT_INFO] = variant_info
     data[KEY_VARIANT_MODULE] = VARIANT_MODULES.get(variant)
     data[KEY_FAMILY] = (
-        variant_info.family.FAMILY
-        if variant_info is not None and variant_info.family
+        variant_info.family_module.FAMILY
+        if variant_info is not None and variant_info.family_module
         else None
     )
     data.update(overrides)

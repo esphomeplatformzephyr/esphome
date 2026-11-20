@@ -13,8 +13,8 @@ from esphome.components.zephyr.variants import (
     ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
-    resolve_framework_version,
-    set_core_data,
+    resolve_variant,
+    set_variant_core_data,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -62,13 +62,12 @@ _ADC_AIN_MAP: dict[int, str] = {
 # gpio0 (0-31) + gpio1 (32-47), any pin for any UART/SPI signal (NRF_PSEL).
 _GPIO_MATRIX_PINS: frozenset[int] = frozenset(range(48))
 
-VARIANT_NAME: str = VARIANT_NRF5340
 VARIANT: ZephyrVariant = ZephyrVariant(
+    name=VARIANT_NRF5340,
+    family_module=nordic_family,
+    manifest=NCS,
+    alt_manifests=(ZEPHYR_MAINLINE,),
     boot=BootLayout(0x0),
-    sdk=NCS,
-    sdk_name="ncs",
-    alt_sdks={"zephyr": ZEPHYR_MAINLINE},
-    family=nordic_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     transports=frozenset({"wifi"}),
@@ -111,15 +110,10 @@ def config_schema(config: ConfigType) -> ConfigType:
         config[CONF_FRAMEWORK].get(CONF_ADVANCED, {})
     )
     config[CONF_BOARD] = qualify_board(VARIANT, config[CONF_BOARD])
-    _, framework_ver, sdk_name, _ = resolve_framework_version(
-        VARIANT, "nrf5340", config, "nRF5340 support"
-    )
-    set_core_data(
-        VARIANT_NAME,
-        VARIANT,
+    resolved = resolve_variant(VARIANT, config, "nRF5340 support")
+    set_variant_core_data(
+        resolved,
         config,
-        framework_ver,
-        framework_type=sdk_name,
         bootloader=config[CONF_FRAMEWORK][CONF_ADVANCED][CONF_BOOTLOADER],
         sdk_source=config[CONF_FRAMEWORK].get(CONF_SOURCE),
         runner=config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_RUNNER),

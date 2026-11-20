@@ -48,7 +48,7 @@ from esphome.components.zephyr.dts_lookup import (
     validate_board_revision,
 )
 from esphome.components.zephyr.framework_helpers import FrameworkSource
-from esphome.components.zephyr.variants import ZephyrSDK, ZephyrVariant
+from esphome.components.zephyr.variants import ZephyrManifest, ZephyrVariant
 from esphome.core import CORE, EsphomeError
 from tests.unit_tests.components.zephyr.zephyr_state import (
     empty_zephyr_data,
@@ -958,13 +958,14 @@ def test_format_size_falls_back_to_bytes_when_not_k_aligned() -> None:
     assert _format_size(1000) == "1000B"
 
 
-_FAKE_SDK = ZephyrSDK(
+_FAKE_MANIFEST = ZephyrManifest(
+    framework_type="zephyr",
     source=FrameworkSource(
         name="Test",
         url="https://example.invalid/zephyr",
         optional=(),
         required=frozenset(),
-    )
+    ),
 )
 
 _BOARD_QUERIES = (
@@ -994,7 +995,11 @@ def no_board_info(monkeypatch: pytest.MonkeyPatch) -> pytest.MonkeyPatch:
 def test_log_board_capabilities_stock_board_full_report(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    variant = ZephyrVariant(sdk=_FAKE_SDK, swap_methods=frozenset({"scratch", "move"}))
+    variant = ZephyrVariant(
+        name="TEST",
+        manifest=_FAKE_MANIFEST,
+        swap_methods=frozenset({"scratch", "move"}),
+    )
     monkeypatch.setattr(
         dts_lookup, "get_board_yaml_supported", lambda board: ["adc", "i2c"]
     )
@@ -1030,7 +1035,7 @@ def test_log_board_capabilities_custom_board_shows_board_root(
     caplog: pytest.LogCaptureFixture,
     tmp_path: Path,
 ) -> None:
-    variant = ZephyrVariant(sdk=_FAKE_SDK)
+    variant = ZephyrVariant(name="TEST", manifest=_FAKE_MANIFEST)
 
     with caplog.at_level("INFO"):
         log_board_capabilities("my_board", "esp32_c6", variant, "4.4.1", tmp_path)
@@ -1046,7 +1051,9 @@ def test_log_board_capabilities_empty_swap_methods_omits_partitions(
     section must be omitted entirely -- even though the board's DTS still defines a
     mcuboot/image-* partition layout as boilerplate, showing it would misleadingly
     imply a real bootloader/OTA partition scheme on this variant."""
-    variant = ZephyrVariant(sdk=_FAKE_SDK)  # swap_methods defaults to empty
+    variant = ZephyrVariant(
+        name="TEST", manifest=_FAKE_MANIFEST
+    )  # swap_methods defaults to empty
     partitions_called = False
 
     def _unexpected_partitions_call(board: str) -> list[tuple[str, int, int]]:
@@ -1069,7 +1076,7 @@ def test_log_board_capabilities_empty_swap_methods_omits_partitions(
 
 @pytest.mark.usefixtures("no_board_info")
 def test_log_board_capabilities_lists_shields(caplog: pytest.LogCaptureFixture) -> None:
-    variant = ZephyrVariant(sdk=_FAKE_SDK)
+    variant = ZephyrVariant(name="TEST", manifest=_FAKE_MANIFEST)
 
     with caplog.at_level("INFO"):
         log_board_capabilities(

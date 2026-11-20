@@ -14,8 +14,8 @@ from esphome.components.zephyr.variants import (
     ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
-    resolve_framework_version,
-    set_core_data,
+    resolve_variant,
+    set_variant_core_data,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -59,15 +59,14 @@ _ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(BOOTLOADER_SCHEMA).extend(
 # and rpi-pico-rp2040-pinctrl.h's ADC_CH0_P26..ADC_CH3_P29 macros.
 _ADC_CHANNEL_MAP: dict[int, int] = {26: 0, 27: 1, 28: 2, 29: 3}
 
-VARIANT_NAME: str = VARIANT_RP2040
 VARIANT: ZephyrVariant = ZephyrVariant(
+    name=VARIANT_RP2040,
+    family_module=rpi_pico_family,
+    manifest=ZEPHYR_MAINLINE,
     mcumgr_ota=True,
     # The first 256 bytes hold boot2, built into the first image; that image starts
     # after it (rpi_pico-common.dtsi second_stage_bootloader@0, code_partition@100).
     boot=BootLayout(0x100),
-    sdk=ZEPHYR_MAINLINE,
-    sdk_name="zephyr",
-    family=rpi_pico_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     transports=frozenset({"wifi"}),
@@ -135,15 +134,10 @@ def config_schema(config: ConfigType) -> ConfigType:
     declare_bootsel_touch(config[CONF_FRAMEWORK][CONF_ADVANCED])
     bootloader = config[CONF_FRAMEWORK][CONF_ADVANCED][CONF_BOOTLOADER]
     config[CONF_BOARD] = qualify_board(VARIANT, config[CONF_BOARD])
-    _, framework_ver, sdk_name, _ = resolve_framework_version(
-        VARIANT, "rp2040", config, "RP2040 support"
-    )
-    set_core_data(
-        VARIANT_NAME,
-        VARIANT,
+    resolved = resolve_variant(VARIANT, config, "RP2040 support")
+    set_variant_core_data(
+        resolved,
         config,
-        framework_ver,
-        framework_type=sdk_name,
         bootloader=bootloader if bootloader == BOOTLOADER_MCUBOOT else "",
         sdk_source=config[CONF_FRAMEWORK].get(CONF_SOURCE),
         runner=config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_RUNNER),

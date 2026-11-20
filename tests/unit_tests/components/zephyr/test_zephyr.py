@@ -1958,9 +1958,9 @@ def test_upload_program_resolves_variant_and_flashes(tmp_path: Path) -> None:
 
     assert result is True
     # Confirms VARIANTS[zephyr_variant()] resolved to the real ESP32H2 SDK, not a
-    # crash -- west_install was called with that variant's actual sdk object.
+    # crash -- west_install was called with that variant's actual manifest object.
     mock_west_install.assert_called_once()
-    assert mock_west_install.call_args[0][0] is VARIANTS["ESP32H2"].sdk
+    assert mock_west_install.call_args[0][0] is VARIANTS["ESP32H2"].manifest
     mock_flash.assert_called_once()
 
 
@@ -2030,11 +2030,11 @@ def test_upload_program_restores_what_validation_set(variant: str) -> None:
 
 def test_upload_program_restore_keeps_pinned_git_source_without_resolving() -> None:
     sha = "0123456789abcdef0123456789abcdef01234567"
-    sdk = VARIANTS["ESP32"].sdk
+    manifest = VARIANTS["ESP32"].manifest
 
     def fake_resolve(source: dict, refresh: object) -> str:
         source["resolved_ref"] = sha
-        return sdk.default_version
+        return manifest.default_version
 
     with patch(
         "esphome.components.zephyr.dts_fetch.resolve_sdk_source_version",
@@ -2058,10 +2058,10 @@ def test_upload_program_restore_turns_local_source_path_back_into_path(
     tmp_path: Path,
 ) -> None:
     CORE.config_path = tmp_path / "test.yaml"
-    sdk = VARIANTS["ESP32"].sdk
+    manifest = VARIANTS["ESP32"].manifest
     with patch(
         "esphome.components.zephyr.dts_fetch.resolve_sdk_source_version",
-        return_value=sdk.default_version,
+        return_value=manifest.default_version,
     ):
         validated = _validate_zephyr_config(
             {
@@ -2685,7 +2685,7 @@ def test_zephyr_additional_framework_projects_mainline_takes_the_family_hals() -
 
     with patch(
         "esphome.components.zephyr.zephyr_family_module",
-        return_value=VARIANTS["STM32C5"].family,
+        return_value=VARIANTS["STM32C5"].family_module,
     ):
         assert zephyr_additional_framework_projects(ZEPHYR_MAINLINE) == frozenset(
             {"hal_stm32"}

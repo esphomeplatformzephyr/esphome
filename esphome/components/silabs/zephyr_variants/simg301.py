@@ -9,8 +9,8 @@ from esphome.components.zephyr.variants import (
     ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
-    resolve_framework_version,
-    set_core_data,
+    resolve_variant,
+    set_variant_core_data,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -35,14 +35,12 @@ _EUSART0_PINS: frozenset[int] = frozenset([*range(9), *range(16, 20)])
 
 _ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA
 
-# Collected into VARIANT_MODULES by this package's __init__.py
-VARIANT_NAME: str = VARIANT_SIMG301
 VARIANT: ZephyrVariant = ZephyrVariant(
+    name=VARIANT_SIMG301,
+    family_module=silabs_family,
+    manifest=ZEPHYR_MAINLINE,
     # Resets from the start of flash (simg301_ek2719a.dts boot_partition@0).
     boot=BootLayout(0x0),
-    sdk=ZEPHYR_MAINLINE,
-    sdk_name="zephyr",
-    family=silabs_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     # The SoC has an ieee802154 node too, but it's untested on this chip.
@@ -70,15 +68,10 @@ def config_schema(config: ConfigType) -> ConfigType:
     config[CONF_FRAMEWORK][CONF_ADVANCED] = _ADVANCED_SCHEMA(
         config[CONF_FRAMEWORK].get(CONF_ADVANCED, {})
     )
-    _, framework_ver, sdk_name, _ = resolve_framework_version(
-        VARIANT, "simg301", config, "the six301 SoC support first in 4.5.0"
-    )
-    set_core_data(
-        VARIANT_NAME,
-        VARIANT,
+    resolved = resolve_variant(VARIANT, config, "the six301 SoC support first in 4.5.0")
+    set_variant_core_data(
+        resolved,
         config,
-        framework_ver,
-        framework_type=sdk_name,
         bootloader=BOOTLOADER_MCUBOOT,
         sdk_source=config[CONF_FRAMEWORK].get(CONF_SOURCE),
         runner=config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_RUNNER),

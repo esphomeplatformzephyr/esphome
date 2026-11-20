@@ -140,12 +140,12 @@ from .variants import (
     NCS,
     SILABS,
     ZEPHYR_MAINLINE,
+    ZephyrManifest,
     ZephyrModule,
     ZephyrModuleTemplate,
-    ZephyrSDK,
     ZephyrVariant,
-    resolve_sdk,
-    set_core_data,
+    ZephyrVariantResolved,
+    set_variant_core_data,
     variant_value,
 )
 
@@ -782,7 +782,7 @@ def zephyr_variant_module() -> ModuleType | None:
 def zephyr_family_module() -> ModuleType | None:
     """The active variant's family module; None without one, or as for zephyr_variant()."""
     info = zephyr_variant_info()
-    return info.family if info is not None else None
+    return info.family_module if info is not None else None
 
 
 def zephyr_usb_uart_type() -> str | None:
@@ -842,8 +842,8 @@ def request_zephyr_module(capability: str) -> None:
     `framework: modules:` override may still apply, so failing on a missing default
     version has to wait until resolve_zephyr_modules() (see there for why)."""
     _require_zephyr_toolchain("request_zephyr_module")
-    _, sdk = resolve_sdk(zephyr_variant_info(), zephyr_framework_type())
-    template = sdk.modules.get(capability)
+    manifest = zephyr_variant_info().manifest_for(zephyr_framework_type())
+    template = manifest.modules.get(capability)
     if template is None:
         raise EsphomeError(
             f"The '{capability}' module isn't available for "
@@ -964,10 +964,10 @@ def zephyr_family_uart_drivers() -> frozenset[str]:
     return family.UART_DRIVERS
 
 
-def zephyr_additional_framework_projects(sdk: ZephyrSDK) -> frozenset[str]:
+def zephyr_additional_framework_projects(manifest: ZephyrManifest) -> frozenset[str]:
     """The framework projects this build needs beyond the framework's required ones:
     the family's vendor HALs on mainline, the projects components ask for on NCS."""
-    if sdk is NCS:
+    if manifest is NCS:
         # The same list as nrf52's: components add to it with include_west_project()
         from esphome.components.nrf52.framework import wanted_west_projects  # noqa: PLC0415
 
@@ -977,7 +977,7 @@ def zephyr_additional_framework_projects(sdk: ZephyrSDK) -> frozenset[str]:
         if sysbuild_conf.get("SB_CONFIG_BOOTLOADER_MCUBOOT", (False,))[0]:
             projects.add("mcuboot")
         return frozenset(projects)
-    if sdk is ZEPHYR_MAINLINE and (family := zephyr_family_module()) is not None:
+    if manifest is ZEPHYR_MAINLINE and (family := zephyr_family_module()) is not None:
         return family.ADDITIONAL_FRAMEWORK_PROJECTS
     return frozenset()
 
@@ -1270,7 +1270,7 @@ _WATCHDOG_TIMEOUT_VALIDATOR = _validate_watchdog_timeout
 
 # Like cv.SOURCE_SCHEMA's git shape, but `url` is optional: `framework: source: {ref: ...}`
 # alone is enough to pin an alpha/pre-release branch of the selected framework's own
-# official manifest (see resolve_framework_version(), which fills in the default).
+# official manifest (see resolve_variant(), which fills in the default).
 _FRAMEWORK_SOURCE_GIT_SCHEMA = cv.Schema(
     {
         cv.Optional(CONF_URL): cv.url,
@@ -1375,20 +1375,20 @@ _MODULE_SCHEMA = cv.All(
     cv.has_at_least_one_key(CONF_SOURCE, CONF_VERSION),
 )
 
-# `type:` isn't validated against the variant's own sdk names here -- which variant is
+# `type:` isn't validated against the variant's own manifests here -- which variant is
 # selected isn't known until the platform schema's CONF_VARIANT key is read, and this
-# schema is applied independently of key order. resolve_framework_version() (called
+# schema is applied independently of key order. resolve_variant() (called
 # per-variant, after the platform schema) does that check, along with version:/source:
 # mutual exclusion and everything else that needs the variant to already be known.
 _FRAMEWORK_SCHEMA: cv.Schema = cv.Schema(
     {
         cv.Optional(CONF_TYPE): cv.string_strict,
         # Also accepts the literal "recommended", an explicit alias for the selected
-        # sdk's default_version (same effect as omitting this key).
+        # manifest's default_version (same effect as omitting this key).
         cv.Optional(CONF_VERSION): cv.string_strict,
-        # Overrides the selected sdk's own official manifest with a fork/branch/ref or a
+        # Overrides the selected manifest repository with a fork/branch/ref or a
         # `local:` path to an already-initialized west workspace. `url` may be omitted to
-        # target a branch (e.g. an alpha/pre-release) of the sdk's own official manifest.
+        # target a branch (e.g. an alpha/pre-release) of the official one.
         cv.Optional(CONF_SOURCE): _FRAMEWORK_SOURCE_SCHEMA,
         # How often a git source: is re-checked for updates (via `git pull`) -- own knob,
         # independent of board_source:'s (a different git source with its own cadence).
@@ -1464,8 +1464,8 @@ def zephyr_toolchain_schema(variant_modules: dict[str, ModuleType]) -> cv.Schema
                 cv.string_strict, cv.ByteLength(max=BOARD_MAX_LENGTH)
             ),
             cv.Optional(CONF_WATCHDOG_TIMEOUT): _WATCHDOG_TIMEOUT_VALIDATOR,
-            # Which SDK to build against (type:), its version, where to fetch it from
-            # (source:), and the Zephyr-only options -- see resolve_framework_version()
+            # Which manifest to build against (type:), its version, where to fetch it from
+            # (source:), and the Zephyr-only options -- see resolve_variant()
             # in variants/__init__.py for how type:/version:/source: are resolved.
             cv.Optional(CONF_FRAMEWORK, default={}): _FRAMEWORK_SCHEMA,
             # Zephyr is the only one; accepted as on nrf52
@@ -1782,11 +1782,11 @@ async def zephyr_toolchain_to_code(config: ConfigType) -> None:
     variant = zephyr_variant()
     # Code generation reads the board's devicetree from the workspace; the compile
     # installs again for projects components ask for later
-    sdk, version = build_workspace()
+    manifest, version = build_workspace()
     check_and_install(
-        sdk,
+        manifest,
         version,
-        zephyr_additional_framework_projects(sdk),
+        zephyr_additional_framework_projects(manifest),
         zephyr_data()["west_version"],
         zephyr_data()["ninja_version"],
         zephyr_data()["sdk_source"],
@@ -1849,14 +1849,15 @@ def _restore_upload_data(zephyr_config: ConfigType) -> None:
         )
         if resolved_ref is not None:
             sdk_source[KEY_SDK_SOURCE_RESOLVED_REF] = resolved_ref
-    set_core_data(
-        variant,
-        variant_data,
+    set_variant_core_data(
+        ZephyrVariantResolved(
+            variant_data,
+            variant_data.manifest_for(framework.get(CONF_TYPE)),
+            CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION],
+        ),
         zephyr_config,
-        CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION],
-        framework_type=resolve_sdk(variant_data, framework.get(CONF_TYPE))[0],
-        bootloader=variant_data.family.bootloader(advanced)
-        if variant_data.family
+        bootloader=variant_data.family_module.bootloader(advanced)
+        if variant_data.family_module
         else "",
         sdk_source=sdk_source,
         runner=advanced.get(CONF_RUNNER),
@@ -2069,11 +2070,11 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
 
         version = str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION])
         variant_data = zephyr_variant_info()
-        _, sdk = resolve_sdk(variant_data, zephyr_data().get(KEY_FRAMEWORK_TYPE))
+        manifest = variant_data.manifest_for(zephyr_framework_type())
         python_bin, framework_path, west_env = west_install(
-            sdk,
+            manifest,
             version,
-            zephyr_additional_framework_projects(sdk),
+            zephyr_additional_framework_projects(manifest),
             zephyr_data()["west_version"],
             zephyr_data()["ninja_version"],
             zephyr_data()["sdk_source"],
@@ -2108,11 +2109,11 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
 
     version = str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION])
     variant_data = zephyr_variant_info()
-    _, sdk = resolve_sdk(variant_data, zephyr_data().get(KEY_FRAMEWORK_TYPE))
+    manifest = variant_data.manifest_for(zephyr_framework_type())
     python_bin, framework_path, west_env = west_install(
-        sdk,
+        manifest,
         version,
-        zephyr_additional_framework_projects(sdk),
+        zephyr_additional_framework_projects(manifest),
         zephyr_data()["west_version"],
         zephyr_data()["ninja_version"],
         zephyr_data()["sdk_source"],
@@ -2177,18 +2178,18 @@ def run_compile(args: object, config: ConfigType) -> bool:
     variant_data = zephyr_variant_info()
     if (toolchain := variant_data.toolchain) is None:
         raise EsphomeError(f"Variant {variant} names no Zephyr SDK toolchain")
-    sdk, version = build_workspace()
+    manifest, version = build_workspace()
     source = zephyr_data()["sdk_source"]
     # Again, for projects components asked for after code generation
     check_and_install(
-        sdk,
+        manifest,
         version,
-        zephyr_additional_framework_projects(sdk),
+        zephyr_additional_framework_projects(manifest),
         zephyr_data()["west_version"],
         zephyr_data()["ninja_version"],
         source,
     )
-    python_executable, framework_path = get_build_paths(sdk, version, source)
+    python_executable, framework_path = get_build_paths(manifest, version, source)
     env = get_build_env(
         python_executable,
         framework_path,
@@ -2196,7 +2197,7 @@ def run_compile(args: object, config: ConfigType) -> bool:
         resolve_ccache_path(),
         get_zephyr_base(),
     )
-    if sdk is SILABS:
+    if manifest is SILABS:
         from .commander_setup import check_and_install as commander_install  # noqa: PLC0415
 
         commander_version = (
@@ -2216,7 +2217,7 @@ def run_compile(args: object, config: ConfigType) -> bool:
     modules = resolve_zephyr_modules()
     # Modules join the build like a converted PlatformIO library, not the workspace
     extra_modules = [m.local_path for m in modules if m.local_path is not None]
-    extra_modules.extend(install_git_modules(modules, sdk.source.url))
+    extra_modules.extend(install_git_modules(modules, manifest.source.url))
 
     board = zephyr_data()[KEY_BOARD]
     build_dir = CORE.relative_build_path(".west_build")

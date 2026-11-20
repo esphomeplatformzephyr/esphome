@@ -155,7 +155,7 @@ def spi_pinctrl(
 
 
 def bootloader(advanced: ConfigType) -> str:
-    """Return the bootloader set_core_data() gets, rebuilt from the cached advanced: block."""
+    """Return the bootloader set_variant_core_data() gets, rebuilt from the cached advanced: block."""
     return BOOTLOADER_MCUBOOT
 
 

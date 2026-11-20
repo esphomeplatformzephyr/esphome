@@ -292,12 +292,12 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
     from esphome.components.zephyr import (  # noqa: PLC0415
         zephyr_additional_framework_projects,
         zephyr_data,
+        zephyr_framework_type,
         zephyr_variant_info,
     )
     from esphome.components.zephyr.build_zephyr import run_west_flash  # noqa: PLC0415
-    from esphome.components.zephyr.const import KEY_FRAMEWORK_TYPE, KEY_RUNNER  # noqa: PLC0415
+    from esphome.components.zephyr.const import KEY_RUNNER  # noqa: PLC0415
     from esphome.components.zephyr.framework import check_and_install as west_install  # noqa: PLC0415
-    from esphome.components.zephyr.variants import resolve_sdk  # noqa: PLC0415
     from esphome.const import KEY_CORE, KEY_FRAMEWORK_VERSION  # noqa: PLC0415
     from esphome.core import CORE, EsphomeError  # noqa: PLC0415
 
@@ -305,11 +305,11 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
 
     version = str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION])
     variant_data = zephyr_variant_info()
-    _, sdk = resolve_sdk(variant_data, zephyr_data().get(KEY_FRAMEWORK_TYPE))
+    manifest = variant_data.manifest_for(zephyr_framework_type())
     python_bin, framework_path, west_env = west_install(
-        sdk,
+        manifest,
         version,
-        zephyr_additional_framework_projects(sdk),
+        zephyr_additional_framework_projects(manifest),
         zephyr_data()["west_version"],
         zephyr_data()["ninja_version"],
         zephyr_data()["sdk_source"],
@@ -361,7 +361,7 @@ def spi_pinctrl(
 
 
 def bootloader(advanced: ConfigType) -> str:
-    """Return the bootloader set_core_data() gets, rebuilt from the cached advanced: block."""
+    """Return the bootloader set_variant_core_data() gets, rebuilt from the cached advanced: block."""
     return BOOTLOADER_MCUBOOT
 
 

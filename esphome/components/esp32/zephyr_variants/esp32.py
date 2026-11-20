@@ -12,8 +12,8 @@ from esphome.components.zephyr.variants import (
     ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
-    resolve_framework_version,
-    set_core_data,
+    resolve_variant,
+    set_variant_core_data,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -69,18 +69,16 @@ _INPUT_CAPABLE_PINS: frozenset[int] = _OUTPUT_CAPABLE_PINS | frozenset(
     {34, 35, 36, 37, 38, 39}
 )
 
-# Collected into VARIANT_MODULES by this package's __init__.py
-VARIANT_NAME: str = VARIANT_ESP32
 VARIANT: ZephyrVariant = ZephyrVariant(
+    name=VARIANT_ESP32,
+    family_module=esp32_family,
+    manifest=ZEPHYR_MAINLINE,
     # No USB Serial/JTAG on the original ESP32
     usb_uart_type=None,
     cpu_arch="xtensa",
     mcumgr_ota=True,
     # ROM loads the first image at 0x1000 (espressif/partitions_0x1000_*.dtsi).
     boot=BootLayout(0x1000),
-    sdk=ZEPHYR_MAINLINE,
-    sdk_name="zephyr",
-    family=esp32_family,
     valid_toolchains=(Toolchain.ZEPHYR,),
     # Original ESP32 is Xtensa (dual-core PRO_CPU/APP_CPU), unlike H2/C6's RISC-V --
     # a completely separate Zephyr SDK toolchain.
@@ -126,15 +124,10 @@ def config_schema(config: ConfigType) -> ConfigType:
         config[CONF_FRAMEWORK].get(CONF_ADVANCED, {})
     )
     config[CONF_BOARD] = qualify_board(VARIANT, config[CONF_BOARD])
-    _, framework_ver, sdk_name, _ = resolve_framework_version(
-        VARIANT, "esp32", config, "mainline ESP32 support"
-    )
-    set_core_data(
-        VARIANT_NAME,
-        VARIANT,
+    resolved = resolve_variant(VARIANT, config, "mainline ESP32 support")
+    set_variant_core_data(
+        resolved,
         config,
-        framework_ver,
-        framework_type=sdk_name,
         bootloader=BOOTLOADER_MCUBOOT,
         sdk_source=config[CONF_FRAMEWORK].get(CONF_SOURCE),
         runner=config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_RUNNER),

@@ -24,7 +24,11 @@ from esphome.components.zephyr.framework import (
     install_git_modules,
 )
 from esphome.components.zephyr.framework_helpers import FrameworkSource
-from esphome.components.zephyr.variants import ZEPHYR_MAINLINE, ZephyrModule, ZephyrSDK
+from esphome.components.zephyr.variants import (
+    ZEPHYR_MAINLINE,
+    ZephyrManifest,
+    ZephyrModule,
+)
 import esphome.config_validation as cv
 from esphome.const import (
     CONF_PATH,
@@ -45,7 +49,9 @@ _SOURCE: FrameworkSource = FrameworkSource(
     optional=("hal_.*",),
     required=frozenset({"hal_common"}),
 )
-_SDK: ZephyrSDK = ZephyrSDK(source=_SOURCE, workspace_prefix="zephyr")
+_MANIFEST: ZephyrManifest = ZephyrManifest(
+    framework_type="zephyr", source=_SOURCE, workspace_prefix="zephyr"
+)
 
 
 class _Calls(list):
@@ -77,7 +83,10 @@ def _git_source(sha: str | None = _SHA) -> dict[str, Any]:
 
 def _workspace(tmp_path: Path, source: dict[str, Any] | None = None) -> Path:
     return (
-        tmp_path / "zephyr" / "frameworks" / _source_cache_key(_SDK, "v4.4.1", source)
+        tmp_path
+        / "zephyr"
+        / "frameworks"
+        / _source_cache_key(_MANIFEST, "v4.4.1", source)
     )
 
 
@@ -86,7 +95,7 @@ def _install(
     source: dict[str, Any] | None = None,
     projects: frozenset[str] = frozenset({"hal_stm32"}),
     manifest_path: str = "zephyr",
-    sdk: ZephyrSDK = _SDK,
+    manifest: ZephyrManifest = _MANIFEST,
 ) -> tuple[_Calls, tuple[Path, Path, dict[str, str]]]:
     """Run check_and_install() against a fake west; return its commands and result.
 
@@ -127,7 +136,7 @@ def _install(
         patch("esphome.components.zephyr.framework_helpers.rmdir"),
     ):
         result = check_and_install(
-            sdk=sdk, version="4.4.1", source=source, projects=projects
+            manifest=manifest, version="4.4.1", source=source, projects=projects
         )
     return calls, result
 
@@ -299,9 +308,10 @@ def test_local_source_without_a_manifest_raises(tmp_path: Path) -> None:
         _install(tmp_path, {"type": "local", "path": checkout})
 
 
-def test_sdk_without_optional_projects_filters_nothing(tmp_path: Path) -> None:
+def test_manifest_without_optional_projects_filters_nothing(tmp_path: Path) -> None:
     """Silicon Labs' manifest already limits its projects itself."""
-    sdk = ZephyrSDK(
+    manifest = ZephyrManifest(
+        framework_type="silabs",
         source=FrameworkSource(
             name="Silicon Labs SDK",
             url="https://example.invalid/zephyr-silabs",
@@ -311,7 +321,7 @@ def test_sdk_without_optional_projects_filters_nothing(tmp_path: Path) -> None:
         workspace_prefix="zephyr-silabs",
     )
 
-    calls, _ = _install(tmp_path, projects=frozenset(), sdk=sdk)
+    calls, _ = _install(tmp_path, projects=frozenset(), manifest=manifest)
 
     assert _west(calls, "config")[0][-1] == ""
 
@@ -321,10 +331,11 @@ def test_sdk_without_optional_projects_filters_nothing(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_source_cache_key_differs_across_sdk_variants() -> None:
+def test_source_cache_key_differs_across_manifests() -> None:
     # ZEPHYR_MAINLINE/NCS/SILABS share one machine-global cache root; a matching version:
-    # string must not resolve to the same directory for different SDKs.
-    mainline = ZephyrSDK(
+    # string must not resolve to the same directory for different manifests.
+    mainline = ZephyrManifest(
+        framework_type="zephyr",
         source=FrameworkSource(
             name="Test",
             url="https://example.invalid/zephyr",
@@ -333,7 +344,8 @@ def test_source_cache_key_differs_across_sdk_variants() -> None:
         ),
         workspace_prefix="a",
     )
-    ncs = ZephyrSDK(
+    ncs = ZephyrManifest(
+        framework_type="ncs",
         source=FrameworkSource(
             name="Test",
             url="https://example.invalid/nrf",

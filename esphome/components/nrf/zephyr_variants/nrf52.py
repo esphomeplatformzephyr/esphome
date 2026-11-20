@@ -21,8 +21,8 @@ from esphome.components.zephyr.variants import (
     ZEPHYR_MAINLINE,
     ZephyrVariant,
     qualify_board,
-    resolve_framework_version,
-    set_core_data,
+    resolve_variant,
+    set_variant_core_data,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -166,22 +166,20 @@ _ADC_AIN_MAP: dict[int, str] = {
 # free-mux GPIO signal (UART, SPI).
 _GPIO_MATRIX_PINS: frozenset[int] = frozenset(range(48))
 
-# Collected into VARIANT_MODULES by this package's __init__.py
-VARIANT_NAME: str = VARIANT_NRF52
 VARIANT: ZephyrVariant = ZephyrVariant(
-    mcumgr_ota=True,
-    # Resets from the start of flash (nordic/nrf52840_partition.dtsi). An Adafruit
-    # bootloader moves this; see to_code().
-    boot=BootLayout(0x0),
+    name=VARIANT_NRF52,
+    family_module=nordic_family,
     # NCS (nRF Connect SDK) is the default -- Nordic's own vendor SDK, which is where
     # real hardware support/testing effort for this chip is expected to concentrate.
     # Mainline Zephyr stays available as an alternate (framework: type: zephyr) for
     # anyone who wants to avoid NCS's licensing/tooling footprint, or who hit a
     # regression only present on one side.
-    sdk=NCS,
-    sdk_name="ncs",
-    alt_sdks={"zephyr": ZEPHYR_MAINLINE},
-    family=nordic_family,
+    manifest=NCS,
+    alt_manifests=(ZEPHYR_MAINLINE,),
+    mcumgr_ota=True,
+    # Resets from the start of flash (nordic/nrf52840_partition.dtsi). An Adafruit
+    # bootloader moves this; see to_code().
+    boot=BootLayout(0x0),
     valid_toolchains=(Toolchain.ZEPHYR,),
     toolchain="arm-zephyr-eabi",
     # OpenThread included: issue #11's tracked entanglement was specifically about
@@ -222,15 +220,10 @@ def config_schema(config: ConfigType) -> ConfigType:
         config[CONF_FRAMEWORK].get(CONF_ADVANCED, {})
     )
     config[CONF_BOARD] = qualify_board(VARIANT, config[CONF_BOARD])
-    _, framework_ver, sdk_name, _ = resolve_framework_version(
-        VARIANT, "nrf52", config, "nRF52840 support"
-    )
-    set_core_data(
-        VARIANT_NAME,
-        VARIANT,
+    resolved = resolve_variant(VARIANT, config, "nRF52840 support")
+    set_variant_core_data(
+        resolved,
         config,
-        framework_ver,
-        framework_type=sdk_name,
         bootloader=config[CONF_FRAMEWORK][CONF_ADVANCED][CONF_BOOTLOADER],
         sdk_source=config[CONF_FRAMEWORK].get(CONF_SOURCE),
         runner=config[CONF_FRAMEWORK][CONF_ADVANCED].get(CONF_RUNNER),
@@ -478,20 +471,19 @@ def upload_serial_dfu(host: str) -> bool:
     from esphome.components.zephyr import (  # noqa: PLC0415
         zephyr_additional_framework_projects,
         zephyr_data,
+        zephyr_framework_type,
         zephyr_variant_info,
     )
-    from esphome.components.zephyr.const import KEY_FRAMEWORK_TYPE  # noqa: PLC0415
     from esphome.components.zephyr.framework import check_and_install as west_install  # noqa: PLC0415
-    from esphome.components.zephyr.variants import resolve_sdk  # noqa: PLC0415
 
     package = CORE.relative_build_path(_DFU_PACKAGE)
     if not package.is_file():
         raise EsphomeError("Firmware not found. Please compile first.")
-    _, sdk = resolve_sdk(zephyr_variant_info(), zephyr_data().get(KEY_FRAMEWORK_TYPE))
+    manifest = zephyr_variant_info().manifest_for(zephyr_framework_type())
     python_bin, _, env = west_install(
-        sdk,
+        manifest,
         str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]),
-        zephyr_additional_framework_projects(sdk),
+        zephyr_additional_framework_projects(manifest),
         zephyr_data()["west_version"],
         zephyr_data()["ninja_version"],
         zephyr_data()["sdk_source"],

@@ -434,7 +434,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
 
 
 def bootloader(advanced: ConfigType) -> str:
-    """Return the bootloader set_core_data() gets, rebuilt from the cached advanced: block."""
+    """Return the bootloader set_variant_core_data() gets, rebuilt from the cached advanced: block."""
     return mcuboot_or_none(advanced)
 
 
