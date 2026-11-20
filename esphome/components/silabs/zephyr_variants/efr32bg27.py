@@ -56,7 +56,7 @@ _ADC_AIN_MAP: dict[int, str] = {
 # by every free-mux GPIO signal (UART, SPI).
 _GPIO_MATRIX_PINS: frozenset[int] = frozenset(_ADC_AIN_MAP)
 
-# Registry entries — collected by variants/__init__.py
+# Collected into VARIANT_MODULES by this package's __init__.py
 VARIANT_NAME: str = VARIANT_EFR32BG27
 VARIANT: ZephyrVariant = ZephyrVariant(
     mcumgr_ota=True,

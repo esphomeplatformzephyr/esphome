@@ -49,7 +49,7 @@ _ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(
     }
 )
 
-# Registry entries — collected by variants/__init__.py
+# Collected into VARIANT_MODULES by this package's __init__.py
 VARIANT_NAME: str = VARIANT_STM32WB55
 VARIANT: ZephyrVariant = ZephyrVariant(
     # Resets from the start of flash (nucleo_wb55rg.dts boot_partition@0).

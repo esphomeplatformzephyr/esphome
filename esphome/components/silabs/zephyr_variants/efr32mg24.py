@@ -54,7 +54,7 @@ _GPIO_MATRIX_PINS: frozenset[int] = frozenset(
     [*range(10), *range(16, 22), *range(32, 42), *range(48, 54)]
 )
 
-# Registry entries — collected by variants/__init__.py
+# Collected into VARIANT_MODULES by this package's __init__.py
 VARIANT_NAME: str = VARIANT_EFR32MG24
 VARIANT: ZephyrVariant = ZephyrVariant(
     mcumgr_ota=True,

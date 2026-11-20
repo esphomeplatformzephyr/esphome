@@ -69,7 +69,7 @@ _SPI_CLK_MACROS: dict[int, str] = {p: f"GSPI_CLK_HP{p}" for p in (8, 25, 46, 52)
 _SPI_MOSI_MACROS: dict[int, str] = {p: f"GSPI_MOSI_HP{p}" for p in (6, 12, 27, 48, 57)}
 _SPI_MISO_MACROS: dict[int, str] = {p: f"GSPI_MISO_HP{p}" for p in (11, 26, 47, 56)}
 
-# Registry entries — collected by variants/__init__.py
+# Collected into VARIANT_MODULES by this package's __init__.py
 VARIANT_NAME: str = VARIANT_SIWX917
 VARIANT: ZephyrVariant = ZephyrVariant(
     # The ROM/TA bootloader and network processor firmware sit below 0x202000

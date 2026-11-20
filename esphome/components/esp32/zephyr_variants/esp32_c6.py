@@ -35,7 +35,7 @@ _ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA
 # GPIO0-23, no gaps; same set for every free-mux GPIO-matrix signal (UART, SPI).
 _GPIO_MATRIX_PINS: frozenset[int] = frozenset(range(24))
 
-# Registry entries — collected by variants/__init__.py
+# Collected into VARIANT_MODULES by this package's __init__.py
 VARIANT_NAME: str = VARIANT_ESP32C6
 VARIANT: ZephyrVariant = ZephyrVariant(
     mcumgr_ota=True,

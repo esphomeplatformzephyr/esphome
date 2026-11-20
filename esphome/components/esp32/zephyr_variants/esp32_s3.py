@@ -41,7 +41,7 @@ _ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA
 # free-mux signal (UART, SPI).
 _GPIO_MATRIX_PINS: frozenset[int] = frozenset(range(22)) | frozenset(range(33, 49))
 
-# Registry entries — collected by variants/__init__.py
+# Collected into VARIANT_MODULES by this package's __init__.py
 VARIANT_NAME: str = VARIANT_ESP32S3
 VARIANT: ZephyrVariant = ZephyrVariant(
     cpu_arch="xtensa",

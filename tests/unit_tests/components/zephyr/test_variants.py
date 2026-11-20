@@ -375,10 +375,13 @@ def test_stm32c5_default_is_its_minimum() -> None:
     ) == variants._sdk_min_version(VARIANTS["STM32C5"], "zephyr", ZEPHYR_MAINLINE)
 
 
-def test_set_core_data() -> None:
-    family = ModuleType("chipfam_family")
-    family.FAMILY = "chipfam"
-    variant = ZephyrVariant(sdk=_DEFAULT_SDK, sdk_name="default", family=family)
+@pytest.mark.parametrize("family", ["chipfam", None])
+def test_set_core_data(family: str | None) -> None:
+    family_module = None
+    if family is not None:
+        family_module = ModuleType(f"{family}_family")
+        family_module.FAMILY = family
+    variant = ZephyrVariant(sdk=_DEFAULT_SDK, sdk_name="default", family=family_module)
     CORE.data[KEY_CORE] = {}
 
     config = {CONF_BOARD: "chip1_dk", CONF_FRAMEWORK: {}}
@@ -392,7 +395,7 @@ def test_set_core_data() -> None:
     )
 
     assert zephyr_variant() == "chip1"
-    assert zephyr_variant_family() == "chipfam"
+    assert zephyr_variant_family() == family
     assert zephyr_framework_type() == "vendor"
     assert CORE.data["zephyr"][CONF_BOARD] == "chip1_dk"
     assert CORE.data["zephyr"][KEY_BOOTLOADER] == "mcuboot"

@@ -1771,7 +1771,7 @@ def zephyr_config_schema(
 # which would add a section comment to every nrf52 main.cpp.
 @coroutine_with_priority(CoroPriority.PLATFORM)
 async def zephyr_toolchain_to_code(config: ConfigType) -> None:
-    """Code generation of a platform in the variants registry."""
+    """Code generation of a platform building a Zephyr variant."""
     from .dts_lookup import (  # noqa: PLC0415
         log_board_capabilities,
         validate_board,
@@ -2144,7 +2144,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
 
 
 def run_compile(args: object, config: ConfigType) -> bool:
-    """Build a platform in the variants registry with west."""
+    """Build a platform's Zephyr variant with west."""
     if not CORE.using_toolchain_zephyr:
         return False
 

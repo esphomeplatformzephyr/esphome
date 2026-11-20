@@ -39,7 +39,7 @@ _DEFAULT_BOARD: str = "nucleo_l476rg"
 # board and MCUboot-shaped partition overlay.
 _ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(BOOTLOADER_SCHEMA)
 
-# Registry entries — collected by variants/__init__.py
+# Collected into VARIANT_MODULES by this package's __init__.py
 VARIANT_NAME: str = VARIANT_STM32L4
 VARIANT: ZephyrVariant = ZephyrVariant(
     # Resets from the start of flash (nucleo_l476rg.dts has no code partition).

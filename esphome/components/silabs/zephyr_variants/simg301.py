@@ -35,7 +35,7 @@ _EUSART0_PINS: frozenset[int] = frozenset([*range(9), *range(16, 20)])
 
 _ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA
 
-# Registry entries — collected by variants/__init__.py
+# Collected into VARIANT_MODULES by this package's __init__.py
 VARIANT_NAME: str = VARIANT_SIMG301
 VARIANT: ZephyrVariant = ZephyrVariant(
     # Resets from the start of flash (simg301_ek2719a.dts boot_partition@0).

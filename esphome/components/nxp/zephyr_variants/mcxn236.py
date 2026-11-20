@@ -42,7 +42,7 @@ _ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(
     }
 )
 
-# Registry entries — collected by variants/__init__.py
+# Collected into VARIANT_MODULES by this package's __init__.py
 VARIANT_NAME: str = VARIANT_MCXN236
 VARIANT: ZephyrVariant = ZephyrVariant(
     # Resets from the start of flash (frdm_mcxn236.dts boot_partition@0).

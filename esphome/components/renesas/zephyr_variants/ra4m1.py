@@ -80,7 +80,7 @@ _PWM_PIN_MAP: dict[int, tuple[int, int]] = {
     70: (0, 1),
 }
 
-# Registry entries — collected by variants/__init__.py
+# Collected into VARIANT_MODULES by this package's __init__.py
 VARIANT_NAME: str = VARIANT_RA4M1
 VARIANT: ZephyrVariant = ZephyrVariant(
     # Resets from the start of flash (ek_ra4m1.dts has no code partition).

@@ -157,7 +157,7 @@ def test_zephyr_variant_family_returns_none_when_variant_unset() -> None:
     assert zephyr_variant_family() is None
 
 
-def test_zephyr_variant_family_returns_none_for_unregistered_variant() -> None:
+def test_zephyr_variant_family_returns_none_for_unknown_variant() -> None:
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant="NOT_A_REAL_VARIANT")
     assert zephyr_variant_family() is None
 
@@ -190,7 +190,7 @@ def test_variant_read_before_the_platform_schema_is_rejected(
 def test_variant_read_without_zephyr_data_is_none(
     lookup: Callable[[], str | None], platform: str
 ) -> None:
-    """esp32 and rp2 also build without Zephyr; nrf52 is not in the registry."""
+    """esp32 and rp2 also build without Zephyr; nrf52 sets no variant."""
     CORE.data.pop(KEY_ZEPHYR, None)
     CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: platform}
     assert lookup() is None
@@ -1857,7 +1857,7 @@ def test_nrf52_dongle_dfu_off_has_no_reset_pin() -> None:
     assert dongle["framework"]["advanced"]["dfu"] is None
 
 
-def test_variant_config_schema_raises_for_unregistered_variant(
+def test_variant_config_schema_raises_for_unknown_variant(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     # Bypass the outer schema's cv.one_of() to reach the platform table lookup.

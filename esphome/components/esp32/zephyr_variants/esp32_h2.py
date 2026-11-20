@@ -38,7 +38,7 @@ _GPIO_MATRIX_PINS: frozenset[int] = frozenset(
     {0, 1, 2, 3, 4, 5, 8, 9, 10, 11, 12, 13, 14, 22, 23, 24, 25, 26, 27}
 )
 
-# Registry entries — collected by variants/__init__.py
+# Collected into VARIANT_MODULES by this package's __init__.py
 VARIANT_NAME: str = VARIANT_ESP32H2
 VARIANT: ZephyrVariant = ZephyrVariant(
     mcumgr_ota=True,

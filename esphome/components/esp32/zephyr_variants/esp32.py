@@ -69,7 +69,7 @@ _INPUT_CAPABLE_PINS: frozenset[int] = _OUTPUT_CAPABLE_PINS | frozenset(
     {34, 35, 36, 37, 38, 39}
 )
 
-# Registry entries — collected by variants/__init__.py
+# Collected into VARIANT_MODULES by this package's __init__.py
 VARIANT_NAME: str = VARIANT_ESP32
 VARIANT: ZephyrVariant = ZephyrVariant(
     # No USB Serial/JTAG on the original ESP32
