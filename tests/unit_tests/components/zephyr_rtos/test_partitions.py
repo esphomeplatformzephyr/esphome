@@ -244,6 +244,18 @@ def test_app_without_code_partition_starts_at_flash_start(tmp_path: Path) -> Non
     _fails(_run(tmp_path, images, boot=BootLayout(0x4000)), "must start at 0x4000")
 
 
+def test_app_without_code_partition_starts_at_load_offset(tmp_path: Path) -> None:
+    # nrf52840dongle: no code partition, linked at 0x1000 behind the MBR.
+    images = {
+        "app": Image(
+            partitions={"storage_partition": (0xDC000, 0x4000)},
+            kconfig={"CONFIG_FLASH_LOAD_OFFSET": "0x1000"},
+        )
+    }
+    _ok(_run(tmp_path, images, boot=BootLayout(0x1000)))
+    _fails(_run(tmp_path, images, boot=BootLayout(0x0)), "it starts at 0x1000")
+
+
 def test_code_partition_ignored_without_use_dt_code_partition(tmp_path: Path) -> None:
     # nucleo_c5a3zg: chosen slot0 at 0xc000, but without MCUboot the app links at 0x0.
     images = {
