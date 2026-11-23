@@ -58,7 +58,8 @@ function(esphome_check_partitions)
   set(written)
 
   # The chosen code partition only places the image with USE_DT_CODE_PARTITION;
-  # otherwise the image is linked at the start of its flash.
+  # otherwise the image is linked at FLASH_LOAD_OFFSET (the nRF52840 Dongle's 0x1000,
+  # behind the MBR) or the start of its flash.
   sysbuild_get(app_dt_code IMAGE ${app} VAR CONFIG_USE_DT_CODE_PARTITION KCONFIG)
   if(app_dt_code)
     _esphome_chosen(app_code ${app} "zephyr,code-partition")
@@ -67,7 +68,10 @@ function(esphome_check_partitions)
     list(APPEND written app_code)
   else()
     dt_chosen(app_code_dev TARGET ${app} PROPERTY "zephyr,flash")
-    set(app_code_start 0)
+    sysbuild_get(app_code_start IMAGE ${app} VAR CONFIG_FLASH_LOAD_OFFSET KCONFIG)
+    if(NOT app_code_start)
+      set(app_code_start 0)
+    endif()
   endif()
   set(first app_code)
   set(first_what "The application")
