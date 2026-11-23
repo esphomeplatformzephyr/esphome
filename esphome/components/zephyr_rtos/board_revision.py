@@ -47,6 +47,19 @@ def _revision_key(fmt: str, value: str) -> tuple[int, int, int] | int | str:
     return (parts[0], parts[1], parts[2])
 
 
+def board_extension_target(board_dir: Path) -> str | None:
+    """Return the board `board_dir/board.yml` extends (`board: extend:`), or None for a
+    board of its own. A board extension adds files, such as a board.cmake declaring a
+    runner, to a board defined elsewhere, and has no devicetree of its own."""
+    try:
+        doc = yaml.safe_load((board_dir / "board.yml").read_text())
+    except (OSError, yaml.YAMLError):
+        return None
+    entry = doc.get("board") if isinstance(doc, dict) else None
+    target = entry.get("extend") if isinstance(entry, dict) else None
+    return target if isinstance(target, str) else None
+
+
 def _read_revision_block(board_dir: Path) -> dict | None:
     """Return `board_dir/board.yml`'s `board: revision:` block, or None if absent/unreadable."""
     board_yml = board_dir / "board.yml"

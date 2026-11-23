@@ -58,7 +58,12 @@ from esphome.storage_json import StorageJSON
 from esphome.types import ConfigType
 from esphome.writer import clean_cmake_cache
 
-from .board_revision import declared_revisions, parse_board_string, resolve_revision
+from .board_revision import (
+    board_extension_target,
+    declared_revisions,
+    parse_board_string,
+    resolve_revision,
+)
 from .const import (
     BOOTLOADER_MCUBOOT,
     CONF_BOARD_SOURCE,
@@ -1084,6 +1089,7 @@ def _resolve_board_source(config: ConfigType, board: str) -> Path:
     # directory instead. Try the fast, common-case glob first; fall back to scanning
     # every board.yml under boards/ for a matching `name:` field, same fallback
     # dts_lookup.py's own _find_board_dir() already relies on for this reason.
+    # A board extension (`board: extend: <name>`) of a board in the framework counts too.
     parts = parse_board_string(board)
     board_yml_matches = list(root.glob(f"boards/*/{parts.name}/board.yml"))
     if not board_yml_matches:
@@ -1099,7 +1105,8 @@ def _resolve_board_source(config: ConfigType, board: str) -> Path:
             # _find_board_dir() fallback scanner handles.
             entries = [doc["board"]] if "board" in doc else doc.get("boards", [])
             if any(
-                isinstance(entry, dict) and entry.get("name") == parts.name
+                isinstance(entry, dict)
+                and parts.name in (entry.get("name"), entry.get("extend"))
                 for entry in entries
             ):
                 board_yml_matches = [board_yml]
@@ -1110,8 +1117,9 @@ def _resolve_board_source(config: ConfigType, board: str) -> Path:
             f"Please check the source contains that board.",
             [CONF_FRAMEWORK, CONF_BOARD_SOURCE],
         )
-    if parts.revision is not None:
-        board_dir = board_yml_matches[0].parent
+    board_dir = board_yml_matches[0].parent
+    # An extension declares no revisions; the extended board's are checked with its DTS.
+    if parts.revision is not None and board_extension_target(board_dir) is None:
         resolved, declares_revisions = resolve_revision(board_dir, parts.revision)
         if not declares_revisions:
             raise cv.Invalid(

@@ -226,7 +226,8 @@ def resolve_dev_id(
         return None
 
     flash_runner = runner_override or (runners_yaml or {}).get("flash-runner")
-    if flash_runner is None or not _runner_supports_dev_id(
+    # dfu-util's device ID is a USB VID:PID, not the serial number of a probe.
+    if flash_runner in (None, "dfu-util") or not _runner_supports_dev_id(
         python_executable, framework_path, flash_runner
     ):
         return None

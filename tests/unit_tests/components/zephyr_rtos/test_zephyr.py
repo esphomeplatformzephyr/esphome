@@ -2187,6 +2187,18 @@ def test_resolve_board_source_raises_for_revision_below_lowest_declared(
         _resolve_board_source(config, "my_board@0.1.0")
 
 
+@pytest.mark.parametrize("dirname", ["xiao_stm32c5", "xiao_stm32c5_dfu"])
+def test_resolve_board_source_accepts_a_board_extension(
+    tmp_path: Path, dirname: str
+) -> None:
+    """An extension of a framework board, found by its directory or its `extend:`."""
+    board_dir = tmp_path / "boards" / "custom" / dirname
+    board_dir.mkdir(parents=True)
+    (board_dir / "board.yml").write_text("board:\n  extend: xiao_stm32c5\n")
+    config = _local_board_source_config(tmp_path)
+    assert _resolve_board_source(config, "xiao_stm32c5@1.0.0/stm32c5a3xx") == tmp_path
+
+
 def test_resolve_board_source_raises_for_revision_on_board_without_revisions(
     tmp_path: Path,
 ) -> None:

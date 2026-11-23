@@ -144,6 +144,31 @@ def test_resolve_dev_id_returns_none_when_runners_yaml_missing(
     assert resolve_dev_id(Path("python"), tmp_path, build_dir, "/dev/ttyACM0") is None
 
 
+@pytest.mark.parametrize("runner_override", [None, "dfu-util"])
+def test_resolve_dev_id_returns_none_for_dfu_util(
+    tmp_path: Path, runner_override: str | None
+) -> None:
+    """dfu-util's device ID is a USB VID:PID, not the serial number of the port."""
+    build_dir = tmp_path / "build"
+    (build_dir / "zephyr").mkdir(parents=True)
+    (build_dir / "zephyr" / "runners.yaml").write_text("flash-runner: dfu-util\n")
+    with patch(
+        "esphome.components.zephyr_rtos.build_zephyr._runner_supports_dev_id",
+        return_value=True,
+    ) as mock_supports:
+        assert (
+            resolve_dev_id(
+                Path("python"),
+                tmp_path,
+                build_dir,
+                "/dev/ttyACM0",
+                runner_override=runner_override,
+            )
+            is None
+        )
+    mock_supports.assert_not_called()
+
+
 # ---------------------------------------------------------------------------
 # run_west_blobs_fetch -- fetch once per module revision
 # ---------------------------------------------------------------------------
