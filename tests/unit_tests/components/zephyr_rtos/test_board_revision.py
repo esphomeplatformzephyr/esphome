@@ -8,6 +8,7 @@ import pytest
 
 from esphome.components.zephyr_rtos.board_revision import (
     BoardParts,
+    board_extension_target,
     declared_revisions,
     default_revision,
     parse_board_string,
@@ -231,3 +232,21 @@ def test_resolve_revision_missing_board_yml(tmp_path: Path) -> None:
     resolved, declares = resolve_revision(tmp_path, "1.0.0")
     assert declares is False
     assert resolved is None
+
+
+@pytest.mark.parametrize(
+    ("board_yml", "expected"),
+    [
+        ("board:\n  extend: xiao_stm32c5\n", "xiao_stm32c5"),
+        ("board:\n  name: my_board\n  vendor: acme\n", None),
+        ("boards:\n  - name: my_board\n", None),
+        ("not: [a board\n", None),
+        (None, None),  # no board.yml
+    ],
+)
+def test_board_extension_target(
+    tmp_path: Path, board_yml: str | None, expected: str | None
+) -> None:
+    if board_yml is not None:
+        (tmp_path / "board.yml").write_text(board_yml)
+    assert board_extension_target(tmp_path) == expected

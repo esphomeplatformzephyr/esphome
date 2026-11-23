@@ -12,7 +12,7 @@ from typing import Any, NoReturn
 import pytest
 
 from esphome.components.zephyr_rtos import dts_lookup
-from esphome.components.zephyr_rtos.const import KEY_ZEPHYR_RTOS
+from esphome.components.zephyr_rtos.const import KEY_BOARD_ROOT, KEY_ZEPHYR_RTOS
 from esphome.components.zephyr_rtos.dts_lookup import (
     _find_board_dir,
     _find_board_yaml,
@@ -208,6 +208,19 @@ def test_find_board_dir_locates_vendor_subfolder(fake_zephyr_base: Path) -> None
 def test_find_board_dir_returns_none_for_unknown_board(fake_zephyr_base: Path) -> None:
     CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data()
     assert _find_board_dir(fake_zephyr_base, "no_such_board/soc") is None
+
+
+def test_find_board_dir_skips_a_board_extension(
+    fake_zephyr_base: Path, tmp_path: Path
+) -> None:
+    """A board_source: extension has no devicetree, so the framework's board is used."""
+    extension = tmp_path / "board_root" / "boards" / "custom" / "esp32h2_devkitm"
+    extension.mkdir(parents=True)
+    (extension / "board.yml").write_text("board:\n  extend: esp32h2_devkitm\n")
+    CORE.data[KEY_ZEPHYR_RTOS] = empty_zephyr_data()
+    CORE.data[KEY_ZEPHYR_RTOS][KEY_BOARD_ROOT] = tmp_path / "board_root"
+    result = _find_board_dir(fake_zephyr_base, "esp32h2_devkitm/esp32h2")
+    assert result == fake_zephyr_base / "boards" / "espressif" / "esp32h2_devkitm"
 
 
 def test_find_board_dir_strips_revision_suffix(fake_zephyr_base: Path) -> None:

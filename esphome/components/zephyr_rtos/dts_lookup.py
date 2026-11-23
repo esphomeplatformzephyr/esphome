@@ -13,7 +13,12 @@ import yaml
 import esphome.config_validation as cv
 from esphome.core import CORE, EsphomeError
 
-from .board_revision import default_revision, parse_board_string, resolve_revision
+from .board_revision import (
+    board_extension_target,
+    default_revision,
+    parse_board_string,
+    resolve_revision,
+)
 from .const import (
     KEY_BOARD_ROOT,
     KEY_SHIELD_ROOT,
@@ -753,7 +758,8 @@ def _find_board_dir(zephyr_base: Path, board: str) -> Path | None:
             if not parent.is_dir():
                 continue
             candidate = parent / board_dirname
-            if candidate.is_dir():
+            # A board extension has no devicetree: the extended board's is used.
+            if candidate.is_dir() and board_extension_target(candidate) is None:
                 result = candidate
                 break
         if result is not None:
