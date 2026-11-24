@@ -34,7 +34,7 @@ from .rpi_pico_family import BOOTSEL_TOUCH_SCHEMA, declare_bootsel_touch
 
 _LOGGER = logging.getLogger(__name__)
 
-_DEFAULT_BOARD: str = "rpi_pico"
+_DEFAULT_BOARD = "rpi_pico"
 
 # RP2040's ROM has its own USB (BOOTSEL) bootloader, so unlike every other mainline
 # variant, a software bootloader here is optional rather than required to flash at all.

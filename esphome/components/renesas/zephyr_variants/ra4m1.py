@@ -32,7 +32,7 @@ from . import renesas_family
 # RA4M1 is single-core -- soc= is left unset (that field exists to disambiguate
 # multi-core chips like esp32_c6's HP/LP split, not to pin a single package variant;
 # each supported board's own board.yml already declares its one real SoC package).
-_DEFAULT_BOARD: str = "ek_ra4m1"
+_DEFAULT_BOARD = "ek_ra4m1"
 
 # ek_ra4m1's stock board has no slot0/slot1 partitions -- MCUboot is opt-in, same
 # shape as rp2040.py: anyone choosing it supplies their own fully-qualified board and

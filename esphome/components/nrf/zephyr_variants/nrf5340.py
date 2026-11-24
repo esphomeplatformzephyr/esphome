@@ -34,7 +34,7 @@ from . import nordic_family
 
 _LOGGER = logging.getLogger(__name__)
 
-_DEFAULT_BOARD: str = "nrf7002dk/nrf5340/cpuapp"
+_DEFAULT_BOARD = "nrf7002dk/nrf5340/cpuapp"
 
 # Only the application core is built. BLE, 802.15.4, OpenThread and Zigbee need the
 # network core image, which isn't built yet; Wi-Fi (nRF7002 over QSPI) doesn't.

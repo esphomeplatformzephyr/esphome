@@ -9,7 +9,7 @@ from esphome.components.zephyr.const import SEGGER_RTT_UART
 from esphome.components.zephyr.variants import mcuboot_or_none
 from esphome.types import ConfigType
 
-FAMILY: str = "stm32"
+FAMILY = "stm32"
 
 # Software UART drivers (devicetree compatible strings) that work on this family,
 # on top of its hardware UARTs.
@@ -19,9 +19,9 @@ UART_DRIVERS: frozenset[str] = frozenset({SEGGER_RTT_UART})
 # vendor HALs are not fetched.
 ADDITIONAL_FRAMEWORK_PROJECTS: frozenset[str] = frozenset({"hal_stm32"})
 # CPU architecture (see ZephyrVariant.cpu_arch)
-CPU_ARCH: str = "arm"
+CPU_ARCH = "arm"
 # Kind of USB UART (see ZephyrVariant.usb_uart_type)
-USB_UART_TYPE: str = "cdc_acm"
+USB_UART_TYPE = "cdc_acm"
 # See ZephyrVariant.has_poweroff
 HAS_POWEROFF: bool = True
 # Board devicetrees #include from this HAL, so the devicetree fetch needs it

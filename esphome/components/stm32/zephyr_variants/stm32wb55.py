@@ -35,7 +35,7 @@ from . import stm32_family
 # as WeAct's stm32wb55_core, the board this variant targets. Its stock flash0 partition
 # table is already MCUboot-shaped (boot/slot0/slot1/storage) but has no
 # scratch_partition, unlike WeAct's own board which reserves 16K for one.
-_DEFAULT_BOARD: str = "nucleo_wb55rg"
+_DEFAULT_BOARD = "nucleo_wb55rg"
 
 # Like stm32f4, not stm32l4: the default board's stock layout is already MCUboot-shaped
 # (boot_partition 48K, slot0/slot1 ~400K each) with plenty of room for real MCUboot

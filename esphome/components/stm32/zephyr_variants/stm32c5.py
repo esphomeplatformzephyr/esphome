@@ -39,7 +39,7 @@ from ..const import VARIANT_STM32C5
 from . import stm32_family
 
 # The largest C5 Nucleo (1M flash, 256K RAM).
-_DEFAULT_BOARD: str = "nucleo_c5a3zg"
+_DEFAULT_BOARD = "nucleo_c5a3zg"
 
 # MCUboot is opt-in: the C5 Nucleo boards point zephyr,code-partition at slot0, but without MCUboot
 # CONFIG_USE_DT_CODE_PARTITION stays off and the app links at offset 0.
@@ -130,7 +130,7 @@ async def to_code(config: ConfigType) -> None:
 
 
 # Seeed XIAO STM32C5; values read from its TinyUF2 bootloader and factory app.
-_XIAO_BOARD: str = "xiao_stm32c5"
+_XIAO_BOARD = "xiao_stm32c5"
 # Seeed's own; Zephyr's uf2families.json has no STM32C5.
 _XIAO_UF2_FAMILY_ID: int = 0x00C5C5C5
 # TinyUF2's double-tap word, the last word of the 256K SRAM.
@@ -140,7 +140,7 @@ _XIAO_UF2_USB_ID: tuple[str, ...] = ("2886", "00c5")
 _UF2_DISK_TIMEOUT: float = 15.0
 
 TinyUf2Touch: cg.MockObjClass = zephyr_ns.class_("TinyUf2Touch", cg.Component)
-CONF_TINYUF2_TOUCH: str = "tinyuf2_touch"
+CONF_TINYUF2_TOUCH = "tinyuf2_touch"
 
 # Internal keys, filled in by _xiao_config_schema().
 _ADVANCED_SCHEMA: cv.Schema = _ADVANCED_SCHEMA.extend(

@@ -11,12 +11,12 @@ from esphome.components.zephyr.const import (
 )
 from esphome.types import ConfigType
 
-FAMILY: str = "nordic"
+FAMILY = "nordic"
 
 _LOGGER = logging.getLogger(__name__)
 
 # Devicetree property nordic pinctrl groups pack all their signal macros into.
-PROPERTY_NAME: str = "psels"
+PROPERTY_NAME = "psels"
 
 # Software UART drivers (devicetree compatible strings) that work on this family,
 # on top of its hardware UARTs.
@@ -26,18 +26,18 @@ UART_DRIVERS: frozenset[str] = frozenset({SEGGER_RTT_UART})
 # vendor HALs are not fetched.
 ADDITIONAL_FRAMEWORK_PROJECTS: frozenset[str] = frozenset({"hal_nordic"})
 # CPU architecture (see ZephyrVariant.cpu_arch)
-CPU_ARCH: str = "arm"
+CPU_ARCH = "arm"
 # Kind of USB UART (see ZephyrVariant.usb_uart_type)
-USB_UART_TYPE: str = "cdc_acm"
+USB_UART_TYPE = "cdc_acm"
 # See ZephyrVariant.mcumgr_cdc and has_poweroff
 MCUMGR_CDC: bool = True
 HAS_POWEROFF: bool = True
 # Pins are named P<port>.<pin>, e.g. P0.02 (see zephyr/gpio.py)
-PIN_NOTATION: str = "dotted"
+PIN_NOTATION = "dotted"
 MAIN_STACK_SIZE: int = 8192
 # Pinctrl macro prefixes (NRF_PSEL(UART_TX, ...), NRF_PSEL(TWIM_SDA, ...))
-UART_PREFIX: str = "UART"
-I2C_PREFIX: str = "TWIM"
+UART_PREFIX = "UART"
+I2C_PREFIX = "TWIM"
 
 
 def to_code(config: ConfigType) -> None:
@@ -87,7 +87,7 @@ def to_code(config: ConfigType) -> None:
 
 # I2C pinctrl group/state to assume when DTS resolution fails -- nordic's I2C
 # node pairs a "default" and a "sleep" state, both sharing one group.
-I2C_FALLBACK_GROUP: str = "group1"
+I2C_FALLBACK_GROUP = "group1"
 I2C_FALLBACK_STATE_SUFFIXES: tuple[str, ...] = ("default", "sleep")
 
 # NRF_PSEL's packed value layout (nrf-pinctrl.h): the function-id ("fun") field is

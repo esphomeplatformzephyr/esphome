@@ -28,7 +28,7 @@ from . import esp32_family
 
 # Bare name; qualify_board() expands it to "esp32c3_devkitm/esp32c3" using soc= below.
 # No hp/lpcore qualifier -- unlike esp32_c6/esp32_c5, this chip is single-core.
-_DEFAULT_BOARD: str = "esp32c3_devkitm"
+_DEFAULT_BOARD = "esp32c3_devkitm"
 
 _ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA
 

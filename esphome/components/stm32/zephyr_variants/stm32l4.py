@@ -32,7 +32,7 @@ from . import stm32_family
 # Bare name; no SoC/qualifier segment needed -- upstream's board.yml declares a single
 # SoC for this board (stm32l476xx), so qualify_board() is a no-op here (soc= is left
 # unset below).
-_DEFAULT_BOARD: str = "nucleo_l476rg"
+_DEFAULT_BOARD = "nucleo_l476rg"
 
 # nucleo_l476rg's stock board has no slot0/slot1 partitions -- MCUboot is opt-in, same
 # shape as rp2040.py/ra4m1.py: anyone choosing it supplies their own fully-qualified

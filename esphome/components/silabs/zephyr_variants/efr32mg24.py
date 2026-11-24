@@ -31,7 +31,7 @@ from . import silabs_family
 # xG24-EK2703A (PCB2703A), Silicon Labs' EFR32xG24 Explorer Kit. Bare name; no
 # SoC/qualifier segment needed -- upstream's board.yml declares a single SoC/core
 # for this board, so qualify_board() is a no-op here (soc= is left unset below).
-_DEFAULT_BOARD: str = "xg24_ek2703a"
+_DEFAULT_BOARD = "xg24_ek2703a"
 
 _ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(
     {

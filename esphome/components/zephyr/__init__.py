@@ -734,7 +734,7 @@ def _require_zephyr_toolchain(name: str) -> None:
         )
 
 
-def _variant_data() -> ZephyrData | dict[str, object]:
+def _get_data() -> ZephyrData | dict[str, object]:
     """The Zephyr data of a Zephyr toolchain build, else {}. Raises when a read comes
     before the platform schema, which sets the target framework, has run."""
     if (data := CORE.data.get(KEY_ZEPHYR)) is not None:
@@ -770,7 +770,7 @@ def zephyr_variant_family() -> str | None:
 def zephyr_variant_resolved() -> ZephyrVariantResolved | None:
     """The active variant with the manifest and version its `framework:` block resolved
     to; None as for zephyr_variant()."""
-    return _variant_data().get(KEY_VARIANT_RESOLVED)
+    return _get_data().get(KEY_VARIANT_RESOLVED)
 
 
 def zephyr_variant_info() -> ZephyrVariant | None:
@@ -781,7 +781,7 @@ def zephyr_variant_info() -> ZephyrVariant | None:
 
 def zephyr_variant_module() -> ModuleType | None:
     """The active variant's module; None as for zephyr_variant()."""
-    return _variant_data().get(KEY_VARIANT_MODULE)
+    return _get_data().get(KEY_VARIANT_MODULE)
 
 
 def zephyr_family_module() -> ModuleType | None:

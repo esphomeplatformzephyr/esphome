@@ -35,7 +35,7 @@ from . import stm32_family
 # board tier as stm32l4.py's nucleo_l476rg. Its stock flash0 partition table is
 # MCUboot-shaped (boot/slot0/slot1/scratch) but has no storage_partition -- every
 # config on this variant is expected to add one via `overlays:`.
-_DEFAULT_BOARD: str = "nucleo_f401re"
+_DEFAULT_BOARD = "nucleo_f401re"
 
 # Unlike stm32l4/rp2040/ra4m1, bootloader: defaults to mcuboot here -- real MCUboot
 # (ECDSA-P256) fits the stock boot_partition with room to spare (measured 24-31K of

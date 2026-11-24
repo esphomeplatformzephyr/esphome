@@ -32,7 +32,7 @@ from . import silabs_family
 # SoC/qualifier segment needed -- upstream's board.yml declares a single SoC
 # (efr32bg27c140f768im40) for this board, so qualify_board() is a no-op here
 # (soc= is left unset below).
-_DEFAULT_BOARD: str = "xg27_dk2602a"
+_DEFAULT_BOARD = "xg27_dk2602a"
 
 _ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(
     {

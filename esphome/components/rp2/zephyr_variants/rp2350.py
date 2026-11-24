@@ -34,7 +34,7 @@ from .rpi_pico_family import BOOTSEL_TOUCH_SCHEMA, declare_bootsel_touch
 
 _LOGGER = logging.getLogger(__name__)
 
-_DEFAULT_BOARD: str = "rpi_pico2"
+_DEFAULT_BOARD = "rpi_pico2"
 
 # Same reasoning as RP2040 (see variants/rp2040.py): the RP2350 ROM's own USB (BOOTSEL)
 # bootloader can flash the chip without any software bootloader, so MCUboot is opt-in

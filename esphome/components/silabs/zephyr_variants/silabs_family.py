@@ -6,10 +6,10 @@ from collections.abc import Callable
 from esphome.components.zephyr.const import BOOTLOADER_MCUBOOT, SEGGER_RTT_UART
 from esphome.types import ConfigType
 
-FAMILY: str = "silabs"
+FAMILY = "silabs"
 
 # Devicetree property silabs pinctrl groups pack all their signal macros into.
-PROPERTY_NAME: str = "pins"
+PROPERTY_NAME = "pins"
 
 # Software UART drivers (devicetree compatible strings) that work on this family,
 # on top of its hardware UARTs.
@@ -19,7 +19,7 @@ UART_DRIVERS: frozenset[str] = frozenset({SEGGER_RTT_UART})
 # vendor HALs are not fetched.
 ADDITIONAL_FRAMEWORK_PROJECTS: frozenset[str] = frozenset({"hal_silabs"})
 # CPU architecture (see ZephyrVariant.cpu_arch)
-CPU_ARCH: str = "arm"
+CPU_ARCH = "arm"
 
 
 def to_code(config: ConfigType) -> None:
@@ -45,7 +45,7 @@ def to_code(config: ConfigType) -> None:
 
 
 # I2C pinctrl group/state to assume when DTS resolution fails.
-I2C_FALLBACK_GROUP: str = "group0"
+I2C_FALLBACK_GROUP = "group0"
 I2C_FALLBACK_STATE_SUFFIXES: tuple[str, ...] = ("default",)
 
 # SILABS_DBUS's packed value layout (silabs-pinctrl-dbus.h): the en_bit field

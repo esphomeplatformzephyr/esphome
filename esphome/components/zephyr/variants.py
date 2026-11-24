@@ -24,8 +24,8 @@ from esphome.const import (
 from esphome.core import CORE, EsphomeError
 from esphome.types import ConfigType
 
-from ..board_revision import parse_board_string
-from ..const import (
+from .board_revision import parse_board_string
+from .const import (
     BOOTLOADER_MCUBOOT,
     CONF_BOOTLOADER,
     CONF_NINJA_VERSION,
@@ -61,8 +61,8 @@ from ..const import (
     KEY_ZEPHYR,
     VERSION_RECOMMENDED,
 )
-from ..framework_helpers import FrameworkSource
-from ..partitions import BootLayout
+from .framework_helpers import FrameworkSource
+from .partitions import BootLayout
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -461,7 +461,7 @@ def resolve_variant(
         )
 
     if source is not None:
-        from ..dts_fetch import (  # deferred: avoid import cycle (dts_fetch imports VARIANTS)
+        from .dts_fetch import (  # deferred: avoid import cycle (dts_fetch imports VARIANTS)
             resolve_sdk_source_version,
         )
 
@@ -526,7 +526,7 @@ def set_variant_core_data(
     """Fill CORE.data for a variant's config_schema; ``bootloader`` is "" for none.
     The keywords after ``runner`` replace a field's start value."""
     # deferred: zephyr's __init__ may import this package
-    from .. import zephyr_data, zephyr_set_core_data
+    from . import zephyr_data, zephyr_set_core_data
 
     zephyr_set_core_data({**config, KEY_BOOTLOADER: bootloader})
     zephyr_data()[KEY_VARIANT_RESOLVED] = resolved

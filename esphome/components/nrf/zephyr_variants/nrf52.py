@@ -51,7 +51,7 @@ from . import nordic_family
 
 _LOGGER = logging.getLogger(__name__)
 
-_DEFAULT_BOARD: str = "adafruit_feather_nrf52840"
+_DEFAULT_BOARD = "adafruit_feather_nrf52840"
 
 # advanced: bootloader: -- deliberately local to this variant, not platform: nrf52's own
 # BOOTLOADER_* constants (see the sdk= comment below re: issue #11 entanglement).
@@ -64,17 +64,17 @@ _DEFAULT_BOARD: str = "adafruit_feather_nrf52840"
 # points zephyr,code-partition at the free gap between them, so the app build lands
 # there without overwriting either. See:
 # https://learn.adafruit.com/introducing-the-adafruit-nrf52840-feather/hathach-memory-map
-BOOTLOADER_ADAFRUIT_NRF52_SD140_V6: str = "adafruit_nrf52_sd140_v6"
-BOOTLOADER_ADAFRUIT_NRF52_SD140_V7: str = "adafruit_nrf52_sd140_v7"
+BOOTLOADER_ADAFRUIT_NRF52_SD140_V6 = "adafruit_nrf52_sd140_v6"
+BOOTLOADER_ADAFRUIT_NRF52_SD140_V7 = "adafruit_nrf52_sd140_v7"
 # Nordic's factory Open DFU bootloader (nRF52840 Dongle): the board's default devicetree
 # (BOARD_HAS_NRF5_BOOTLOADER) links the app at 0x1000, behind the MBR, and below the
 # bootloader at 0xE0000. It speaks Nordic's Secure DFU, packaged by Nordic's nrfutil.
-BOOTLOADER_NRF: str = "nrf"
+BOOTLOADER_NRF = "nrf"
 _OPEN_DFU_LAYOUT: BootLayout = BootLayout(0x1000, ((0x0, 0x1000), (0xE0000, 0x100000)))
-_DONGLE_BOARD: str = "nrf52840dongle"
+_DONGLE_BOARD = "nrf52840dongle"
 # The dongle's GPIO wired to RESET: a pin reset is the Open DFU bootloader's cue to stay in
 # DFU mode, as it ignores the retained register the Adafruit bootloaders read
-_DONGLE_RESET_PIN: str = "P0.19"
+_DONGLE_RESET_PIN = "P0.19"
 
 # Where each SoftDevice ends (upstream nordic/nrf52840_partition_uf2_sdv{6,7}.dtsi) and
 # where the Adafruit UF2 bootloader starts; the app must fit between them.
@@ -90,7 +90,7 @@ _SOFTDEVICE_VERSION: dict[str, int] = {
 _ADAFRUIT_BOOTLOADER_START: int = 0xF4000
 _FLASH_SIZE: int = 0x100000  # nRF52840
 
-CONF_DFU: str = "dfu"
+CONF_DFU = "dfu"
 DeviceFirmwareUpdate: cg.MockObjClass = zephyr_ns.class_(
     "DeviceFirmwareUpdate", cg.Component
 )
@@ -110,10 +110,10 @@ def _dfu_schema(value: bool | ConfigType) -> ConfigType | None:
 
 
 # As platform: nrf52: DC/DC or LDO for REG1; only boards with the DC/DC inductor can use DC/DC
-CONF_DCDC: str = "dcdc"
+CONF_DCDC = "dcdc"
 # As platform: nrf52: REGOUT0, the GPIO voltage of a board powered through VDDH
-CONF_REG0: str = "reg0"
-CONF_UICR_ERASE: str = "uicr_erase"
+CONF_REG0 = "reg0"
+CONF_UICR_ERASE = "uicr_erase"
 VOLTAGE_LEVELS: list[float] = [1.8, 2.1, 2.4, 2.7, 3.0, 3.3]
 
 _ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(
@@ -360,7 +360,7 @@ _GENPKG_PARAMS: dict[str, tuple[str, ...]] = {
     BOOTLOADER_ADAFRUIT_NRF52_SD140_V6: ("0x0052", "0x00B6"),
     BOOTLOADER_ADAFRUIT_NRF52_SD140_V7: ("0x0052", "0x00CA,0x0100,0x0123"),
 }
-_DFU_PACKAGE: str = "firmware.zip"
+_DFU_PACKAGE = "firmware.zip"
 
 
 def uses_serial_dfu() -> bool:

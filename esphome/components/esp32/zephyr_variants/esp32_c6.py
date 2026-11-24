@@ -27,7 +27,7 @@ from ..const import VARIANT_ESP32C6
 from . import esp32_family
 
 # qualify_board() expands this to "esp32c6_devkitc/esp32c6/hpcore" via soc=/qualifier= below.
-_DEFAULT_BOARD: str = "esp32c6_devkitc"
+_DEFAULT_BOARD = "esp32c6_devkitc"
 
 _ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA
 

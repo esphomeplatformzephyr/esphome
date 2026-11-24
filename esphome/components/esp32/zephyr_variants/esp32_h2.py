@@ -27,7 +27,7 @@ from ..const import VARIANT_ESP32H2
 from . import esp32_family
 
 # Bare name; qualify_board() expands it to "esp32h2_devkitm/esp32h2" using soc= below.
-_DEFAULT_BOARD: str = "esp32h2_devkitm"
+_DEFAULT_BOARD = "esp32h2_devkitm"
 
 _ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA
 

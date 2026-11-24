@@ -30,7 +30,7 @@ from esphome.types import ConfigType
 from ..const import VARIANT_MCXN236
 from . import nxp_family
 
-_DEFAULT_BOARD: str = "frdm_mcxn236"
+_DEFAULT_BOARD = "frdm_mcxn236"
 
 # frdm_mcxn236.dts sets zephyr,code-partition = &slot0_partition and the chip resets
 # to 0x0, so only MCUboot boots it.

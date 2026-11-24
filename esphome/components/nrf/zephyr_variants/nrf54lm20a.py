@@ -33,7 +33,7 @@ from esphome.types import ConfigType
 from ..const import VARIANT_NRF54LM20A
 from . import nordic_family
 
-_DEFAULT_BOARD: str = "nrf54lm20dk"
+_DEFAULT_BOARD = "nrf54lm20dk"
 # qualify_board() expands this to "nrf54lm20dk/nrf54lm20a/cpuapp" via soc=/qualifier=
 # below -- the application core target confirmed in upstream Zephyr's own board.yml for
 # this DK. Only the application core is supported here -- cpuflpr (the RISC-V

@@ -31,7 +31,7 @@ from . import silabs_family
 # xG26-EK2709A (BRD2709A), Silicon Labs' EFR32xG26 Explorer Kit. Bare name; no
 # SoC/qualifier segment needed -- upstream's board.yml declares a single SoC for
 # this board, so qualify_board() is a no-op here (soc= is left unset below).
-_DEFAULT_BOARD: str = "xg26_ek2709a"
+_DEFAULT_BOARD = "xg26_ek2709a"
 
 _ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA.extend(
     {

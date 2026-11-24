@@ -33,7 +33,7 @@ from . import stm32_family
 # SoC for this board (stm32f103xb), same as stm32f4.py/stm32l4.py. ST's own Nucleo-64
 # eval board for the STM32F1 line, the smallest MCU family ESPHome's Zephyr platform
 # targets: 128K flash/20K RAM total, versus 512K/96K on stm32f4's nucleo_f401re.
-_DEFAULT_BOARD: str = "nucleo_f103rb"
+_DEFAULT_BOARD = "nucleo_f103rb"
 
 # Like stm32f4/wb55, not stm32l4: nucleo_f103rb's stock flash0 layout is already
 # MCUboot-shaped (34K boot_partition, 45K/46K slot0/slot1, 3K storage, no

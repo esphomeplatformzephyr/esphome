@@ -34,7 +34,7 @@ from . import stm32_family
 # unset below). ST's own Discovery kit for the STM32U5 line. Its stock flash0 partition
 # table is already MCUboot-shaped (boot 64K / slot0 1952K / slot1 1960K / storage 120K),
 # so unlike stm32f4's nucleo_f401re no `overlays:` storage_partition is needed.
-_DEFAULT_BOARD: str = "stm32u5g9j_dk1"
+_DEFAULT_BOARD = "stm32u5g9j_dk1"
 
 # Like stm32f1/f4/wb55: the stock board links the app at slot0_partition (0x10000) and
 # the chip resets to offset 0, so a `none` image would never run. none stays selectable

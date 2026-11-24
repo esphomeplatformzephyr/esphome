@@ -28,7 +28,7 @@ from . import silabs_family
 
 # SixG301 Explorer Kit (BRD2719A). Not in mainline Zephyr yet: set `board_source:` to
 # esphomeplatformzephyr/custom_zephyr_boards.
-_DEFAULT_BOARD: str = "simg301_ek2719a"
+_DEFAULT_BOARD = "simg301_ek2719a"
 
 # EUSART0, the only UART, reaches PA0-PA8 and PB0-PB3 only (six301-pinctrl.h).
 _EUSART0_PINS: frozenset[int] = frozenset([*range(9), *range(16, 20)])

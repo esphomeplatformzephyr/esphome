@@ -32,7 +32,7 @@ from . import esp32_family
 _LOGGER = logging.getLogger(__name__)
 
 # qualify_board() expands this to "esp32_devkitc/esp32/procpu" via soc=/qualifier= below.
-_DEFAULT_BOARD: str = "esp32_devkitc"
+_DEFAULT_BOARD = "esp32_devkitc"
 
 _ADVANCED_SCHEMA: cv.Schema = ADVANCED_SCHEMA
 

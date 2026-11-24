@@ -30,7 +30,7 @@ from . import silabs_siwx91x_family
 # SiWx917-DK2605A (BRD2605A), Silicon Labs' SiWx917 Wi-Fi 6 + BLE 5.4 dev kit. Bare
 # name; no SoC/qualifier segment needed -- upstream's board.yml declares a single
 # SoC for this board, same shape as efr32mg24's xg24_ek2703a.
-_DEFAULT_BOARD: str = "siwx917_dk2605a"
+_DEFAULT_BOARD = "siwx917_dk2605a"
 
 # This chip's real firmware-upgrade tooling also goes through Silicon Labs'
 # "commander" CLI (Kconfig SIWX91X_SIGN_KEY/SIWX91X_MIC_KEY are both passed

@@ -15,10 +15,10 @@ from ..const import (
     VARIANT_ESP32S3,
 )
 
-FAMILY: str = "esp32"
+FAMILY = "esp32"
 
 # Devicetree property esp32-family pinctrl groups pack all their signal macros into.
-PROPERTY_NAME: str = "pinmux"
+PROPERTY_NAME = "pinmux"
 
 # Software UART drivers (devicetree compatible strings) that work on this family,
 # on top of its hardware UARTs.
@@ -29,9 +29,9 @@ UART_DRIVERS: frozenset[str] = frozenset()
 # vendor HALs are not fetched.
 ADDITIONAL_FRAMEWORK_PROJECTS: frozenset[str] = frozenset({"hal_espressif"})
 # CPU architecture (see ZephyrVariant.cpu_arch)
-CPU_ARCH: str = "riscv"
+CPU_ARCH = "riscv"
 # Kind of USB UART (see ZephyrVariant.usb_uart_type)
-USB_UART_TYPE: str = "serial_jtag"
+USB_UART_TYPE = "serial_jtag"
 # See ZephyrVariant.has_poweroff
 HAS_POWEROFF: bool = True
 # Matches platform: esp32's 8192 loop task; UDP OTA overflows 4096
@@ -73,7 +73,7 @@ def to_code(config: ConfigType) -> None:
 
 
 # I2C pinctrl group/state to assume when DTS resolution fails.
-I2C_FALLBACK_GROUP: str = "group1"
+I2C_FALLBACK_GROUP = "group1"
 I2C_FALLBACK_STATE_SUFFIXES: tuple[str, ...] = ("default",)
 
 # GPIO-matrix pinmux value layout (esp-pinctrl-common.h and per-chip variants):

@@ -33,7 +33,7 @@ from esphome.types import ConfigType
 from ..const import VARIANT_NRF54L15
 from . import nordic_family
 
-_DEFAULT_BOARD: str = "nrf54l15dk"
+_DEFAULT_BOARD = "nrf54l15dk"
 # qualify_board() expands this to "nrf54l15dk/nrf54l15/cpuapp" via soc=/qualifier= below --
 # the application core target confirmed in upstream Zephyr's own board.yml for this DK
 # (boards/nordic/nrf54l15dk/board.yml lists nrf54l15's cpuapp/cpuflpr cpuclusters). Only
