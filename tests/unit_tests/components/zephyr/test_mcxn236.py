@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -37,7 +36,7 @@ def _run_to_code(
         patch.object(mcxn236.cg, "add_build_flag"),
         patch.object(mcxn236.cg, "add_define"),
     ):
-        asyncio.run(mcxn236.to_code(config))
+        mcxn236.to_code(config)
     mock_rng.assert_called_once_with(BOARD, "nxp,els-trng")
     return mock_conf, mock_overlay, mock_sysbuild, mock_prefs
 

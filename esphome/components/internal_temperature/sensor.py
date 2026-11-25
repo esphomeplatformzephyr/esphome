@@ -8,7 +8,7 @@ from esphome.components.zephyr import (
     zephyr_add_overlay,
     zephyr_add_prj_conf,
     zephyr_variant,
-    zephyr_variant_info,
+    zephyr_variant_name,
 )
 from esphome.config_helpers import filter_source_files_from_platform
 import esphome.config_validation as cv
@@ -73,7 +73,7 @@ async def to_code(config: ConfigType) -> None:
     elif CORE.using_toolchain_zephyr:
         # Every Zephyr sensor driver needs it; the driver itself follows its node's status
         zephyr_add_prj_conf("SENSOR", True)
-        if nodes := zephyr_variant_info().die_temp_nodes:
+        if nodes := zephyr_variant().die_temp_nodes:
             for label in nodes:
                 zephyr_add_overlay(f'&{label} {{ status = "okay"; }};')
             cg.add_define("INTERNAL_TEMPERATURE_NODE_LABEL", cg.RawExpression(nodes[0]))
@@ -82,7 +82,7 @@ async def to_code(config: ConfigType) -> None:
                 "internal_temperature is not implemented for Zephyr variant '%s'; it "
                 "reads the sensor that a 'die-temp0' devicetree alias points to, which "
                 "the board or your own 'framework: overlays:' must provide",
-                zephyr_variant(),
+                zephyr_variant_name(),
             )
 
 

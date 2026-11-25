@@ -112,9 +112,9 @@ def uart_pinctrl(
     real UART instance valid-pins table, or None if unresolvable -- rp2040/
     rp2350 have no group-role resolver (group_role_resolver is always None,
     falling back to the generic positional guess)."""
-    from esphome.components.zephyr import zephyr_variant_info  # noqa: PLC0415
+    from esphome.components.zephyr import zephyr_variant  # noqa: PLC0415
 
-    variant_info = zephyr_variant_info()
+    variant_info = zephyr_variant()
     instance_pins = (
         variant_info.uart_valid_pins_by_instance.get(port_label.upper())
         if variant_info is not None
@@ -147,7 +147,7 @@ def to_code(config: ConfigType) -> None:
         zephyr_add_overlay,
         zephyr_add_prj_conf,
         zephyr_data,
-        zephyr_variant,
+        zephyr_variant_name,
     )
     from esphome.components.zephyr.const import BOOTLOADER_MCUBOOT, KEY_BOOTLOADER  # noqa: PLC0415
     from esphome.const import CONF_AP, CONF_LOG_LEVEL, CONF_WIFI  # noqa: PLC0415
@@ -157,7 +157,7 @@ def to_code(config: ConfigType) -> None:
     zephyr_add_prj_conf("CPP", True)
     zephyr_add_prj_conf("REQUIRES_FULL_LIBCPP", True)
     # rp2040 is Cortex-M0+, no hardware FPU; rp2350 is Cortex-M33, which has one.
-    if zephyr_variant() != VARIANT_RP2040:
+    if zephyr_variant_name() != VARIANT_RP2040:
         zephyr_add_prj_conf("FPU", True)
     # No ENTROPY_GENERATOR here: rp2040 has no hardware RNG at all; rp2350's does
     # exist but Zephyr's driver for it hangs the whole boot sequence (unbounded
@@ -177,7 +177,7 @@ def to_code(config: ConfigType) -> None:
 
     boot_mode_dtsi = (
         "rp2040-boot-mode-retention"
-        if zephyr_variant() == VARIANT_RP2040
+        if zephyr_variant_name() == VARIANT_RP2040
         else "rp2350-boot-mode-retention"
     )
     boot_mode_overlay = f"#include <vendor/raspberrypi/{boot_mode_dtsi}.dtsi>"
@@ -441,7 +441,7 @@ def bootloader(advanced: ConfigType) -> str:
 def i2c_check_pins(
     bus_label: str, sda: int | None, scl: int | None, variant: str
 ) -> None:
-    from esphome.components.zephyr import zephyr_variant_info  # noqa: PLC0415
+    from esphome.components.zephyr import zephyr_variant  # noqa: PLC0415
     from esphome.core import EsphomeError  # noqa: PLC0415
 
     # Each pin is tied to one fixed I2C instance+role -- both are needed
@@ -452,9 +452,7 @@ def i2c_check_pins(
             f"({variant}) -- its GPIO mux ties each pin to a fixed "
             "instance+role pair."
         )
-    instance_pins = zephyr_variant_info().i2c_valid_pins_by_instance.get(
-        bus_label.upper()
-    )
+    instance_pins = zephyr_variant().i2c_valid_pins_by_instance.get(bus_label.upper())
     if (
         instance_pins is None
         or sda not in instance_pins.get("sda", frozenset())

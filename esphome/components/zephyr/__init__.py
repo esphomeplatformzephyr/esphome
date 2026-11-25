@@ -8,7 +8,7 @@ import re
 import subprocess
 import textwrap
 from types import ModuleType
-from typing import Any, Literal, NamedTuple, NotRequired, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, NamedTuple, NotRequired, TypedDict
 
 import yaml
 
@@ -133,18 +133,15 @@ from .rtt import (  # noqa: F401
     rtt_label_channel,
     validate_rtt_port,
 )
-from .variants import (
-    NCS,
-    SILABS,
-    ZEPHYR_MAINLINE,
-    ZephyrManifest,
-    ZephyrModule,
-    ZephyrModuleTemplate,
-    ZephyrVariant,
-    ZephyrVariantResolved,
-    set_variant_core_data,
-    variant_value,
-)
+
+if TYPE_CHECKING:
+    from .variants import (
+        ZephyrManifest,
+        ZephyrModule,
+        ZephyrModuleTemplate,
+        ZephyrVariant,
+        ZephyrVariantResolved,
+    )
 
 CODEOWNERS = ["@tomaszduda23", "@rwrozelle"]
 DOMAIN = "zephyr"
@@ -218,7 +215,7 @@ class ZephyrData(TypedDict):
     sdk_source: NotRequired[ConfigType | None]
     # The active variant with its resolved manifest and version, and the variant's
     # module (config_schema, to_code, hooks)
-    variant_resolved: NotRequired[ZephyrVariantResolved]
+    variant_resolved: NotRequired["ZephyrVariantResolved"]
     variant_module: NotRequired[ModuleType]
     sysbuild_conf: NotRequired[dict[str, tuple[PrjConfValueType, bool]]]
     # (label, reason) partitions components need; see partitions.zephyr_require_partition()
@@ -258,10 +255,10 @@ class ZephyrData(TypedDict):
     # to a version -- a framework: modules: override (module_overrides) may still apply
     # before final resolution in run_compile(), so resolving eagerly here could raise
     # for a version gap the user's own override was going to fill.
-    module_requests: NotRequired[dict[str, ZephyrModuleTemplate]]
+    module_requests: NotRequired["dict[str, ZephyrModuleTemplate]"]
     # module name -> a full user-authored ZephyrModule (framework: modules: with source:),
     # or a plain version string overriding a component-requested module's default.
-    module_overrides: NotRequired[dict[str, ZephyrModule | str]]
+    module_overrides: NotRequired["dict[str, ZephyrModule | str]"]
     # (west_module, allow_regex, sentinel_name) entries added via zephyr_add_blobs() --
     # transport-conditional blob fetches, on top of the variant's own static `blobs`.
     blobs: NotRequired[list[tuple[str, str, str]]]
@@ -735,8 +732,7 @@ def _require_zephyr_toolchain(name: str) -> None:
 
 
 def _get_data() -> ZephyrData | dict[str, object]:
-    """The Zephyr data of a Zephyr toolchain build, else {}. Raises when a read comes
-    before the platform schema, which sets the target framework, has run."""
+    """Raise if the platform schema, which sets the target framework, has not run yet."""
     if (data := CORE.data.get(KEY_ZEPHYR)) is not None:
         return data if CORE.using_toolchain_zephyr else {}
     if (framework := CORE.data.get(KEY_CORE, {}).get(KEY_TARGET_FRAMEWORK)) is None:
@@ -746,53 +742,60 @@ def _get_data() -> ZephyrData | dict[str, object]:
     return {}
 
 
-def zephyr_variant() -> str | None:
-    """The active Zephyr variant name; None off the Zephyr toolchain or on a
-    platform that also builds without Zephyr. Raises when read too early."""
-    resolved = zephyr_variant_resolved()
-    return resolved.variant.name if resolved is not None else None
-
-
-def zephyr_framework_type() -> str | None:
-    """The active `framework: type:` (e.g. "zephyr", "ncs"); None as for
-    zephyr_variant()."""
-    resolved = zephyr_variant_resolved()
-    return resolved.manifest.framework_type if resolved is not None else None
-
-
-def zephyr_variant_family() -> str | None:
-    """The active variant's family (e.g. "esp32"); None without one, or as for
-    zephyr_variant()."""
-    family = zephyr_family_module()
-    return family.FAMILY if family is not None else None
-
-
-def zephyr_variant_resolved() -> ZephyrVariantResolved | None:
+def _variant_resolved() -> "ZephyrVariantResolved | None":
     """The active variant with the manifest and version its `framework:` block resolved
-    to; None as for zephyr_variant()."""
+    to; None as for zephyr_variant_name()."""
     return _get_data().get(KEY_VARIANT_RESOLVED)
 
 
-def zephyr_variant_info() -> ZephyrVariant | None:
-    """The active variant's ZephyrVariant; None as for zephyr_variant()."""
-    resolved = zephyr_variant_resolved()
+def zephyr_variant() -> "ZephyrVariant | None":
+    """The active variant's ZephyrVariant; None as for zephyr_variant_name()."""
+    resolved = _variant_resolved()
     return resolved.variant if resolved is not None else None
 
 
+def zephyr_variant_name() -> str | None:
+    """The active chip from a platform's zephyr_variants; None for nrf52 and others."""
+    variant = zephyr_variant()
+    return variant.name if variant is not None else None
+
+
+def zephyr_variant_family_module() -> ModuleType | None:
+    """The active variant's family module; None without one, or as for zephyr_variant_name()."""
+    variant = zephyr_variant()
+    return variant.family_module if variant is not None else None
+
+
+def zephyr_variant_family_name() -> str | None:
+    """The active variant's family name, e.g. "stm32"; None without one, or as for
+    zephyr_variant_name()."""
+    family = zephyr_variant_family_module()
+    return family.FAMILY if family is not None else None
+
+
+def zephyr_framework_type() -> str | None:
+    """The active `framework: type:`, e.g. "zephyr"; None as for zephyr_variant_name()."""
+    manifest = zephyr_variant_manifest()
+    return manifest.framework_type if manifest is not None else None
+
+
+def zephyr_variant_manifest() -> "ZephyrManifest | None":
+    """The manifest the active variant's `framework: type:` selected; None as for
+    zephyr_variant_name()."""
+    resolved = _variant_resolved()
+    return resolved.manifest if resolved is not None else None
+
+
 def zephyr_variant_module() -> ModuleType | None:
-    """The active variant's module; None as for zephyr_variant()."""
+    """The active variant's module; None as for zephyr_variant_name()."""
     return _get_data().get(KEY_VARIANT_MODULE)
-
-
-def zephyr_family_module() -> ModuleType | None:
-    """The active variant's family module; None without one, or as for zephyr_variant()."""
-    info = zephyr_variant_info()
-    return info.family_module if info is not None else None
 
 
 def zephyr_usb_uart_type() -> str | None:
     """The active variant's kind of USB UART ("cdc_acm", "serial_jtag"), or None."""
-    if (info := zephyr_variant_info()) is None:
+    from .variants import variant_value
+
+    if (info := zephyr_variant()) is None:
         return None
     return variant_value(info, "usb_uart_type")
 
@@ -801,7 +804,7 @@ def zephyr_only_on_variant(*variant_names: str):
     """Return a cv validator that requires the Zephyr variant to be one of variant_names."""
 
     def validator(value):
-        variant = zephyr_variant()
+        variant = zephyr_variant_name()
         if variant not in variant_names:
             listed = ", ".join(repr(v) for v in variant_names)
             raise cv.Invalid(
@@ -847,7 +850,7 @@ def request_zephyr_module(capability: str) -> None:
     `framework: modules:` override may still apply, so failing on a missing default
     version has to wait until resolve_zephyr_modules() (see there for why)."""
     _require_zephyr_toolchain("request_zephyr_module")
-    manifest = zephyr_variant_resolved().manifest
+    manifest = zephyr_variant_manifest()
     template = manifest.modules.get(capability)
     if template is None:
         raise EsphomeError(
@@ -862,7 +865,7 @@ def request_zephyr_module(capability: str) -> None:
     requests[capability] = template
 
 
-def zephyr_set_module_override(name: str, override: ZephyrModule | str) -> None:
+def zephyr_set_module_override(name: str, override: "ZephyrModule | str") -> None:
     """Unconditionally record a `framework: modules:` override, replacing anything a
     component requested. `override` is a full ZephyrModule (source: given -- a
     brand-new or replaced module) or a plain version string (version-only tweak of a
@@ -872,11 +875,13 @@ def zephyr_set_module_override(name: str, override: ZephyrModule | str) -> None:
     zephyr_data()[KEY_MODULE_OVERRIDES][name] = override
 
 
-def resolve_zephyr_modules() -> list[ZephyrModule]:
+def resolve_zephyr_modules() -> "list[ZephyrModule]":
     """Combine module_requests with any module_overrides into the final set of
     modules to fetch. Called once, from run_compile() -- by then every component's
     to_code() and the framework: modules: override job have both already run, so an
     override is guaranteed visible before a request's version gets resolved."""
+    from .variants import ZephyrModule, ZephyrModuleTemplate
+
     root_version = CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]
     overrides = dict(zephyr_data()[KEY_MODULE_OVERRIDES])
     resolved: dict[str, ZephyrModule] = {}
@@ -964,14 +969,16 @@ def zephyr_add_blobs(module: str, allow_regex: str, sentinel_name: str) -> None:
 def zephyr_family_uart_drivers() -> frozenset[str]:
     """Software UART drivers (devicetree compatibles) the active family supports.
     Empty without a family (platform: nrf52)."""
-    if (family := zephyr_family_module()) is None:
+    if (family := zephyr_variant_family_module()) is None:
         return frozenset()
     return family.UART_DRIVERS
 
 
-def zephyr_additional_framework_projects(manifest: ZephyrManifest) -> frozenset[str]:
+def zephyr_additional_framework_projects(manifest: "ZephyrManifest") -> frozenset[str]:
     """The framework projects this build needs beyond the framework's required ones:
     the family's vendor HALs on mainline, the projects components ask for on NCS."""
+    from .variants import NCS, ZEPHYR_MAINLINE
+
     if manifest is NCS:
         # The same list as nrf52's: components add to it with include_west_project()
         from esphome.components.nrf52.framework import wanted_west_projects  # noqa: PLC0415
@@ -982,7 +989,10 @@ def zephyr_additional_framework_projects(manifest: ZephyrManifest) -> frozenset[
         if sysbuild_conf.get("SB_CONFIG_BOOTLOADER_MCUBOOT", (False,))[0]:
             projects.add("mcuboot")
         return frozenset(projects)
-    if manifest is ZEPHYR_MAINLINE and (family := zephyr_family_module()) is not None:
+    if (
+        manifest is ZEPHYR_MAINLINE
+        and (family := zephyr_variant_family_module()) is not None
+    ):
         return family.ADDITIONAL_FRAMEWORK_PROJECTS
     return frozenset()
 
@@ -1045,7 +1055,7 @@ def _base_to_code(config: ConfigType) -> None:
 
 
 def _main_stack_to_code(config: ConfigType) -> None:
-    family = zephyr_family_module()
+    family = zephyr_variant_family_module()
     default_stack = getattr(family, "MAIN_STACK_SIZE", 4096) if family else 4096
     zephyr_add_prj_conf(
         "MAIN_STACK_SIZE",
@@ -1093,6 +1103,8 @@ async def _modules_to_code(config: ConfigType) -> None:
 
 
 def _apply_module_overrides(module_confs: list[ConfigType]) -> None:
+    from .variants import ZephyrModule
+
     for module_conf in module_confs:
         name = module_conf[CONF_NAME]
         source = module_conf.get(CONF_SOURCE)
@@ -1257,7 +1269,7 @@ def _remove_stale_image_files(written: set[Path]) -> bool:
 # Watchdog range mirrors esp32's own CONF_WATCHDOG_TIMEOUT validator (esp32/__init__.py) --
 # confirmed working on real ESP32-H2 hardware under Zephyr. 0 is a special case, not part of
 # that shared range: it disables the watchdog entirely (no CONFIG_WATCHDOG, no wdt_setup()
-# call at all -- see the zephyr_variant() watchdog codegen block below), rather than
+# call at all -- see the zephyr_variant_name() watchdog codegen block below), rather than
 # requesting an unusably short real timeout.
 def _validate_watchdog_timeout(value):
     # Bare 0 has no unit, so it wouldn't parse as a normal TimePeriod otherwise.
@@ -1784,7 +1796,7 @@ async def zephyr_toolchain_to_code(config: ConfigType) -> None:
     )
     from .framework import build_workspace, check_and_install  # noqa: PLC0415
 
-    variant = zephyr_variant()
+    variant = zephyr_variant_name()
     # Code generation reads the board's devicetree from the workspace; the compile
     # installs again for projects components ask for later
     manifest, version = build_workspace()
@@ -1811,7 +1823,7 @@ async def zephyr_toolchain_to_code(config: ConfigType) -> None:
     log_board_capabilities(
         board,
         variant,
-        zephyr_variant_info(),
+        zephyr_variant(),
         str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]),
         zephyr_data()["board_root"],
         zephyr_data()[KEY_SHIELDS],
@@ -1821,9 +1833,9 @@ async def zephyr_toolchain_to_code(config: ConfigType) -> None:
     _main_stack_to_code(config)
     zephyr_to_code(config)
     _base_to_code(config)
-    if (family := zephyr_family_module()) is not None:
+    if (family := zephyr_variant_family_module()) is not None:
         family.to_code(config)
-    await zephyr_variant_module().to_code(config)
+    zephyr_variant_module().to_code(config)
 
 
 def _restore_upload_data(zephyr_config: ConfigType) -> None:
@@ -1831,6 +1843,8 @@ def _restore_upload_data(zephyr_config: ConfigType) -> None:
     config, which skips validation. Re-validating that dict isn't an option: validation
     adds keys its own schema rejects, and would re-resolve moving git refs the build
     already pinned."""
+    from .variants import ZephyrVariantResolved, set_variant_core_data
+
     if KEY_FRAMEWORK_VERSION not in CORE.data.get(KEY_CORE, {}):
         raise EsphomeError(
             "Zephyr framework version is missing from the build metadata; "
@@ -1883,7 +1897,7 @@ def _variant_hook(name: str, default: Any = None) -> Any:
 
 def _family_hook(name: str, default: Any = None) -> Any:
     """The active family's module attribute `name`; see _variant_hook()."""
-    if (family := zephyr_family_module()) is None:
+    if (family := zephyr_variant_family_module()) is None:
         return default
     return getattr(family, name, default)
 
@@ -2074,7 +2088,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
         from .framework import check_and_install as west_install
 
         version = str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION])
-        manifest = zephyr_variant_resolved().manifest
+        manifest = zephyr_variant_manifest()
         python_bin, framework_path, west_env = west_install(
             manifest,
             version,
@@ -2112,7 +2126,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
     from .framework import check_and_install as west_install
 
     version = str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION])
-    manifest = zephyr_variant_resolved().manifest
+    manifest = zephyr_variant_manifest()
     python_bin, framework_path, west_env = west_install(
         manifest,
         version,
@@ -2149,6 +2163,8 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
 
 def run_compile(args: object, config: ConfigType) -> bool:
     """Build a platform's Zephyr variant with west."""
+    from .variants import SILABS
+
     if not CORE.using_toolchain_zephyr:
         return False
 
@@ -2177,8 +2193,8 @@ def run_compile(args: object, config: ConfigType) -> bool:
     from .mcuboot import check_mcuboot_swap_limit  # noqa: PLC0415
     from .toolchain import get_idedata  # noqa: PLC0415
 
-    variant = zephyr_variant()
-    variant_data = zephyr_variant_info()
+    variant = zephyr_variant_name()
+    variant_data = zephyr_variant()
     if (toolchain := variant_data.toolchain) is None:
         raise EsphomeError(f"Variant {variant} names no Zephyr SDK toolchain")
     manifest, version = build_workspace()

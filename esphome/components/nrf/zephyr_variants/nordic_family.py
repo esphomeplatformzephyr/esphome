@@ -47,7 +47,7 @@ def to_code(config: ConfigType) -> None:
     from esphome.components.zephyr import (  # noqa: PLC0415 -- avoids circular import at module load
         zephyr_add_prj_conf,
         zephyr_framework_type,
-        zephyr_variant_info,  # noqa: PLC0415
+        zephyr_variant,  # noqa: PLC0415
     )
     from esphome.const import CONF_FRAMEWORK, CONF_LOG_LEVEL  # noqa: PLC0415
     from esphome.core import CORE  # noqa: PLC0415
@@ -55,7 +55,7 @@ def to_code(config: ConfigType) -> None:
     zephyr_add_prj_conf("CPP", True)
     zephyr_add_prj_conf("REQUIRES_FULL_LIBCPP", True)
     zephyr_add_prj_conf("FPU", True)
-    if zephyr_variant_info().rng_needs_second_core and zephyr_framework_type() != "ncs":
+    if zephyr_variant().rng_needs_second_core and zephyr_framework_type() != "ncs":
         # Insecure software PRNG, as on rp2040/rp2350; ENTROPY_GENERATOR would fail to link.
         zephyr_add_prj_conf("TEST_RANDOM_GENERATOR", True)
         if "network" in CORE.config:
@@ -144,14 +144,12 @@ def i2c_check_pins(
     """Reject pins outside the bus's power domain, or SDA and SCL on two ports (nRF54L)."""
     from esphome.components.zephyr import (
         zephyr_data,  # noqa: PLC0415
-        zephyr_variant_info,  # noqa: PLC0415
+        zephyr_variant,  # noqa: PLC0415
     )
     from esphome.components.zephyr.const import KEY_BOARD  # noqa: PLC0415
     from esphome.core import EsphomeError  # noqa: PLC0415
 
-    if (
-        ports := zephyr_variant_info().i2c_ports_by_instance.get(bus_label.upper())
-    ) is None:
+    if (ports := zephyr_variant().i2c_ports_by_instance.get(bus_label.upper())) is None:
         return
     for role, pin in (("sda", sda), ("scl", scl)):
         if pin is not None and pin // 32 not in ports:

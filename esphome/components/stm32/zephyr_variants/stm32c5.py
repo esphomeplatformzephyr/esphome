@@ -1,8 +1,19 @@
+"""STM32C5 chips."""
+
 import os
 from pathlib import Path
 import time
 
 import esphome.codegen as cg
+from esphome.components.zephyr import (
+    zephyr_add_cdc_acm_rate_callback,
+    zephyr_add_overlay,
+    zephyr_add_prj_conf,
+    zephyr_add_sysbuild_conf,
+    zephyr_data,
+    zephyr_set_boot_layout,
+    zephyr_setup_preferences,
+)
 from esphome.components.zephyr.board_revision import parse_board_string
 from esphome.components.zephyr.const import (
     ADVANCED_SCHEMA,
@@ -14,6 +25,11 @@ from esphome.components.zephyr.const import (
     KEY_BOOTLOADER,
     declare_component_id,
     zephyr_ns,
+)
+from esphome.components.zephyr.dts_lookup import (
+    dts_node_enabled,
+    get_rng_node_label,
+    has_pinctrl_configured,
 )
 from esphome.components.zephyr.partitions import BootLayout
 from esphome.components.zephyr.variants import (
@@ -38,7 +54,7 @@ from esphome.types import ConfigType
 from ..const import VARIANT_STM32C5
 from . import stm32_family
 
-# The largest C5 Nucleo (1M flash, 256K RAM).
+# The largest C5 Nucleo (1M flash, 256K RAM)
 _DEFAULT_BOARD = "nucleo_c5a3zg"
 
 # MCUboot is opt-in: the C5 Nucleo boards point zephyr,code-partition at slot0, but without MCUboot
@@ -71,9 +87,7 @@ VARIANT: ZephyrVariant = ZephyrVariant(
 
 
 def config_schema(config: ConfigType) -> ConfigType:
-    config = dict(config)
-    if CONF_BOARD not in config:
-        config[CONF_BOARD] = _DEFAULT_BOARD
+    config = {CONF_BOARD: _DEFAULT_BOARD, **config}
     config[CONF_FRAMEWORK][CONF_ADVANCED] = _ADVANCED_SCHEMA(
         config[CONF_FRAMEWORK].get(CONF_ADVANCED, {})
     )
@@ -91,17 +105,7 @@ def config_schema(config: ConfigType) -> ConfigType:
     return config
 
 
-async def to_code(config: ConfigType) -> None:
-    from esphome.components.zephyr import (
-        zephyr_add_overlay,
-        zephyr_add_prj_conf,
-        zephyr_add_sysbuild_conf,
-        zephyr_data,
-        zephyr_set_boot_layout,
-        zephyr_setup_preferences,
-    )
-    from esphome.components.zephyr.dts_lookup import get_rng_node_label
-
+def to_code(config: ConfigType) -> None:
     cg.add_build_flag("-DUSE_ZEPHYR_VARIANT_STM32C5")
     cg.add_define("ESPHOME_BOARD", config[CONF_BOARD])
     cg.add_define("ESPHOME_VARIANT", VARIANT.name)
@@ -173,12 +177,6 @@ def _xiao_config_schema(config: ConfigType) -> None:
 
 
 def _xiao_to_code(config: ConfigType) -> None:
-    from esphome.components.zephyr import zephyr_add_overlay, zephyr_add_prj_conf
-    from esphome.components.zephyr.dts_lookup import (
-        dts_node_enabled,
-        has_pinctrl_configured,
-    )
-
     if _is_xiao(config[CONF_BOARD]):
         if uses_tinyuf2():
             zephyr_add_prj_conf("BUILD_OUTPUT_UF2", True)
@@ -204,8 +202,6 @@ def _xiao_to_code(config: ConfigType) -> None:
 
 @coroutine_with_priority(CoroPriority.DIAGNOSTICS)
 async def _tinyuf2_touch_to_code(advanced: ConfigType) -> None:
-    from esphome.components.zephyr import zephyr_add_cdc_acm_rate_callback
-
     var = cg.new_Pvariable(
         advanced[CONF_TINYUF2_TOUCH],
         zephyr_add_cdc_acm_rate_callback(),
@@ -215,8 +211,6 @@ async def _tinyuf2_touch_to_code(advanced: ConfigType) -> None:
 
 
 def uses_tinyuf2() -> bool:
-    from esphome.components.zephyr import zephyr_data
-
     data = zephyr_data()
     return _is_xiao(data[KEY_BOARD]) and data[KEY_BOOTLOADER] != BOOTLOADER_MCUBOOT
 

@@ -847,7 +847,7 @@ async def _late_logger_init(config: ConfigType) -> None:
             zephyr_add_prj_conf,
             zephyr_cdc_acm_label,
             zephyr_data,
-            zephyr_variant_info,
+            zephyr_variant,
         )
         from esphome.components.zephyr.const import KEY_BOARD
 
@@ -876,7 +876,7 @@ async def _late_logger_init(config: ConfigType) -> None:
                 node = resolve_uart_node_label(
                     zephyr_data()[KEY_BOARD],
                     hw_uart,
-                    zephyr_variant_info().uart_node_labels,
+                    zephyr_variant().uart_node_labels,
                 )
                 node_known = True
             if node_known:

@@ -8,11 +8,14 @@ of them."""
 
 from collections.abc import Callable
 import logging
+from typing import TYPE_CHECKING
 
 from esphome.core import EsphomeError
 
 from .gpio import pin_summary
-from .variants import ZephyrVariant
+
+if TYPE_CHECKING:
+    from .variants import ZephyrVariant
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -309,15 +312,15 @@ def zephyr_setup_uart_pinctrl(
     from . import (  # noqa: PLC0415 -- avoids circular import at module load
         _require_zephyr_toolchain,
         zephyr_add_overlay,
-        zephyr_family_module,
         zephyr_variant,
-        zephyr_variant_info,
+        zephyr_variant_family_module,
+        zephyr_variant_name,
     )
 
     _require_zephyr_toolchain("zephyr_setup_uart_pinctrl")
 
-    tx_display = _pin_display(tx_pin, zephyr_variant_info())
-    rx_display = _pin_display(rx_pin, zephyr_variant_info())
+    tx_display = _pin_display(tx_pin, zephyr_variant())
+    rx_display = _pin_display(rx_pin, zephyr_variant())
 
     if tx_pin is None and rx_pin is None:
         if not node_known:
@@ -346,7 +349,7 @@ def zephyr_setup_uart_pinctrl(
         )
         return _BOARD_DEFAULT, _BOARD_DEFAULT
 
-    family_module = zephyr_family_module()
+    family_module = zephyr_variant_family_module()
     if family_module is None or not hasattr(family_module, "uart_pinctrl"):
         # The family generates no UART pinctrl overlay -- don't silently ignore the
         # pins. Every family with uart_valid_pins/uart_valid_pins_by_instance set
@@ -354,12 +357,12 @@ def zephyr_setup_uart_pinctrl(
         # uart_pinctrl, so this should be unreachable in practice.
         raise EsphomeError(
             f"tx_pin:/rx_pin: are not supported for UART on this Zephyr variant "
-            f"('{zephyr_variant()}') -- remove them to use the board's default UART pins."
+            f"('{zephyr_variant_name()}') -- remove them to use the board's default UART pins."
         )
     prefix = getattr(family_module, "UART_PREFIX", port_label.upper())
 
-    tx_value = family_module.pin_macro(prefix, "TX", tx_pin, zephyr_variant())
-    rx_value = family_module.pin_macro(prefix, "RX", rx_pin, zephyr_variant())
+    tx_value = family_module.pin_macro(prefix, "TX", tx_pin, zephyr_variant_name())
+    rx_value = family_module.pin_macro(prefix, "RX", rx_pin, zephyr_variant_name())
     resolvers = family_module.uart_pinctrl(board, port_label)
     property_name = family_module.PROPERTY_NAME
     group_role_resolver, value_role_decoder = (
@@ -376,7 +379,7 @@ def zephyr_setup_uart_pinctrl(
     )
     zephyr_add_overlay(
         _build_uart_pinctrl_states_overlay(
-            states, property_name, zephyr_variant_info().pinctrl_node_label
+            states, property_name, zephyr_variant().pinctrl_node_label
         )
     )
     # A board whose stock node already declares >1 pinctrl state (e.g. "sleep" for
@@ -402,7 +405,7 @@ def zephyr_setup_uart_pinctrl(
     return tx_display, rx_display
 
 
-def _pin_display(pin: int | None, variant_info: ZephyrVariant | None) -> str:
+def _pin_display(pin: int | None, variant_info: "ZephyrVariant | None") -> str:
     """dump_config display string for a flat pin number."""
     if pin is None:
         return _BOARD_DEFAULT
@@ -422,16 +425,16 @@ def zephyr_setup_i2c_pinctrl(
     from . import (  # noqa: PLC0415 -- avoids circular import at module load
         _require_zephyr_toolchain,
         zephyr_add_overlay,
-        zephyr_family_module,
         zephyr_variant,
-        zephyr_variant_info,
+        zephyr_variant_family_module,
+        zephyr_variant_name,
     )
 
     _require_zephyr_toolchain("zephyr_setup_i2c_pinctrl")
 
-    variant_name = zephyr_variant() or ""
-    sda_display = _pin_display(sda, zephyr_variant_info())
-    scl_display = _pin_display(scl, zephyr_variant_info())
+    variant_name = zephyr_variant_name() or ""
+    sda_display = _pin_display(sda, zephyr_variant())
+    scl_display = _pin_display(scl, zephyr_variant())
 
     if sda is None and scl is None:
         # Bus is already enabled unconditionally by the caller -- board's own
@@ -439,7 +442,7 @@ def zephyr_setup_i2c_pinctrl(
         return sda_display, scl_display
 
     role_values: dict[str, str] = {}
-    family_module = zephyr_family_module()
+    family_module = zephyr_variant_family_module()
     if family_module is None or not hasattr(family_module, "i2c_value_role_decoder"):
         # The family generates no I2C pinctrl overlay -- don't silently ignore the pins.
         raise EsphomeError(
@@ -471,7 +474,7 @@ def zephyr_setup_i2c_pinctrl(
         property_name,
         role_values,
         value_role_decoder,
-        zephyr_variant_info().pinctrl_node_label,
+        zephyr_variant().pinctrl_node_label,
     )
     if (extra_overlay := getattr(family_module, "i2c_extra_overlay", None)) is not None:
         pinctrl_overlay += extra_overlay(bus_label, sda, scl, variant_name)
@@ -631,9 +634,9 @@ def zephyr_setup_spi_pinctrl(
         _require_zephyr_toolchain,
         zephyr_add_overlay,
         zephyr_add_prj_conf,
-        zephyr_family_module,
         zephyr_variant,
-        zephyr_variant_info,
+        zephyr_variant_family_module,
+        zephyr_variant_name,
     )
 
     _require_zephyr_toolchain("zephyr_setup_spi_pinctrl")
@@ -655,7 +658,7 @@ def zephyr_setup_spi_pinctrl(
             bus_label,
         )
 
-    family_module = zephyr_family_module()
+    family_module = zephyr_variant_family_module()
     if family_module is None or not hasattr(family_module, "spi_pin_values"):
         # The family generates no SPI pinctrl overlay -- clk/miso/mosi are irrelevant
         # here, whatever the board (or the user's own framework: overlays:) already
@@ -664,7 +667,7 @@ def zephyr_setup_spi_pinctrl(
         return
 
     values = family_module.spi_pin_values(
-        bus_label, clk, miso, mosi, data_pins, zephyr_variant()
+        bus_label, clk, miso, mosi, data_pins, zephyr_variant_name()
     )
     resolvers = family_module.spi_pinctrl(board, bus_label)
     property_name = family_module.PROPERTY_NAME
@@ -680,7 +683,7 @@ def zephyr_setup_spi_pinctrl(
         value_role_decoder=value_role_decoder,
         property_name=property_name,
     )
-    pinctrl_label = zephyr_variant_info().pinctrl_node_label
+    pinctrl_label = zephyr_variant().pinctrl_node_label
     zephyr_add_overlay(
         _build_spi_pinctrl_states_overlay(states, property_name, pinctrl_label)
     )

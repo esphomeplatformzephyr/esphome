@@ -1,3 +1,9 @@
+"""Shared code for the chips built with the Zephyr toolchain.
+
+Each platform lists its chips in its own ``zephyr_variants`` package; a chip's module
+holds its ``ZephyrVariant`` and its ``config_schema`` and ``to_code``.
+"""
+
 from dataclasses import dataclass, field
 import logging
 from pathlib import Path
@@ -24,6 +30,7 @@ from esphome.const import (
 from esphome.core import CORE, EsphomeError
 from esphome.types import ConfigType
 
+from . import zephyr_data, zephyr_set_core_data
 from .board_revision import parse_board_string
 from .const import (
     BOOTLOADER_MCUBOOT,
@@ -71,7 +78,7 @@ _LOGGER = logging.getLogger(__name__)
 FAMILY_DEFAULT: Final = "family default"
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(frozen=True)
 class ZephyrManifest:
     """The west manifest repository a build starts from (Zephyr, NCS, etc.)."""
 
@@ -429,8 +436,8 @@ def resolve_variant(
 ) -> ZephyrVariantResolved:
     """Resolve `framework: type:`, `version:` and `source:` of a variant's config.
 
-    ``min_version_reason`` says why the manifest's minimum exists, e.g. "mainline
-    ESP32-C6 support". A version other than the manifest's default only warns.
+    ``min_version_reason`` says why the manifest's minimum exists, e.g. "mainline STM32
+    support".
     """
     framework = config[CONF_FRAMEWORK]
     framework_types = [m.framework_type for m in variant.manifests]
@@ -442,8 +449,6 @@ def resolve_variant(
             [CONF_FRAMEWORK, CONF_TYPE],
         )
     manifest = variant.manifest_for(framework_type)
-    default_version = manifest.default_version
-    min_version = manifest.min_version
 
     if CONF_VERSION in framework and CONF_SOURCE in framework:
         raise cv.Invalid(
@@ -470,31 +475,31 @@ def resolve_variant(
         with cv.prepend_path([CONF_FRAMEWORK, CONF_SOURCE]):
             version_str = resolve_sdk_source_version(source, framework[CONF_REFRESH])
     else:
-        version_str = str(framework.get(CONF_VERSION, default_version))
+        version_str = str(framework.get(CONF_VERSION, manifest.default_version))
         if version_str == VERSION_RECOMMENDED:
-            version_str = default_version
+            version_str = manifest.default_version
 
     try:
-        framework_ver = cv.Version.parse(version_str)
-        framework_order = _release_order(framework_ver)
+        version = cv.Version.parse(version_str)
+        version_order = _release_order(version)
     except ValueError as err:
         raise cv.Invalid(
             f"'{version_str}' is not a version number", [CONF_FRAMEWORK, CONF_VERSION]
         ) from err
-    if framework_order < _release_order(min_version):
+    if version_order < _release_order(manifest.min_version):
         raise cv.Invalid(
-            f"{variant.name} requires {manifest.framework_type} >= {min_version} "
+            f"{variant.name} requires {manifest.framework_type} >= {manifest.min_version} "
             f"({min_version_reason}). Got {version_str}.",
             [CONF_FRAMEWORK, CONF_VERSION],
         )
-    if source is None and framework_ver != cv.Version.parse(default_version):
+    if source is None and version != cv.Version.parse(manifest.default_version):
         _LOGGER.warning(
             "The selected %s version is not the recommended one (%s). "
             "If there are connectivity or build issues please remove the manual version.",
             manifest.framework_type,
-            default_version,
+            manifest.default_version,
         )
-    return ZephyrVariantResolved(variant, manifest, framework_ver)
+    return ZephyrVariantResolved(variant, manifest, version)
 
 
 def set_variant_core_data(
@@ -525,9 +530,6 @@ def set_variant_core_data(
 ) -> None:
     """Fill CORE.data for a variant's config_schema; ``bootloader`` is "" for none.
     The keywords after ``runner`` replace a field's start value."""
-    # deferred: zephyr's __init__ may import this package
-    from . import zephyr_data, zephyr_set_core_data
-
     zephyr_set_core_data({**config, KEY_BOOTLOADER: bootloader})
     zephyr_data()[KEY_VARIANT_RESOLVED] = resolved
     # The devicetree caches, filled as code generation reads the board

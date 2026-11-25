@@ -80,8 +80,7 @@ KEY_BOARD_YAML_CACHE: Final = "board_yaml_cache"
 # Devicetree compatible of Zephyr's SEGGER RTT UART driver
 SEGGER_RTT_UART = "segger,rtt-uart"
 
-# framework: version: "recommended" -- explicit alias for the variant's default_version,
-# same as omitting `version:` entirely.
+# `framework: version: recommended`, the same as leaving `version:` out
 VERSION_RECOMMENDED: Final = "recommended"
 
 zephyr_ns = cg.esphome_ns.namespace("zephyr")

@@ -18,12 +18,12 @@ from esphome.components.esp32 import (
     get_esp32_variant,
 )
 from esphome.components.zephyr import (
-    variant_value,
     zephyr_add_prj_conf,
     zephyr_variant,
-    zephyr_variant_family,
-    zephyr_variant_info,
+    zephyr_variant_family_name,
+    zephyr_variant_name,
 )
+from esphome.components.zephyr.variants import variant_value
 from esphome.config_helpers import filter_source_files_from_platform
 import esphome.config_validation as cv
 from esphome.const import (
@@ -207,10 +207,10 @@ _WAKEUP_PIN_MODE_BOTH_LEVELS = (
 
 def validate_config(config: ConfigType) -> ConfigType:
     if CORE.using_toolchain_zephyr and not variant_value(
-        zephyr_variant_info(), "has_poweroff"
+        zephyr_variant(), "has_poweroff"
     ):
         raise cv.Invalid(
-            f"deep_sleep is not supported on the Zephyr {zephyr_variant()} variant"
+            f"deep_sleep is not supported on the Zephyr {zephyr_variant_name()} variant"
         )
 
     wakeup_pins = config.get(CONF_WAKEUP_PIN)
@@ -443,7 +443,7 @@ async def to_code(config: ConfigType) -> None:
             await cg.add_pin(var.set_wakeup_pin, wakeup_pins[0][CONF_PIN])
             if CORE.using_toolchain_zephyr:
                 cg.add_define("USE_DEEP_SLEEP_ZEPHYR_WAKEUP_PIN")
-                if zephyr_variant_family() == "stm32":
+                if zephyr_variant_family_name() == "stm32":
                     # Maps the pin to its PWR wake-up line
                     zephyr_add_prj_conf("STM32_WKUP_PINS", True)
     cg.add_optional(var.set_wakeup_pin_mode, config.get(CONF_WAKEUP_PIN_MODE))

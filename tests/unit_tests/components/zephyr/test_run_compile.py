@@ -108,7 +108,7 @@ def test_fails_with_west(build: MagicMock) -> None:
 def test_needs_the_variant_toolchain(build: MagicMock) -> None:
     with (
         patch(
-            "esphome.components.zephyr.zephyr_variant_info",
+            "esphome.components.zephyr.zephyr_variant",
             return_value=replace(stm32c5.VARIANT, toolchain=None),
         ),
         pytest.raises(EsphomeError, match="names no Zephyr SDK toolchain"),

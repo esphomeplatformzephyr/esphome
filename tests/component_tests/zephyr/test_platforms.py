@@ -107,7 +107,7 @@ def test_esp32_only_features_are_rejected_on_zephyr(
 )
 def test_split_default_keys(platform: str, variant: str, expected: list[str]) -> None:
     CORE.data[KEY_CORE] = {KEY_TARGET_PLATFORM: platform}
-    with patch("esphome.components.zephyr.zephyr_variant", return_value=variant):
+    with patch("esphome.components.zephyr.zephyr_variant_name", return_value=variant):
         assert cv._zephyr_toolchain_default_keys() == expected
 
 

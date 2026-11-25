@@ -103,7 +103,7 @@ def config_schema(config: ConfigType) -> ConfigType:
     return config
 
 
-async def to_code(config: ConfigType) -> None:
+def to_code(config: ConfigType) -> None:
     from esphome.components.zephyr import (
         zephyr_add_overlay,
         zephyr_add_prj_conf,

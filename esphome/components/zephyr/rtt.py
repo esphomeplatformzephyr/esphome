@@ -47,10 +47,14 @@ def claim_rtt_channel(channel: int, owner: str) -> None:
 
 def validate_rtt_port(port: str) -> str:
     """Reject an RTT<n> port on a family whose SoCs have no SEGGER RTT support."""
-    from . import zephyr_family_uart_drivers, zephyr_variant, zephyr_variant_family
+    from . import (
+        zephyr_family_uart_drivers,
+        zephyr_variant_family_name,
+        zephyr_variant_name,
+    )
 
     if SEGGER_RTT_UART not in zephyr_family_uart_drivers():
-        family = zephyr_variant_family() or zephyr_variant()
+        family = zephyr_variant_family_name() or zephyr_variant_name()
         raise cv.Invalid(f"{port} needs SEGGER RTT, which {family} does not support")
     return port
 

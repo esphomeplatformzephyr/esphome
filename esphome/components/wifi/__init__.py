@@ -456,14 +456,14 @@ def validate_variant(_):
     if CORE.using_toolchain_zephyr:
         from esphome.components.zephyr import (
             zephyr_data,
-            zephyr_family_module,
             zephyr_variant,
-            zephyr_variant_info,
+            zephyr_variant_family_module,
+            zephyr_variant_name,
         )
         from esphome.components.zephyr.const import KEY_BOARD
 
-        variant_name = zephyr_variant()
-        variant = zephyr_variant_info()
+        variant_name = zephyr_variant_name()
+        variant = zephyr_variant()
         if variant is None or "wifi" not in variant.transports:
             raise cv.Invalid(
                 f"wifi is not supported on Zephyr variant '{variant_name}'"
@@ -494,7 +494,7 @@ def validate_variant(_):
                 f"eap is not supported on Zephyr variant '{variant_name}'",
                 [CONF_NETWORKS],
             )
-        family_module = zephyr_family_module()
+        family_module = zephyr_variant_family_module()
         if (
             check_board := getattr(family_module, "wifi_check_board", None)
         ) is not None:
@@ -1130,7 +1130,7 @@ async def to_code(config):
             zephyr_add_overlay,
             zephyr_add_prj_conf,
             zephyr_variant,
-            zephyr_variant_info,
+            zephyr_variant_name,
         )
 
         zephyr_add_prj_conf("WIFI", True)
@@ -1138,11 +1138,11 @@ async def to_code(config):
         # Pin single-threaded net_mgmt dispatch -- the event queue in
         # wifi_component_zephyr.cpp is single-producer only.
         zephyr_add_prj_conf("NET_MGMT_EVENT_THREAD", True)
-        variant = zephyr_variant_info()
+        variant = zephyr_variant()
         transport_driver = variant.transport_drivers.get("wifi")
         if transport_driver is None:
             raise EsphomeError(
-                f"Zephyr variant '{zephyr_variant()}' declares wifi support but has "
+                f"Zephyr variant '{zephyr_variant_name()}' declares wifi support but has "
                 f"no transport_drivers entry for it"
             )
         kconfig, dt_label = transport_driver

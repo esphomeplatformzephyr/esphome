@@ -8,12 +8,21 @@ from pathlib import Path
 import re
 import subprocess
 import time
+from typing import TYPE_CHECKING
 
 import yaml
 
 from esphome.build_helpers.tools_cache import ZEPHYR_TOOLS_CACHE, tools_cache_path
-from esphome.const import CONF_PATH, CONF_REF, CONF_TYPE, CONF_URL, TYPE_LOCAL
-from esphome.core import EsphomeError
+from esphome.const import (
+    CONF_PATH,
+    CONF_REF,
+    CONF_TYPE,
+    CONF_URL,
+    KEY_CORE,
+    KEY_FRAMEWORK_VERSION,
+    TYPE_LOCAL,
+)
+from esphome.core import CORE, EsphomeError
 from esphome.framework_helpers import (
     get_python_env_executable_path,
     install_lock,
@@ -35,7 +44,9 @@ from .framework_helpers import (
     refresh_framework,
 )
 from .sdk_install import ensure_sdk
-from .variants import ZephyrManifest, ZephyrModule
+
+if TYPE_CHECKING:
+    from .variants import ZephyrManifest, ZephyrModule
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -46,9 +57,8 @@ _STALE_DOWNLOAD_AGE: int = 24 * 60 * 60
 
 
 def get_zephyr_tools_path() -> Path:
-    # Machine-global (OS user cache dir) so all Zephyr-based projects share one
-    # SDK/toolchain/west install; see build_helpers.tools_cache.tools_cache_path
-    # for the env-override and normalization rules.
+    # Machine-global (OS user cache dir) so all projects share one install;
+    # see espidf.framework.get_idf_tools_path for the location rationale.
     return tools_cache_path(*ZEPHYR_TOOLS_CACHE)
 
 
@@ -63,7 +73,7 @@ def _get_toolchain_path(sdk_version: str, toolchain: str) -> Path:
 
 
 def _get_framework_path(
-    manifest: ZephyrManifest, version: str, source: ConfigType | None = None
+    manifest: "ZephyrManifest", version: str, source: ConfigType | None = None
 ) -> Path:
     return (
         get_zephyr_tools_path()
@@ -72,14 +82,13 @@ def _get_framework_path(
     )
 
 
-def build_workspace() -> tuple[ZephyrManifest, str]:
+def build_workspace() -> "tuple[ZephyrManifest, str]":
     """The manifest this build installs and the version its workspace is installed at;
     the install and every reader of the workspace take it from here."""
     # deferred: zephyr's __init__ may import this module
-    from . import zephyr_variant_resolved
+    from . import zephyr_variant_manifest
 
-    resolved = zephyr_variant_resolved()
-    return resolved.manifest, f"v{resolved.version}"
+    return zephyr_variant_manifest(), f"v{CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]}"
 
 
 def get_zephyr_base() -> Path:
@@ -94,7 +103,7 @@ def get_zephyr_base() -> Path:
 
 
 def get_build_paths(
-    manifest: ZephyrManifest, version: str, source: ConfigType | None = None
+    manifest: "ZephyrManifest", version: str, source: ConfigType | None = None
 ) -> tuple[Path, Path]:
     """The venv's python and the workspace a build runs west in."""
     python_executable = get_python_env_executable_path(
@@ -126,7 +135,7 @@ def get_build_env(
 
 
 def _source_cache_key(
-    manifest: ZephyrManifest,
+    manifest: "ZephyrManifest",
     ver_tag: str,
     source: ConfigType | None,
 ) -> str:
@@ -218,7 +227,7 @@ def _module_is_current(sentinel: Path, refresh: float | None) -> bool:
     )
 
 
-def install_git_modules(modules: list[ZephyrModule], sdk_url: str) -> list[Path]:
+def install_git_modules(modules: "list[ZephyrModule]", sdk_url: str) -> list[Path]:
     """Fetch each git module into its own folder and return the folders, for
     EXTRA_ZEPHYR_MODULES. A fetched module's revision is checked again once its
     refresh time has passed. sdk_url is the SDK the build uses, the one project a
@@ -288,7 +297,7 @@ def install_git_modules(modules: list[ZephyrModule], sdk_url: str) -> list[Path]
 
 
 def check_and_install(
-    manifest: ZephyrManifest,
+    manifest: "ZephyrManifest",
     version: str,
     projects: frozenset[str],
     west_version: str | None = None,
@@ -308,7 +317,7 @@ def check_and_install(
 
 
 def _check_and_install(
-    manifest: ZephyrManifest,
+    manifest: "ZephyrManifest",
     version: str,
     west_version: str | None,
     ninja_version: str | None,
@@ -385,7 +394,7 @@ def _check_and_install(
 def _install_workspace(
     python_bin: Path,
     framework: Path,
-    manifest: ZephyrManifest,
+    manifest: "ZephyrManifest",
     ver_tag: str,
     source: ConfigType | None,
     projects: frozenset[str],

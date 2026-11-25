@@ -23,7 +23,6 @@ from esphome.components.zephyr import (
     HexValue,
     apply_swap_method,
     validate_swap_method,
-    variant_value,
     zephyr_add_overlay,
     zephyr_add_prj_conf,
     zephyr_add_sysbuild_conf,
@@ -31,8 +30,8 @@ from esphome.components.zephyr import (
     zephyr_claim_cdc_acm,
     zephyr_data,
     zephyr_framework_type,
-    zephyr_variant as zephyr_variant,
-    zephyr_variant_info,
+    zephyr_variant,
+    zephyr_variant_name as zephyr_variant_name,
 )
 from esphome.components.zephyr.const import (
     BOOTLOADER_MCUBOOT,
@@ -41,6 +40,7 @@ from esphome.components.zephyr.const import (
     KEY_PM_STATIC,
     KEY_SYSBUILD,
 )
+from esphome.components.zephyr.variants import variant_value
 from esphome.components.zephyr_ble_server import request_ble_l2cap_mtu
 import esphome.config_validation as cv
 from esphome.const import (
@@ -113,7 +113,7 @@ def _validate_platform(conf: ConfigType) -> ConfigType:
         CORE.is_nrf52
         or (
             CORE.using_toolchain_zephyr
-            and (variant := zephyr_variant_info()) is not None
+            and (variant := zephyr_variant()) is not None
             and variant.mcumgr_ota
         )
     ):
@@ -123,7 +123,7 @@ def _validate_platform(conf: ConfigType) -> ConfigType:
         )
     hw_uart = conf[CONF_TRANSPORT].get(CONF_HARDWARE_UART)
     if hw_uart in CDC_IDS and not (
-        CORE.is_nrf52 or variant_value(zephyr_variant_info(), "mcumgr_cdc")
+        CORE.is_nrf52 or variant_value(zephyr_variant(), "mcumgr_cdc")
     ):
         raise cv.Invalid(
             f"'{hw_uart}' is not available on this variant -- it has no USB "
@@ -300,7 +300,7 @@ async def to_code(config: ConfigType) -> None:
             uart_name = resolve_uart_node_label(
                 zephyr_data()[KEY_BOARD],
                 hw_uart,
-                zephyr_variant_info().uart_node_labels,
+                zephyr_variant().uart_node_labels,
             )
         zephyr_add_prj_conf("MCUMGR_TRANSPORT_UART", True)
         # The mcumgr serial driver; MCUMGR_TRANSPORT_UART depends on it and is dropped without it

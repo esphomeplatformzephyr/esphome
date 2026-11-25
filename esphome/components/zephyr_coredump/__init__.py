@@ -10,8 +10,8 @@ from esphome.components.zephyr import (
     zephyr_add_prj_conf,
     zephyr_data,
     zephyr_require_partition,
-    zephyr_variant as zephyr_variant,
-    zephyr_variant_info,
+    zephyr_variant,
+    zephyr_variant_name as zephyr_variant_name,
 )
 from esphome.components.zephyr.const import (
     BOOTLOADER_MCUBOOT,
@@ -142,7 +142,7 @@ async def _zephyr_to_code(config: ConfigType) -> None:
     """Zephyr RTOS: every supported SDK is Zephyr 4.x, so the stack pointer fix is never needed,
     and the user's devicetree provides the partition."""
     # Xtensa has no ARCH_SUPPORTS_COREDUMP_THREADS, so only the faulting thread is stored
-    if variant_value(zephyr_variant_info(), "cpu_arch") == "xtensa":
+    if variant_value(zephyr_variant(), "cpu_arch") == "xtensa":
         zephyr_add_prj_conf("DEBUG_COREDUMP_MEMORY_DUMP_MIN", True)
     else:
         zephyr_add_prj_conf("DEBUG_COREDUMP_MEMORY_DUMP_THREADS", True)

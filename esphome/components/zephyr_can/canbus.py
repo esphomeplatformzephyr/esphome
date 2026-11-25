@@ -17,8 +17,8 @@ from esphome.components.zephyr import (
     zephyr_add_overlay,
     zephyr_add_prj_conf,
     zephyr_data,
-    zephyr_variant_family,
-    zephyr_variant_info,
+    zephyr_variant,
+    zephyr_variant_family_name,
 )
 from esphome.components.zephyr.const import KEY_BOARD
 import esphome.config_validation as cv
@@ -68,7 +68,7 @@ def _validate_instance(value: str) -> str:
 
 
 def _validate(config: ConfigType) -> ConfigType:
-    if not CORE.using_zephyr or zephyr_variant_family() not in SUPPORTED_FAMILIES:
+    if not CORE.using_zephyr or zephyr_variant_family_name() not in SUPPORTED_FAMILIES:
         raise cv.Invalid(
             "zephyr_can is only available on Zephyr variants of the "
             f"{', '.join(SUPPORTED_FAMILIES)} family"
@@ -121,7 +121,7 @@ def _resolve_instance(board: str) -> str:
 
 def _pin_name(pin: int) -> str:
     """Format a pin number the way STM32 pinctrl nodes spell it, e.g. 11 -> 'pa11'."""
-    variant = zephyr_variant_info()
+    variant = zephyr_variant()
     port_labels = variant.gpio_port_labels
     port = pin // variant.gpio_port_width
     if port >= len(port_labels):

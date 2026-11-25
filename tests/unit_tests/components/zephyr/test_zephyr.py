@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Callable
 import dataclasses
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -49,14 +48,13 @@ from esphome.components.zephyr import (
     zephyr_claim_cdc_acm,
     zephyr_config_schema,
     zephyr_data,
-    zephyr_framework_type,
     zephyr_only_on_variant,
     zephyr_set_module_override,
     zephyr_setup_i2c_pinctrl,
     zephyr_setup_spi_pinctrl,
     zephyr_setup_uart_pinctrl,
-    zephyr_variant,
-    zephyr_variant_family,
+    zephyr_variant_family_name,
+    zephyr_variant_name,
 )
 from esphome.components.zephyr.const import (
     CONF_BOARD_SOURCE,
@@ -98,7 +96,6 @@ from esphome.const import (
     KEY_TARGET_PLATFORM,
     PLATFORM_ESP32,
     PLATFORM_NRF,
-    PLATFORM_RP2,
     PLATFORM_STM32,
     TYPE_GIT,
     TYPE_LOCAL,
@@ -137,93 +134,38 @@ def test_empty_zephyr_data_has_every_zephyr_data_key() -> None:
 
 
 # ---------------------------------------------------------------------------
-# zephyr_variant / zephyr_variant_family
+# zephyr_variant_name / zephyr_variant_family_name
 # ---------------------------------------------------------------------------
 
 
 def test_zephyr_variant_returns_variant_name() -> None:
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant="ESP32H2")
-    assert zephyr_variant() == "ESP32H2"
+    assert zephyr_variant_name() == "ESP32H2"
 
 
 def test_zephyr_variant_returns_none_when_unset() -> None:
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant=None)
-    assert zephyr_variant() is None
+    assert zephyr_variant_name() is None
 
 
 def test_zephyr_variant_family_returns_none_when_variant_unset() -> None:
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant=None)
-    assert zephyr_variant_family() is None
+    assert zephyr_variant_family_name() is None
 
 
 def test_zephyr_variant_family_returns_none_for_unknown_variant() -> None:
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant="NOT_A_REAL_VARIANT")
-    assert zephyr_variant_family() is None
+    assert zephyr_variant_family_name() is None
 
 
 def test_zephyr_variant_family_returns_family_for_esp32h2() -> None:
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant="ESP32H2")
-    assert zephyr_variant_family() == "esp32"
+    assert zephyr_variant_family_name() == "esp32"
 
 
 def test_zephyr_variant_family_returns_family_for_esp32c6() -> None:
     CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant="ESP32C6")
-    assert zephyr_variant_family() == "esp32"
-
-
-_VARIANT_READERS = [zephyr_variant, zephyr_variant_family, zephyr_framework_type]
-
-
-@pytest.mark.parametrize("platform", [None, PLATFORM_ESP32, PLATFORM_STM32])
-@pytest.mark.parametrize("lookup", _VARIANT_READERS)
-def test_variant_read_before_the_platform_schema_is_rejected(
-    lookup: Callable[[], str | None], platform: str | None
-) -> None:
-    """Until the platform schema sets the target framework, even esp32 may be Zephyr."""
-    CORE.data.pop(KEY_ZEPHYR, None)
-    CORE.data[KEY_CORE] = {} if platform is None else {KEY_TARGET_PLATFORM: platform}
-    with pytest.raises(RuntimeError, match="before the platform schema set it"):
-        lookup()
-
-
-@pytest.mark.parametrize("lookup", _VARIANT_READERS)
-def test_variant_read_on_zephyr_without_zephyr_data_is_rejected(
-    lookup: Callable[[], str | None],
-) -> None:
-    CORE.data.pop(KEY_ZEPHYR, None)
-    CORE.data[KEY_CORE] = {
-        KEY_TARGET_PLATFORM: PLATFORM_STM32,
-        KEY_TARGET_FRAMEWORK: "zephyr",
-    }
-    with pytest.raises(RuntimeError, match="without Zephyr data"):
-        lookup()
-
-
-@pytest.mark.parametrize(
-    ("platform", "framework"),
-    [(PLATFORM_ESP32, "esp-idf"), (PLATFORM_RP2, "arduino")],
-)
-@pytest.mark.parametrize("lookup", _VARIANT_READERS)
-def test_variant_read_without_zephyr_data_is_none(
-    lookup: Callable[[], str | None], platform: str, framework: str
-) -> None:
-    """esp32 and rp2 also build without Zephyr."""
-    CORE.data.pop(KEY_ZEPHYR, None)
-    CORE.data[KEY_CORE] = {
-        KEY_TARGET_PLATFORM: platform,
-        KEY_TARGET_FRAMEWORK: framework,
-    }
-    assert lookup() is None
-
-
-@pytest.mark.parametrize("lookup", _VARIANT_READERS)
-def test_variant_read_off_the_zephyr_toolchain_is_none(
-    lookup: Callable[[], str | None],
-) -> None:
-    """nrf52 keeps Zephyr data on its PlatformIO toolchain, which has no variant."""
-    CORE.data[KEY_ZEPHYR] = empty_zephyr_data(variant="ESP32C6")
-    CORE.toolchain = Toolchain.PLATFORMIO
-    assert lookup() is None
+    assert zephyr_variant_family_name() == "esp32"
 
 
 # ---------------------------------------------------------------------------
@@ -1943,7 +1885,7 @@ def test_upload_program_returns_false_for_non_serial_host() -> None:
 
 def test_upload_program_resolves_variant_and_flashes(tmp_path: Path) -> None:
     """Regression test: previously crashed with NameError on VARIANTS[variant]
-    (undefined local) instead of VARIANTS[zephyr_variant()]."""
+    (undefined local) instead of VARIANTS[zephyr_variant_name()]."""
     from esphome.const import KEY_FRAMEWORK_VERSION
     from esphome.upload_targets import PortType
 
@@ -1974,7 +1916,7 @@ def test_upload_program_resolves_variant_and_flashes(tmp_path: Path) -> None:
         )
 
     assert result is True
-    # Confirms VARIANTS[zephyr_variant()] resolved to the real ESP32H2 SDK, not a
+    # Confirms VARIANTS[zephyr_variant_name()] resolved to the real ESP32H2 SDK, not a
     # crash -- west_install was called with that variant's actual manifest object.
     mock_west_install.assert_called_once()
     assert mock_west_install.call_args[0][0] is VARIANTS["ESP32H2"].manifest
@@ -2699,7 +2641,7 @@ def test_zephyr_toolchain_store() -> None:
 def test_zephyr_additional_framework_projects_mainline_takes_the_family_hals() -> None:
 
     with patch(
-        "esphome.components.zephyr.zephyr_family_module",
+        "esphome.components.zephyr.zephyr_variant_family_module",
         return_value=VARIANTS["STM32C5"].family_module,
     ):
         assert zephyr_additional_framework_projects(ZEPHYR_MAINLINE) == frozenset(

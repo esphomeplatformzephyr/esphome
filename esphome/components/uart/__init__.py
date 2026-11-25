@@ -189,12 +189,12 @@ def validate_zephyr_config(config):
             )
         from esphome.components.zephyr import (
             zephyr_variant,  # noqa: PLC0415
-            zephyr_variant_info,  # noqa: PLC0415
+            zephyr_variant_name,  # noqa: PLC0415
         )
 
         # Only esp32-family UART pins go through the GPIO matrix and can use any pin.
-        variant = zephyr_variant()
-        variant_info = zephyr_variant_info()
+        variant = zephyr_variant_name()
+        variant_info = zephyr_variant()
         valid_pins = variant_info.uart_valid_pins if variant_info is not None else {}
         valid_pins_by_instance = (
             variant_info.uart_valid_pins_by_instance if variant_info is not None else {}
@@ -561,7 +561,7 @@ async def to_code(config):
                 zephyr_add_prj_conf,
                 zephyr_data,
                 zephyr_setup_uart_pinctrl,
-                zephyr_variant_info,
+                zephyr_variant,
             )
             from esphome.components.zephyr.const import KEY_BOARD
 
@@ -591,7 +591,7 @@ async def to_code(config):
                 port_label = resolve_uart_node_label(
                     zephyr_data()[KEY_BOARD],
                     port_value,
-                    zephyr_variant_info().uart_node_labels,
+                    zephyr_variant().uart_node_labels,
                 )
             cg.add(
                 var.set_configured_device(

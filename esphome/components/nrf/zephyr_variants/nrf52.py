@@ -254,7 +254,7 @@ def config_schema(config: ConfigType) -> ConfigType:
     return config
 
 
-async def to_code(config: ConfigType) -> None:
+def to_code(config: ConfigType) -> None:
     from esphome.components.zephyr import (
         zephyr_add_overlay,
         zephyr_add_prj_conf,
@@ -471,14 +471,14 @@ def upload_serial_dfu(host: str) -> bool:
     from esphome.components.zephyr import (  # noqa: PLC0415
         zephyr_additional_framework_projects,
         zephyr_data,
-        zephyr_variant_resolved,
+        zephyr_variant_manifest,
     )
     from esphome.components.zephyr.framework import check_and_install as west_install  # noqa: PLC0415
 
     package = CORE.relative_build_path(_DFU_PACKAGE)
     if not package.is_file():
         raise EsphomeError("Firmware not found. Please compile first.")
-    manifest = zephyr_variant_resolved().manifest
+    manifest = zephyr_variant_manifest()
     python_bin, _, env = west_install(
         manifest,
         str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]),

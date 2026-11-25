@@ -1140,9 +1140,9 @@ def _find_picotool() -> Path | None:
 
 
 def _is_zephyr_rpi_pico() -> bool:
-    from esphome.components.zephyr import zephyr_variant_family
+    from esphome.components.zephyr import zephyr_variant_family_name
 
-    return CORE.using_toolchain_zephyr and zephyr_variant_family() == "rpi_pico"
+    return CORE.using_toolchain_zephyr and zephyr_variant_family_name() == "rpi_pico"
 
 
 def _find_picotool_zephyr() -> Path | None:

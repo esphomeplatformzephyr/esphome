@@ -44,7 +44,7 @@ def to_code(config: ConfigType) -> None:
     """REQUIRES_FULL_LIBCPP selects GLIBCXX_LIBCPP; without it Zephyr defaults
     to MINIMAL_LIBCPP, which has no STL and breaks ESPHome's C++ headers."""
     import esphome.codegen as cg  # noqa: PLC0415
-    from esphome.components.zephyr import zephyr_add_prj_conf, zephyr_variant_info  # noqa: PLC0415 -- avoids circular import at module load
+    from esphome.components.zephyr import zephyr_add_prj_conf, zephyr_variant  # noqa: PLC0415 -- avoids circular import at module load
     from esphome.components.zephyr.variants import variant_value  # noqa: PLC0415
     from esphome.const import CONF_AP, CONF_FRAMEWORK, CONF_LOG_LEVEL, CONF_WIFI  # noqa: PLC0415
     from esphome.core import CORE  # noqa: PLC0415
@@ -53,7 +53,7 @@ def to_code(config: ConfigType) -> None:
     zephyr_add_prj_conf("REQUIRES_FULL_LIBCPP", True)
     # Original ESP32 (LX6) and S3 (LX7) have a hardware FPU; esp32_h2/c6/c5/c3 are
     # RV32IMAC/RV32IMC, none of which do.
-    xtensa = variant_value(zephyr_variant_info(), "cpu_arch") == "xtensa"
+    xtensa = variant_value(zephyr_variant(), "cpu_arch") == "xtensa"
     if xtensa:
         zephyr_add_prj_conf("FPU", True)
     # random_bytes() uses sys_rand_get(), which requires the entropy subsystem.
@@ -123,10 +123,10 @@ def _i2c_value_role(value: int, signal_ids: dict[str, int]) -> str | None:
 
 def i2c_value_role_decoder(bus_label: str) -> Callable[[int], str | None] | None:
     """None if the instance/variant isn't in _I2C_INSTANCE_SIGNAL_IDS."""
-    from esphome.components.zephyr import zephyr_variant  # noqa: PLC0415 -- avoids circular import at module load
+    from esphome.components.zephyr import zephyr_variant_name  # noqa: PLC0415 -- avoids circular import at module load
 
     instance = int(bus_label.removeprefix("i2c")) if bus_label[3:].isdigit() else None
-    signal_ids = _I2C_INSTANCE_SIGNAL_IDS.get(zephyr_variant(), {}).get(instance)
+    signal_ids = _I2C_INSTANCE_SIGNAL_IDS.get(zephyr_variant_name(), {}).get(instance)
     if signal_ids is None:
         return None
 
@@ -195,12 +195,14 @@ def uart_pinctrl(
     """Return (group_role_resolver, value_role_decoder) bound to port_label's real
     UART instance signal IDs, or None if the instance/variant isn't in
     _UART_INSTANCE_SIGNAL_BASE (falls back to the positional guess)."""
-    from esphome.components.zephyr import zephyr_variant  # noqa: PLC0415 -- avoids circular import at module load
+    from esphome.components.zephyr import zephyr_variant_name  # noqa: PLC0415 -- avoids circular import at module load
 
     instance = (
         int(port_label.removeprefix("uart")) if port_label[4:].isdigit() else None
     )
-    signal_base = _UART_INSTANCE_SIGNAL_BASE.get(zephyr_variant(), {}).get(instance)
+    signal_base = _UART_INSTANCE_SIGNAL_BASE.get(zephyr_variant_name(), {}).get(
+        instance
+    )
     if signal_base is None:
         return None
 
@@ -292,7 +294,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
     from esphome.components.zephyr import (  # noqa: PLC0415
         zephyr_additional_framework_projects,
         zephyr_data,
-        zephyr_variant_resolved,
+        zephyr_variant_manifest,
     )
     from esphome.components.zephyr.build_zephyr import run_west_flash  # noqa: PLC0415
     from esphome.components.zephyr.const import KEY_RUNNER  # noqa: PLC0415
@@ -303,7 +305,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
     check_permissions(host)
 
     version = str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION])
-    manifest = zephyr_variant_resolved().manifest
+    manifest = zephyr_variant_manifest()
     python_bin, framework_path, west_env = west_install(
         manifest,
         version,
@@ -341,10 +343,10 @@ def spi_pinctrl(
     """Return (group_role_resolver, value_role_decoder) bound to bus_label's
     signal IDs, or None if unknown (falls back to the single-shared-group guess
     in _resolve_spi_pinctrl_states())."""
-    from esphome.components.zephyr import zephyr_variant  # noqa: PLC0415 -- avoids circular import at module load
+    from esphome.components.zephyr import zephyr_variant_name  # noqa: PLC0415 -- avoids circular import at module load
 
     instance = int(bus_label.removeprefix("spi")) if bus_label[3:].isdigit() else None
-    signal_ids = _SPI_INSTANCE_SIGNAL_IDS.get(zephyr_variant(), {}).get(instance)
+    signal_ids = _SPI_INSTANCE_SIGNAL_IDS.get(zephyr_variant_name(), {}).get(instance)
     if signal_ids is None:
         return None
 

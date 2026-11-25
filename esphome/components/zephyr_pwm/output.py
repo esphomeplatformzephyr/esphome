@@ -11,8 +11,8 @@ from esphome.components.output import DOMAIN as OUTPUT_DOMAIN
 from esphome.components.zephyr import (
     zephyr_add_overlay_builder,
     zephyr_add_prj_conf,
-    zephyr_variant_family,
-    zephyr_variant_info,
+    zephyr_variant,
+    zephyr_variant_family_name,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -75,7 +75,7 @@ def _pwm_node_labels() -> list[str]:
     """
     if CORE.is_nrf52:
         return list(_get_variant_pwm().labels)
-    return zephyr_variant_info().pwm_node_labels
+    return zephyr_variant().pwm_node_labels
 
 
 def _pwm_pin_map() -> dict[int, tuple[int, int]]:
@@ -84,14 +84,14 @@ def _pwm_pin_map() -> dict[int, tuple[int, int]]:
     allocator instead (nrf52/nordic)."""
     if CORE.is_nrf52:
         return {}
-    return zephyr_variant_info().pwm_pin_map
+    return zephyr_variant().pwm_pin_map
 
 
 def _only_on_pwm_hardware(value):
     if CORE.is_nrf52:
         return value
     if CORE.using_zephyr:
-        family = zephyr_variant_family()
+        family = zephyr_variant_family_name()
         if family in ("nordic", "rpi_pico") and _pwm_node_labels():
             return value
         if family == "renesas" and _pwm_pin_map():
@@ -124,7 +124,7 @@ def _pwm_channels_per_block() -> int:
     """
     if CORE.is_nrf52:
         return 4
-    return zephyr_variant_info().pwm_channels_per_block
+    return zephyr_variant().pwm_channels_per_block
 
 
 @dataclass
@@ -224,11 +224,11 @@ def _allocate_blocks_fixed(
 def _allocate_blocks() -> None:
     zephyr_pwm_conf = fv.platform_entries(domain=OUTPUT_DOMAIN, platform=DOMAIN)
 
-    if CORE.using_zephyr and zephyr_variant_family() == "rpi_pico":
+    if CORE.using_zephyr and zephyr_variant_family_name() == "rpi_pico":
         pwm_blocks = _allocate_blocks_fixed(
             zephyr_pwm_conf, _rpi_pico_pwm_slice_channel
         )
-    elif CORE.using_zephyr and zephyr_variant_family() == "renesas":
+    elif CORE.using_zephyr and zephyr_variant_family_name() == "renesas":
         pwm_blocks = _allocate_blocks_fixed(zephyr_pwm_conf, _pwm_pin_map().get)
     else:
         # The nRF54L GPIO chapter says a peripheral cannot mix pins from different ports
@@ -363,7 +363,7 @@ def _overlay_pwm_nordic(pwm_blocks: list[PWMBlock], labels: list[str]) -> str:
 def _overlay_pwm() -> str:
     pwm_blocks: list[PWMBlock] = _get_data().pwm_blocks
     if CORE.using_zephyr:
-        family = zephyr_variant_family()
+        family = zephyr_variant_family_name()
         if family == "rpi_pico":
             return _overlay_pwm_rpi_pico(pwm_blocks)
         if family == "renesas":
@@ -378,14 +378,14 @@ async def to_code(config: ConfigType) -> None:
     pwm_block = next(
         (block for block in pwm_blocks if pin[CONF_NUMBER] in block.pins), None
     )
-    if CORE.using_zephyr and zephyr_variant_family() == "rpi_pico":
+    if CORE.using_zephyr and zephyr_variant_family_name() == "rpi_pico":
         # RP2040/RP2350 share one "pwm" device across all blocks (slices), so the
         # driver's channel argument must be the pin's own real global slice*2+A/B
         # index -- not its position within the block, which is allocation order
         # and unrelated to the pin's actual fixed hardware channel.
         slice_id, local_channel = _rpi_pico_pwm_slice_channel(pin[CONF_NUMBER])
         channel_id = slice_id * 2 + local_channel
-    elif CORE.using_zephyr and zephyr_variant_family() == "renesas":
+    elif CORE.using_zephyr and zephyr_variant_family_name() == "renesas":
         _, channel_id = _pwm_pin_map()[pin[CONF_NUMBER]]
     else:
         channel_id = pwm_block.pins.index(pin[CONF_NUMBER])

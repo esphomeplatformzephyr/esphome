@@ -2381,10 +2381,10 @@ def _zephyr_toolchain_default_keys() -> list[str]:
     prefix (``stm32_l4``, ``nrf_52``). esp32 and rp2 add ``_zephyr`` (``esp32_c3_zephyr``,
     ``rp2_zephyr``): their plain keys hold ESP-IDF and Arduino values.
     """
-    from esphome.components.zephyr import zephyr_variant
+    from esphome.components.zephyr import zephyr_variant_name
 
     platform = CORE.target_platform
-    variant = (zephyr_variant() or "").lower()
+    variant = (zephyr_variant_name() or "").lower()
     suffix = ""
     if platform == PLATFORM_ESP32:
         variant = variant.removeprefix("esp32")

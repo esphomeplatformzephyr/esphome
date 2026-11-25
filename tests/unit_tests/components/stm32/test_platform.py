@@ -7,7 +7,7 @@ from esphome.components.zephyr import (
     zephyr_data,
     zephyr_framework_type,
     zephyr_toolchain_schema,
-    zephyr_variant,
+    zephyr_variant_name,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -41,7 +41,7 @@ def test_config_schema_sets_up_the_variant(variant: str) -> None:
     assert CORE.toolchain == Toolchain.ZEPHYR
     assert CORE.data[KEY_CORE][KEY_TARGET_PLATFORM] == PLATFORM_STM32
     assert CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION] == cv.Version(4, 5, 0)
-    assert zephyr_variant() == "STM32C5"
+    assert zephyr_variant_name() == "STM32C5"
     assert zephyr_framework_type() == "zephyr"
     assert zephyr_data()[CONF_BOARD] == "nucleo_c5a3zg"
 

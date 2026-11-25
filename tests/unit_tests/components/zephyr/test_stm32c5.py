@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 import sys
 from types import SimpleNamespace
@@ -36,7 +35,7 @@ from tests.unit_tests.components.zephyr.zephyr_state import empty_zephyr_data
 XIAO = "xiao_stm32c5"
 NUCLEO = "nucleo_c5a3zg"
 PORT = "/dev/ttyACM0"
-_DTS = "esphome.components.zephyr.dts_lookup"
+_C5 = "esphome.components.stm32.zephyr_variants.stm32c5"
 
 
 def _state(tmp_path: Path, board: str = XIAO) -> None:
@@ -109,10 +108,10 @@ def test_to_code_builds_uf2_and_touch_only_on_the_xiao(
 ) -> None:
     _state(tmp_path, board)
     with (
-        patch("esphome.components.zephyr.zephyr_add_prj_conf") as mock_conf,
-        patch("esphome.components.zephyr.zephyr_add_overlay"),
-        patch(f"{_DTS}.dts_node_enabled", return_value=True),
-        patch(f"{_DTS}.has_pinctrl_configured", return_value=True),
+        patch(f"{_C5}.zephyr_add_prj_conf") as mock_conf,
+        patch(f"{_C5}.zephyr_add_overlay"),
+        patch(f"{_C5}.dts_node_enabled", return_value=True),
+        patch(f"{_C5}.has_pinctrl_configured", return_value=True),
         patch.object(stm32c5.cg, "add_define") as mock_define,
         patch.object(CORE, "add_job") as mock_job,
     ):
@@ -132,10 +131,10 @@ def test_to_code_turns_off_the_mcuboot_console_on_the_xiao(tmp_path: Path) -> No
     _state(tmp_path)
     CORE.data[KEY_ZEPHYR]["bootloader"] = BOOTLOADER_MCUBOOT
     with (
-        patch("esphome.components.zephyr.zephyr_add_prj_conf") as mock_conf,
-        patch("esphome.components.zephyr.zephyr_add_overlay"),
-        patch(f"{_DTS}.dts_node_enabled", return_value=True),
-        patch(f"{_DTS}.has_pinctrl_configured", return_value=True),
+        patch(f"{_C5}.zephyr_add_prj_conf") as mock_conf,
+        patch(f"{_C5}.zephyr_add_overlay"),
+        patch(f"{_C5}.dts_node_enabled", return_value=True),
+        patch(f"{_C5}.has_pinctrl_configured", return_value=True),
         patch.object(stm32c5.cg, "add_define") as mock_define,
         patch.object(CORE, "add_job") as mock_job,
     ):
@@ -159,10 +158,10 @@ def test_to_code_adds_usb_clock_and_pins_only_while_the_board_lacks_them(
 ) -> None:
     _state(tmp_path)
     with (
-        patch("esphome.components.zephyr.zephyr_add_prj_conf"),
-        patch("esphome.components.zephyr.zephyr_add_overlay") as mock_overlay,
-        patch(f"{_DTS}.dts_node_enabled", return_value=clk48) as mock_enabled,
-        patch(f"{_DTS}.has_pinctrl_configured", return_value=usb_pins),
+        patch(f"{_C5}.zephyr_add_prj_conf"),
+        patch(f"{_C5}.zephyr_add_overlay") as mock_overlay,
+        patch(f"{_C5}.dts_node_enabled", return_value=clk48) as mock_enabled,
+        patch(f"{_C5}.has_pinctrl_configured", return_value=usb_pins),
         patch.object(stm32c5.cg, "add_define"),
         patch.object(CORE, "add_job"),
     ):
@@ -318,15 +317,15 @@ def test_to_code(
     _state(tmp_path, NUCLEO)
     CORE.data[KEY_ZEPHYR]["bootloader"] = bootloader
     with (
-        patch("esphome.components.zephyr.zephyr_add_prj_conf") as mock_conf,
-        patch("esphome.components.zephyr.zephyr_add_overlay") as mock_overlay,
-        patch("esphome.components.zephyr.zephyr_add_sysbuild_conf") as mock_sysbuild,
-        patch("esphome.components.zephyr.zephyr_setup_preferences") as mock_prefs,
-        patch(f"{_DTS}.get_rng_node_label", return_value=rng_label) as mock_rng,
+        patch(f"{_C5}.zephyr_add_prj_conf") as mock_conf,
+        patch(f"{_C5}.zephyr_add_overlay") as mock_overlay,
+        patch(f"{_C5}.zephyr_add_sysbuild_conf") as mock_sysbuild,
+        patch(f"{_C5}.zephyr_setup_preferences") as mock_prefs,
+        patch(f"{_C5}.get_rng_node_label", return_value=rng_label) as mock_rng,
         patch.object(stm32c5.cg, "add_define") as mock_define,
         patch.object(stm32c5.cg, "add_build_flag"),
     ):
-        asyncio.run(stm32c5.to_code({CONF_BOARD: NUCLEO}))
+        stm32c5.to_code({CONF_BOARD: NUCLEO})
 
     mock_rng.assert_called_once_with(NUCLEO)
     mock_prefs.assert_called_once_with()

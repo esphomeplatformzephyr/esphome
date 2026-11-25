@@ -60,7 +60,7 @@ async def to_code(config: ConfigType) -> None:
         )
     light_sleep = has_pm and enable_light_sleep is True
 
-    is_esp32 = zephyr.zephyr_variant_family() == "esp32"
+    is_esp32 = zephyr.zephyr_variant_family_name() == "esp32"
     if light_sleep:
         zephyr.zephyr_add_prj_conf("PM", True)
         if is_esp32:

@@ -29,7 +29,7 @@ from esphome.components.zephyr import (
     zephyr_add_prj_conf,
     zephyr_data,
     zephyr_setup_spi_pinctrl,
-    zephyr_variant,
+    zephyr_variant_name,
 )
 from esphome.components.zephyr.const import KEY_BOARD
 from esphome.config_helpers import filter_source_files_from_platform
@@ -380,12 +380,12 @@ def _validate_clk_pin_required(value: ConfigType) -> ConfigType:
 
 def validate_spi_config(config: list[ConfigType]) -> list[ConfigType]:
     if CORE.using_toolchain_zephyr:
-        from esphome.components.zephyr import zephyr_variant_info  # noqa: PLC0415
+        from esphome.components.zephyr import zephyr_variant  # noqa: PLC0415
 
         # interface: <bus label> picks one of the board's SPI buses; "hardware" and
         # "any" are resolved from the board DTS in to_code().
-        variant = zephyr_variant()
-        variant_info = zephyr_variant_info()
+        variant = zephyr_variant_name()
+        variant_info = zephyr_variant()
         valid_pins = variant_info.spi_valid_pins if variant_info is not None else {}
         for spi in config:
             interface = spi[CONF_INTERFACE]
@@ -501,7 +501,7 @@ _ZEPHYR_QUAD_VARIANTS = (
 
 def _quad_platform_validator(value):
     if CORE.using_toolchain_zephyr:
-        variant = zephyr_variant()
+        variant = zephyr_variant_name()
         if variant not in _ZEPHYR_QUAD_VARIANTS:
             raise cv.Invalid(f"Quad SPI is not available on Zephyr variant {variant!r}")
         return value

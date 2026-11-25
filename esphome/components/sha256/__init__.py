@@ -16,11 +16,14 @@ async def to_code(config: ConfigType) -> None:
     cg.add_define("USE_SHA256")
 
     if CORE.using_toolchain_zephyr:
-        from esphome.components.zephyr import zephyr_add_prj_conf, zephyr_variant_family
+        from esphome.components.zephyr import (
+            zephyr_add_prj_conf,
+            zephyr_variant_family_name,
+        )
 
         # All platform:zephyr variants (>= 4.4.0) are above the PSA crypto threshold.
         zephyr_add_prj_conf("PSA_CRYPTO", True)
-        if zephyr_variant_family() != "nordic":
+        if zephyr_variant_family_name() != "nordic":
             # Nordic builds call the PSA Crypto API directly (sha256.h), which
             # both NCS and mainline provide; only the mbedtls branch needs this.
             zephyr_add_prj_conf("MBEDTLS_MD_C", True)

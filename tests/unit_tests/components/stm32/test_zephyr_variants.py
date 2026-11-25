@@ -1,17 +1,15 @@
 """Tests for the STM32 Zephyr variants."""
 
-import asyncio
 from collections.abc import Callable
 
 import pytest
 
 from esphome.components.stm32.zephyr_variants import stm32_family, stm32c5
 from esphome.components.zephyr import (
-    dts_lookup,
     zephyr_data,
     zephyr_framework_type,
-    zephyr_variant,
-    zephyr_variant_family,
+    zephyr_variant_family_name,
+    zephyr_variant_name,
 )
 from esphome.components.zephyr.const import KEY_BOOTLOADER, KEY_OVERLAY, KEY_PRJ_CONF
 import esphome.config_validation as cv
@@ -37,8 +35,8 @@ def test_config_schema_defaults_to_the_largest_nucleo() -> None:
     assert config[CONF_BOARD] == "nucleo_c5a3zg"
     assert zephyr_data()[CONF_BOARD] == "nucleo_c5a3zg"
     assert zephyr_data()[KEY_BOOTLOADER] == ""
-    assert zephyr_variant() == "STM32C5"
-    assert zephyr_variant_family() == "stm32"
+    assert zephyr_variant_name() == "STM32C5"
+    assert zephyr_variant_family_name() == "stm32"
     assert zephyr_framework_type() == "zephyr"
     assert CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION] == cv.Version(4, 5, 0)
 
@@ -55,7 +53,7 @@ def rng_label(monkeypatch: pytest.MonkeyPatch) -> Callable[[str | None], None]:
     """Give the board the RNG node label passed in, or none."""
 
     def _set(label: str | None) -> None:
-        monkeypatch.setattr(dts_lookup, "get_rng_node_label", lambda board: label)
+        monkeypatch.setattr(stm32c5, "get_rng_node_label", lambda board: label)
 
     return _set
 
@@ -64,7 +62,7 @@ def test_to_code(rng_label: Callable[[str | None], None]) -> None:
     rng_label("rng")
     stm32c5.config_schema({CONF_FRAMEWORK: {}})
 
-    asyncio.run(stm32c5.to_code({CONF_BOARD: "nucleo_c5a3zg"}))
+    stm32c5.to_code({CONF_BOARD: "nucleo_c5a3zg"})
 
     defines = {define.name: str(define.value) for define in CORE.defines}
     assert defines["ESPHOME_BOARD"] == '"nucleo_c5a3zg"'
@@ -91,7 +89,7 @@ def test_to_code_picks_the_entropy_source(
     rng_label(label)
     stm32c5.config_schema({CONF_FRAMEWORK: {}})
 
-    asyncio.run(stm32c5.to_code({CONF_BOARD: "nucleo_c5a3zg"}))
+    stm32c5.to_code({CONF_BOARD: "nucleo_c5a3zg"})
 
     other = ({"ENTROPY_GENERATOR", "TEST_RANDOM_GENERATOR"} - {prj_conf}).pop()
     assert _prj_conf()[prj_conf] is True

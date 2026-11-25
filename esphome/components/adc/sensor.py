@@ -17,8 +17,8 @@ from esphome.components.zephyr import (
     zephyr_add_user,
     zephyr_data,
     zephyr_variant,
-    zephyr_variant_family,
-    zephyr_variant_info,
+    zephyr_variant_family_name,
+    zephyr_variant_name,
 )
 from esphome.components.zephyr.const import KEY_BOARD
 from esphome.config_helpers import filter_source_files_from_platform
@@ -78,7 +78,7 @@ ZEPHYR_ESP32_ATTENUATION_TO_GAIN = {
 def validate_config(config: ConfigType) -> ConfigType:
     if CONF_ATTENUATION in config and not (
         CORE.is_esp32
-        or (CORE.using_toolchain_zephyr and zephyr_variant_family() == "esp32")
+        or (CORE.using_toolchain_zephyr and zephyr_variant_family_name() == "esp32")
     ):
         raise cv.Invalid(
             "attenuation is only valid on esp32",
@@ -394,10 +394,10 @@ async def to_code(config: ConfigType) -> None:
                     }};
                 }};
             """)
-    elif CORE.using_zephyr and zephyr_variant_family() == "esp32":
-        variant = zephyr_variant()
+    elif CORE.using_zephyr and zephyr_variant_family_name() == "esp32":
+        variant = zephyr_variant_name()
         pin_num = config[CONF_PIN][CONF_NUMBER]
-        channel_map = zephyr_variant_info().adc1_channel_map
+        channel_map = zephyr_variant().adc1_channel_map
         if pin_num not in channel_map:
             raise EsphomeError(f"Pin {pin_num} is not a valid ADC1 pin on {variant}")
         # channel_id addresses the channel within adc0's own silicon namespace; unrelated
@@ -425,7 +425,7 @@ async def to_code(config: ConfigType) -> None:
                 }};
             """
         )
-    elif CORE.using_zephyr and zephyr_variant_family() == "nordic":
+    elif CORE.using_zephyr and zephyr_variant_family_name() == "nordic":
         # Devicetree shape matches platform: nrf52's own CORE.is_nrf52 branch above
         # (same physical SAADC peripheral): channel@N is an arbitrary config slot, the
         # real pin connection is the separate zephyr,input-positive AIN name. Fixed gain
@@ -435,9 +435,9 @@ async def to_code(config: ConfigType) -> None:
         channel_id = data.zephyr_adc_channel_id
         data.zephyr_adc_channel_id += 1
         zephyr_add_prj_conf("ADC", True)
-        variant = zephyr_variant()
+        variant = zephyr_variant_name()
         pin_num = config[CONF_PIN][CONF_NUMBER]
-        ain_map = zephyr_variant_info().adc_ain_map
+        ain_map = zephyr_variant().adc_ain_map
         if pin_num not in ain_map:
             raise EsphomeError(f"Pin {pin_num} is not a valid ADC pin on {variant}")
         ain_name = ain_map[pin_num]
@@ -469,7 +469,7 @@ async def to_code(config: ConfigType) -> None:
                 }};
             """
         )
-    elif CORE.using_zephyr and zephyr_variant_family() == "silabs":
+    elif CORE.using_zephyr and zephyr_variant_family_name() == "silabs":
         # Silicon Labs IADC. adc_ain_map already stores the full zephyr,input-positive
         # macro name (silabs-adc.h), so no vendor prefix is needed; node label is the
         # SoC's own "adc0" (no generic "adc" alias, unlike nrf52). The explicit
@@ -480,8 +480,8 @@ async def to_code(config: ConfigType) -> None:
         channel_id = data.zephyr_adc_channel_id
         data.zephyr_adc_channel_id += 1
         zephyr_add_prj_conf("ADC", True)
-        variant = zephyr_variant()
-        variant_info = zephyr_variant_info()
+        variant = zephyr_variant_name()
+        variant_info = zephyr_variant()
         pin_num = config[CONF_PIN][CONF_NUMBER]
         ain_map = variant_info.adc_ain_map
         if pin_num not in ain_map:
@@ -537,7 +537,7 @@ async def to_code(config: ConfigType) -> None:
                 }};
             """
         )
-    elif CORE.using_zephyr and zephyr_variant_family() == "silabs_siwx91x":
+    elif CORE.using_zephyr and zephyr_variant_family_name() == "silabs_siwx91x":
         # Silicon Labs SiWx91x ADC -- a different IP from EFR32's IADC above despite
         # the shared vendor name (see siwx917.py's family= comment). Like nRF52's
         # SAADC, adc_ain_map stores the driver's own zephyr,input-positive macro name
@@ -554,9 +554,9 @@ async def to_code(config: ConfigType) -> None:
         channel_id = data.zephyr_adc_channel_id
         data.zephyr_adc_channel_id += 1
         zephyr_add_prj_conf("ADC", True)
-        variant = zephyr_variant()
+        variant = zephyr_variant_name()
         pin_num = config[CONF_PIN][CONF_NUMBER]
-        ain_map = zephyr_variant_info().adc_ain_map
+        ain_map = zephyr_variant().adc_ain_map
         if pin_num not in ain_map:
             raise EsphomeError(f"Pin {pin_num} is not a valid ADC pin on {variant}")
         ain_name = ain_map[pin_num]
@@ -589,7 +589,7 @@ async def to_code(config: ConfigType) -> None:
                 }};
             """
         )
-    elif CORE.using_zephyr and zephyr_variant_family() == "renesas":
+    elif CORE.using_zephyr and zephyr_variant_family_name() == "renesas":
         # RA4M1's ADC12 driver rejects any gain/acquisition-time other than
         # ADC_GAIN_1/ADC_ACQ_TIME_DEFAULT. Each channel also needs its own pinctrl
         # group added to adc0_default (only P000/AN000 is wired there by default) --
@@ -599,8 +599,8 @@ async def to_code(config: ConfigType) -> None:
         channel_id = data.zephyr_adc_channel_id
         data.zephyr_adc_channel_id += 1
         zephyr_add_prj_conf("ADC", True)
-        variant = zephyr_variant()
-        variant_info = zephyr_variant_info()
+        variant = zephyr_variant_name()
+        variant_info = zephyr_variant()
         pin_num = config[CONF_PIN][CONF_NUMBER]
         ain_map = variant_info.adc_ain_map
         if pin_num not in ain_map:
@@ -642,15 +642,15 @@ async def to_code(config: ConfigType) -> None:
                 }};
             """
         )
-    elif CORE.using_zephyr and zephyr_variant_family() == "rpi_pico":
+    elif CORE.using_zephyr and zephyr_variant_family_name() == "rpi_pico":
         # RP2040/RP2350's ADC has no PGA: adc_rpi_pico.c's channel_setup() rejects any
         # gain other than ADC_GAIN_1. Its 4 channels are fixed-function silicon on
         # GPIO26-29 (channel = pin - 26), confirmed against Zephyr's
         # raspberrypi,pico-adc binding and the rpi-pico-rp2040/rp2350a-pinctrl.h
         # ADC_CHn_P2x macros (adc1_channel_map below encodes this).
         zephyr_add_prj_conf("ADC", True)
-        variant = zephyr_variant()
-        variant_info = zephyr_variant_info()
+        variant = zephyr_variant_name()
+        variant_info = zephyr_variant()
         pin_num = config[CONF_PIN][CONF_NUMBER]
         channel_map = variant_info.adc1_channel_map
         if pin_num not in channel_map:
@@ -705,7 +705,7 @@ async def to_code(config: ConfigType) -> None:
         )
     elif CORE.using_zephyr:
         raise EsphomeError(
-            f"ADC is not yet implemented for Zephyr variant '{zephyr_variant()}'"
+            f"ADC is not yet implemented for Zephyr variant '{zephyr_variant_name()}'"
         )
 
 
