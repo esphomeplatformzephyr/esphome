@@ -294,7 +294,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
     from esphome.components.zephyr import (  # noqa: PLC0415
         zephyr_additional_framework_projects,
         zephyr_data,
-        zephyr_variant_manifest,
+        zephyr_manifest,
     )
     from esphome.components.zephyr.build_zephyr import run_west_flash  # noqa: PLC0415
     from esphome.components.zephyr.const import KEY_RUNNER  # noqa: PLC0415
@@ -305,7 +305,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
     check_permissions(host)
 
     version = str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION])
-    manifest = zephyr_variant_manifest()
+    manifest = zephyr_manifest()
     python_bin, framework_path, west_env = west_install(
         manifest,
         version,

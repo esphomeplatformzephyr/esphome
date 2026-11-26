@@ -6,9 +6,9 @@ from esphome.components.const import CONF_MANUFACTURER
 from esphome.components.zephyr import (
     request_zephyr_module,
     zephyr_add_prj_conf,
+    zephyr_manifest,
     zephyr_require_partition,
     zephyr_variant,
-    zephyr_variant_manifest,
 )
 import esphome.config_validation as cv
 from esphome.const import (
@@ -83,7 +83,7 @@ def zigbee_zephyr_supported() -> bool:
     variant = zephyr_variant()
     if variant is None or "zigbee" not in variant.transports:
         return False
-    return "zigbee" in zephyr_variant_manifest().modules
+    return "zigbee" in zephyr_manifest().modules
 
 
 def requires_zigbee_zephyr_supported(value):

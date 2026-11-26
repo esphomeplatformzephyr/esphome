@@ -775,11 +775,11 @@ def zephyr_variant_family_name() -> str | None:
 
 def zephyr_framework_type() -> str | None:
     """The active `framework: type:`, e.g. "zephyr"; None as for zephyr_variant_name()."""
-    manifest = zephyr_variant_manifest()
+    manifest = zephyr_manifest()
     return manifest.framework_type if manifest is not None else None
 
 
-def zephyr_variant_manifest() -> "ZephyrManifest | None":
+def zephyr_manifest() -> "ZephyrManifest | None":
     """The manifest the active variant's `framework: type:` selected; None as for
     zephyr_variant_name()."""
     resolved = _variant_resolved()
@@ -850,7 +850,7 @@ def request_zephyr_module(capability: str) -> None:
     `framework: modules:` override may still apply, so failing on a missing default
     version has to wait until resolve_zephyr_modules() (see there for why)."""
     _require_zephyr_toolchain("request_zephyr_module")
-    manifest = zephyr_variant_manifest()
+    manifest = zephyr_manifest()
     template = manifest.modules.get(capability)
     if template is None:
         raise EsphomeError(
@@ -2088,7 +2088,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
         from .framework import check_and_install as west_install
 
         version = str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION])
-        manifest = zephyr_variant_manifest()
+        manifest = zephyr_manifest()
         python_bin, framework_path, west_env = west_install(
             manifest,
             version,
@@ -2126,7 +2126,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
     from .framework import check_and_install as west_install
 
     version = str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION])
-    manifest = zephyr_variant_manifest()
+    manifest = zephyr_manifest()
     python_bin, framework_path, west_env = west_install(
         manifest,
         version,

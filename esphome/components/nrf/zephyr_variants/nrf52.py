@@ -471,14 +471,14 @@ def upload_serial_dfu(host: str) -> bool:
     from esphome.components.zephyr import (  # noqa: PLC0415
         zephyr_additional_framework_projects,
         zephyr_data,
-        zephyr_variant_manifest,
+        zephyr_manifest,
     )
     from esphome.components.zephyr.framework import check_and_install as west_install  # noqa: PLC0415
 
     package = CORE.relative_build_path(_DFU_PACKAGE)
     if not package.is_file():
         raise EsphomeError("Firmware not found. Please compile first.")
-    manifest = zephyr_variant_manifest()
+    manifest = zephyr_manifest()
     python_bin, _, env = west_install(
         manifest,
         str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]),

@@ -86,9 +86,9 @@ def build_workspace() -> "tuple[ZephyrManifest, str]":
     """The manifest this build installs and the version its workspace is installed at;
     the install and every reader of the workspace take it from here."""
     # deferred: zephyr's __init__ may import this module
-    from . import zephyr_variant_manifest
+    from . import zephyr_manifest
 
-    return zephyr_variant_manifest(), f"v{CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]}"
+    return zephyr_manifest(), f"v{CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]}"
 
 
 def get_zephyr_base() -> Path:
