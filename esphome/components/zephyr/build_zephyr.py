@@ -9,7 +9,6 @@ import yaml
 
 from esphome.build_helpers import pch
 from esphome.build_helpers.ccache import ccache_env
-from esphome.const import KEY_CORE, KEY_FRAMEWORK_VERSION
 from esphome.core import CORE, EsphomeError
 from esphome.framework_helpers import (
     cmake_escape,
@@ -84,7 +83,7 @@ def _write_pch_checksum(
         CORE.relative_src_path(),
         pch.PCH_DEFAULT_HEADERS,
         (
-            str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]),
+            str(CORE.framework_version),
             _sdk_revision(framework_path),
             board,
             *(

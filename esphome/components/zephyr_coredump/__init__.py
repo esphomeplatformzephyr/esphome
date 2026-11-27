@@ -21,7 +21,7 @@ from esphome.components.zephyr.const import (
 )
 from esphome.components.zephyr.variants import variant_value
 import esphome.config_validation as cv
-from esphome.const import CONF_ID, KEY_CORE, KEY_FRAMEWORK_VERSION, Framework
+from esphome.const import CONF_ID, Framework
 from esphome.core import CORE, CoroPriority, coroutine_with_priority
 from esphome.types import ConfigType
 
@@ -43,10 +43,6 @@ CONFIG_SCHEMA = cv.All(
     cv.Schema({cv.GenerateID(): cv.declare_id(Coredump)}).extend(cv.COMPONENT_SCHEMA),
     cv.only_with_framework(Framework.ZEPHYR),
 )
-
-
-def _framework_version() -> cv.Version:
-    return CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]
 
 
 def _partition_address() -> int:
@@ -101,7 +97,7 @@ async def to_code(config: ConfigType) -> None:
     if not CORE.is_nrf52:
         await _zephyr_to_code(config)
         return
-    framework_ver = _framework_version()
+    framework_ver = CORE.framework_version
     if framework_ver >= DUMP_THREADS_MIN_VERSION:
         zephyr_add_prj_conf("DEBUG_COREDUMP_MEMORY_DUMP_THREADS", True)
     else:

@@ -5,13 +5,14 @@ from esphome.const import CONF_ID, CONF_UPDATE_INTERVAL
 from esphome.core import CORE
 from esphome.types import ConfigType
 
-from .. import consume_endpoint, default_zigbee_ids
-from ..const import ZigbeeComponent, zigbee_ns
+from .. import consume_endpoint
+from ..const import CONF_ZIGBEE_ID, ZigbeeComponent, zigbee_ns
 from ..const_esp32 import ROLE
-from ..const_zephyr import CONF_ZIGBEE_ID
+from ..endpoints_zephyr import endpoint_ids
 from ..zigbee_ep_esp32 import add_clusters_to_first_ep, get_first_ep_num
 from ..zigbee_zephyr import (
     ZigbeeClusterDesc,
+    add_zcl_device_handler,
     get_slot_index,
     zigbee_assign,
     zigbee_new_attr_list,
@@ -28,7 +29,6 @@ ZigbeeTime = zigbee_ns.class_("ZigbeeTime", time_.RealTimeClock)
 
 def _validate_zigbee_time(config: ConfigType) -> ConfigType:
     if zigbee_zephyr_supported():
-        config = default_zigbee_ids(config)
         return consume_endpoint(config)
     if CORE.is_esp32:
         cl = [
@@ -73,6 +73,7 @@ async def to_code(config: ConfigType) -> None:
 
 async def _add_time_zephyr(config: ConfigType) -> None:
     slot_index = get_slot_index()
+    ep_id = endpoint_ids().allocate()
 
     # Create unique names for this sensor's variables based on slot index
     prefix = f"zigbee_ep{slot_index + 1}"
@@ -104,6 +105,7 @@ async def _add_time_zephyr(config: ConfigType) -> None:
         0,
         clusters,
         slot_index,
+        ep_id,
         "ZB_HA_CUSTOM_ATTR_DEVICE_ID",
     )
 
@@ -112,6 +114,7 @@ async def _add_time_zephyr(config: ConfigType) -> None:
     await time_.register_time(var, config)
     await cg.register_component(var, config)
 
-    cg.add(var.set_endpoint(slot_index + 1))
+    cg.add(var.set_endpoint(ep_id))
     cg.add(var.set_cluster_attributes(time_attrs))
     await cg.register_parented(var, config[CONF_ZIGBEE_ID])
+    await add_zcl_device_handler(config, var, ep_id)

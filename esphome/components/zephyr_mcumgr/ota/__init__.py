@@ -50,8 +50,6 @@ from esphome.const import (
     CONF_NUMBER,
     CONF_PIN,
     CONF_STATUS,
-    KEY_CORE,
-    KEY_FRAMEWORK_VERSION,
 )
 from esphome.core import CORE, coroutine_with_priority
 from esphome.coroutine import CoroPriority
@@ -193,8 +191,7 @@ def _validate_bootloader(config: ConfigType) -> None:
         return
     if bootloader not in MCUMGR_OTA_BOOTLOADERS:
         raise cv.Invalid(f"{bootloader} does not support OTA")
-    framework_ver: cv.Version = CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]
-    if framework_ver < cv.Version(2, 9, 2):
+    if CORE.framework_version < cv.Version(2, 9, 2):
         raise cv.Invalid(
             "OTA with Adafruit_nRF52_Bootloader requires at least SDK 2.9.2"
         )
@@ -342,8 +339,7 @@ async def to_code(config: ConfigType) -> None:
                 """,
             image="mcuboot",
         )
-    framework_ver = CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]
-    if framework_ver >= cv.Version(2, 9, 2):
+    if CORE.framework_version >= cv.Version(2, 9, 2):
         zephyr_data()[KEY_SYSBUILD] = True
 
     bootloader = zephyr_data()[KEY_BOOTLOADER]

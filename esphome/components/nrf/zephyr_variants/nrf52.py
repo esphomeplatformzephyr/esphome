@@ -37,8 +37,6 @@ from esphome.const import (
     CONF_RESET_PIN,
     CONF_SOURCE,
     CONF_VOLTAGE,
-    KEY_CORE,
-    KEY_FRAMEWORK_VERSION,
     ThreadModel,
     Toolchain,
 )
@@ -481,7 +479,7 @@ def upload_serial_dfu(host: str) -> bool:
     manifest = zephyr_manifest()
     python_bin, _, env = west_install(
         manifest,
-        str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]),
+        str(CORE.framework_version),
         zephyr_additional_framework_projects(manifest),
         zephyr_data()["west_version"],
         zephyr_data()["ninja_version"],

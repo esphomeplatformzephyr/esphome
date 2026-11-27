@@ -461,8 +461,7 @@ def zephyr_use_usb_device_next() -> bool:
     """
     if CORE.using_toolchain_zephyr:
         return True
-    framework_ver: cv.Version = CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]
-    return CORE.is_nrf52 and framework_ver >= cv.Version(3, 4, 1)
+    return CORE.is_nrf52 and CORE.framework_version >= cv.Version(3, 4, 1)
 
 
 def _disable_board_cdc_acm_overlay() -> str:
@@ -525,6 +524,23 @@ def zephyr_require_cdc_acm() -> None:
     zephyr_enable_usb_cdc_acm()
     if zephyr_use_usb_device_next():
         zephyr_data()["cdc_acm_required"] = True
+
+
+def zephyr_enable_poweroff() -> None:
+    """Enable sys_poweroff(); Zigbee builds leave it out and stay awake instead.
+
+    Zephyr RTOS variants without has_poweroff have no POWEROFF to enable, so
+    shutdown_device() halts there instead.
+    """
+    from .variants import variant_value
+
+    if "zigbee" in CORE.loaded_integrations:
+        return
+    if CORE.using_toolchain_zephyr and not variant_value(
+        zephyr_variant(), "has_poweroff"
+    ):
+        return
+    zephyr_add_prj_conf("POWEROFF", True)
 
 
 def _cdc_acm_add_ports() -> None:
@@ -882,7 +898,7 @@ def resolve_zephyr_modules() -> "list[ZephyrModule]":
     override is guaranteed visible before a request's version gets resolved."""
     from .variants import ZephyrModule, ZephyrModuleTemplate
 
-    root_version = CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]
+    root_version = CORE.framework_version
     overrides = dict(zephyr_data()[KEY_MODULE_OVERRIDES])
     resolved: dict[str, ZephyrModule] = {}
     seen_templates: dict[str, ZephyrModuleTemplate] = {}
@@ -1824,7 +1840,7 @@ async def zephyr_toolchain_to_code(config: ConfigType) -> None:
         board,
         variant,
         zephyr_variant(),
-        str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]),
+        str(CORE.framework_version),
         zephyr_data()["board_root"],
         zephyr_data()[KEY_SHIELDS],
     )
@@ -1872,7 +1888,7 @@ def _restore_upload_data(zephyr_config: ConfigType) -> None:
         ZephyrVariantResolved(
             variant_data,
             variant_data.manifest_for(framework.get(CONF_TYPE)),
-            CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION],
+            CORE.framework_version,
         ),
         zephyr_config,
         bootloader=variant_data.family_module.bootloader(advanced)
@@ -2087,7 +2103,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
         from .build_zephyr import run_west_flash_pyocd
         from .framework import check_and_install as west_install
 
-        version = str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION])
+        version = str(CORE.framework_version)
         manifest = zephyr_manifest()
         python_bin, framework_path, west_env = west_install(
             manifest,
@@ -2125,7 +2141,7 @@ def upload_program(config: ConfigType, args, host: str) -> bool:
     from .build_zephyr import resolve_dev_id, run_west_flash_generic
     from .framework import check_and_install as west_install
 
-    version = str(CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION])
+    version = str(CORE.framework_version)
     manifest = zephyr_manifest()
     python_bin, framework_path, west_env = west_install(
         manifest,

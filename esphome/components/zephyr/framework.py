@@ -13,15 +13,7 @@ from typing import TYPE_CHECKING
 import yaml
 
 from esphome.build_helpers.tools_cache import ZEPHYR_TOOLS_CACHE, tools_cache_path
-from esphome.const import (
-    CONF_PATH,
-    CONF_REF,
-    CONF_TYPE,
-    CONF_URL,
-    KEY_CORE,
-    KEY_FRAMEWORK_VERSION,
-    TYPE_LOCAL,
-)
+from esphome.const import CONF_PATH, CONF_REF, CONF_TYPE, CONF_URL, TYPE_LOCAL
 from esphome.core import CORE, EsphomeError
 from esphome.framework_helpers import (
     get_python_env_executable_path,
@@ -88,7 +80,7 @@ def build_workspace() -> "tuple[ZephyrManifest, str]":
     # deferred: zephyr's __init__ may import this module
     from . import zephyr_manifest
 
-    return zephyr_manifest(), f"v{CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION]}"
+    return zephyr_manifest(), f"v{CORE.framework_version}"
 
 
 def get_zephyr_base() -> Path:

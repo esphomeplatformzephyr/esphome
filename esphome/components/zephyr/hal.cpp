@@ -13,8 +13,8 @@
 #include "esphome/components/logger/logger.h"
 #endif
 
-#ifdef USE_ZEPHYR_DWT_MICROS
-#include <cmsis_core.h>
+#ifdef CONFIG_SOC_FAMILY_NORDIC_NRF
+#include <nrfx.h>
 #endif
 
 // Empty zephyr namespace block to satisfy ci-custom's lint_namespace check.
@@ -72,9 +72,34 @@ static void wdt_warning_cb(const device *dev, int channel_id) {
 #endif  // USE_ZEPHYR_WDT_MS && USE_LOGGER
 #endif
 
-// yield(), delay(), millis(), millis_64(), delayMicroseconds(), micros() except the cycle-counter one,
-// arch_get_cpu_cycle_count(), arch_get_cpu_freq_hz() inlined in
-// components/zephyr/hal.h.
+// yield(), delay(), millis(), millis_64(), delayMicroseconds(), micros() except the cycle-counter one
+// inlined in components/zephyr/hal.h.
+
+// The nRF CPU clock code needs nrfx; other families keep the kernel clock for both.
+#if defined(CONFIG_SOC_FAMILY_NORDIC_NRF) && CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC == 1000000
+#define ESPHOME_ZEPHYR_NRF_US_TIMER_CYCLES
+#endif
+
+#if defined(ESPHOME_ZEPHYR_NRF_US_TIMER_CYCLES) || defined(USE_ZEPHYR_DWT_MICROS)
+uint32_t arch_get_cpu_freq_hz() {
+  // Nothing else updates SystemCoreClock, so on nRF54L it would keep its 64 MHz default.
+  SystemCoreClockUpdate();
+  return SystemCoreClock;
+}
+#endif
+
+#ifdef ESPHOME_ZEPHYR_NRF_US_TIMER_CYCLES
+// The DWT cycle counter stays at 0 on nRF54L, so the 1 MHz system timer is scaled to CPU cycles. It wraps at
+// 2^32 like a real cycle counter, so differences stay correct, but it only steps once per microsecond.
+static uint32_t cpu_cycles_per_us;  // NOLINT(cppcoreguidelines-avoid-non-const-global-variables)
+uint32_t arch_get_cpu_cycle_count() { return k_cycle_get_32() * cpu_cycles_per_us; }
+#elif defined(USE_ZEPHYR_DWT_MICROS)
+uint32_t arch_get_cpu_cycle_count() { return DWT->CYCCNT; }
+#else
+// No cycle counter here (Cortex-M0 nRF51, non-nRF families), so both use the kernel clock to stay in the same unit.
+uint32_t arch_get_cpu_cycle_count() { return k_cycle_get_32(); }
+uint32_t arch_get_cpu_freq_hz() { return sys_clock_hw_cycles_per_sec(); }
+#endif
 
 #ifdef USE_ZEPHYR_DWT_MICROS
 // The kernel clock counts in ticks of about 30 us, and the CPU cycle counter stops while the CPU sleeps.
@@ -133,7 +158,9 @@ void arch_init() {
     boot_write_img_confirmed();
   }
 #endif
-#ifdef USE_ZEPHYR_DWT_MICROS
+#ifdef ESPHOME_ZEPHYR_NRF_US_TIMER_CYCLES
+  cpu_cycles_per_us = arch_get_cpu_freq_hz() / 1000000;
+#elif defined(USE_ZEPHYR_DWT_MICROS)
   CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
   DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
 #endif
