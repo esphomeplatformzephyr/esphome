@@ -710,6 +710,15 @@ class TestEsphomeCore:
             "foo/build/.pioenvs/test-device/firmware.uf2"
         )
 
+    def test_firmware_bin__zephyr(self, target):
+        """The Zephyr toolchain's MCUboot-signed app image, nested by sysbuild."""
+        target.name = "test-device"
+        target.data[const.KEY_CORE] = {const.KEY_TARGET_PLATFORM: "stm32"}
+        target.toolchain = const.Toolchain.ZEPHYR
+        assert target.firmware_bin == Path(
+            "foo/build/.west_build/zephyr/zephyr/zephyr.signed.bin"
+        )
+
     def test_firmware_bin__host(self, target):
         """Host platform produces a native ELF/Mach-O named `program`,
         not firmware.bin -- needed for `esphome upload` to find the
@@ -1053,12 +1062,13 @@ class TestEsphomeCore:
         assert "Wire" in target.platformio_libraries
 
     @pytest.mark.parametrize(
-        "toolchain", [const.Toolchain.ESP_IDF, const.Toolchain.SDK_NRF]
+        "toolchain",
+        [const.Toolchain.ESP_IDF, const.Toolchain.SDK_NRF, const.Toolchain.ZEPHYR],
     )
     def test_add_build_unflag__warns_on_native_cmake_toolchains(
         self, target, caplog: pytest.LogCaptureFixture, toolchain: const.Toolchain
     ) -> None:
-        """Build unflags are not consumed by the native IDF and nRF52 build
+        """Build unflags are not consumed by the native IDF, nRF52 and Zephyr build
         generators, so adding one on those toolchains warns; PlatformIO stays
         silent."""
         target.toolchain = const.Toolchain.PLATFORMIO

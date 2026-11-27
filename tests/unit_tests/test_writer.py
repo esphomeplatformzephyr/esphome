@@ -492,6 +492,19 @@ def test_clean_cmake_cache_esp_idf(
 
 
 @patch("esphome.writer.CORE")
+def test_clean_cmake_cache_zephyr(mock_core: MagicMock, tmp_path: Path) -> None:
+    """clean_cmake_cache removes the Zephyr toolchain's sysbuild CMakeCache.txt."""
+    _mock_cmake_cache_paths(mock_core, tmp_path)
+    cmake_cache_file = tmp_path / ".west_build" / "CMakeCache.txt"
+    cmake_cache_file.parent.mkdir(parents=True)
+    cmake_cache_file.write_text("# CMake cache file")
+
+    clean_cmake_cache()
+
+    assert not cmake_cache_file.exists()
+
+
+@patch("esphome.writer.CORE")
 def test_clean_cmake_cache_no_cmake_file(
     mock_core: MagicMock,
     tmp_path: Path,

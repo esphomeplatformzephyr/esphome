@@ -54,8 +54,9 @@ def get_zephyr_tools_path() -> Path:
     return tools_cache_path(*ZEPHYR_TOOLS_CACHE)
 
 
-def _get_python_env_path(version: str) -> Path:
-    return get_zephyr_tools_path() / "penvs" / version
+def _get_python_env_path(workspace_key: str) -> Path:
+    # One venv per workspace, so one workspace's pip install can't change another's
+    return get_zephyr_tools_path() / "penvs" / workspace_key
 
 
 def _get_toolchain_path(sdk_version: str, toolchain: str) -> Path:
@@ -99,7 +100,7 @@ def get_build_paths(
 ) -> tuple[Path, Path]:
     """The venv's python and the workspace a build runs west in."""
     python_executable = get_python_env_executable_path(
-        _get_python_env_path(version), "python"
+        _get_python_env_path(_source_cache_key(manifest, version, source)), "python"
     )
     if source is not None and source[CONF_TYPE] == TYPE_LOCAL:
         # A local checkout's parent folder is its workspace (install_local_framework)
@@ -335,18 +336,15 @@ def _check_and_install(
       - west_env        -- environment dict with ZEPHYR_BASE and PATH set
     """
     ver_tag = f"v{version}" if not version.startswith("v") else version
-    python_env = _get_python_env_path(ver_tag)
+    python_env = _get_python_env_path(_source_cache_key(manifest, ver_tag, source))
     python_bin = get_python_env_executable_path(python_env, "python")
 
-    # Every workspace of this version shares the venv. It only changes when the west
-    # requirements or overrides do, so builds that use it are not locked against that.
-    with install_lock(get_zephyr_tools_path(), f"penv-{ver_tag}"):
-        overrides = {"west": west_version, "ninja": ninja_version}
-        # Beside the venv, not in it: a rebuild removes the venv folder
-        requirements = python_env.with_name(f"{python_env.name}.requirements.txt")
-        requirements.parent.mkdir(parents=True, exist_ok=True)
-        requirements.write_text(_effective_requirements(overrides))
-        install_venv = ensure_venv(python_env, requirements, ver_tag)
+    overrides = {"west": west_version, "ninja": ninja_version}
+    # Beside the venv, not in it: a rebuild removes the venv folder
+    requirements = python_env.with_name(f"{python_env.name}.requirements.txt")
+    requirements.parent.mkdir(parents=True, exist_ok=True)
+    requirements.write_text(_effective_requirements(overrides))
+    install_venv = ensure_venv(python_env, requirements, ver_tag)
 
     if source is not None and source[CONF_TYPE] == TYPE_LOCAL:
         zephyr_dir = source[CONF_PATH]  # already a resolved Path
@@ -364,16 +362,14 @@ def _check_and_install(
         zephyr_dir = framework / "zephyr"
         _install_workspace(python_bin, framework, manifest, ver_tag, source, projects)
 
-    with install_lock(get_zephyr_tools_path(), f"penv-{ver_tag}"):
-        # One marker per workspace, since workspaces share the penv
-        ensure_zephyr_requirements(
-            python_env,
-            framework,
-            install_venv,
-            ver_tag,
-            f".zephyr_reqs_ready-{framework.name}",
-            zephyr_dir=zephyr_dir,
-        )
+    ensure_zephyr_requirements(
+        python_env,
+        framework,
+        install_venv,
+        ver_tag,
+        ".zephyr_reqs_ready",
+        zephyr_dir=zephyr_dir,
+    )
 
     west_env = {
         **os.environ,

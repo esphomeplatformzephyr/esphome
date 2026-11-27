@@ -45,6 +45,7 @@ from esphome.components.zephyr.dts_lookup import (
     log_board_capabilities,
     resolve_uart_node_label,
     resolve_zephyr_bus,
+    validate_board,
     validate_board_revision,
 )
 from esphome.components.zephyr.framework_helpers import FrameworkSource
@@ -1522,6 +1523,40 @@ def test_validate_board_revision_returns_none_for_board_without_revisions(
     assert validate_board_revision("my_board@1.0.0") is None
 
 
+def test_validate_board(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _revisioned_board_dir(tmp_path)
+    monkeypatch.setattr(dts_lookup, "get_zephyr_base", lambda: tmp_path)
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
+    assert validate_board("actinius_icarus/nrf9160/ns") is True
+    assert validate_board("no_such_board") is False
+
+
+def test_get_edt_without_the_revision_overlay_file(
+    edt_texts: list[str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A declared revision without its overlay file builds from the base alone."""
+    board_dir = _revisioned_board_dir(tmp_path)
+    (board_dir / "actinius_icarus_nrf9160_ns_2_0_0.overlay").unlink()
+    monkeypatch.setattr(dts_lookup, "get_zephyr_base", lambda: tmp_path)
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
+
+    _get_edt("actinius_icarus/nrf9160/ns")
+
+    assert edt_texts == ["/* base */"]
+
+
+def test_get_edt_fails_without_a_dts_file(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "boards" / "acme" / "my_board").mkdir(parents=True)
+    monkeypatch.setattr(dts_lookup, "_load_edtlib", _fake_edtlib(lambda *a, **k: 1))
+    monkeypatch.setattr(dts_lookup, "get_zephyr_base", lambda: tmp_path)
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
+
+    with pytest.raises(EsphomeError, match="no .dts file named for it in"):
+        _get_edt("my_board")
+
+
 # ---------------------------------------------------------------------------
 # _find_cpp -- first candidate that passes the real command
 # ---------------------------------------------------------------------------
@@ -1692,8 +1727,10 @@ def test_get_edt_fails_when_devicetree_parse_fails(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     _board_tree(tmp_path)
+    (tmp_path / "dts" / "bindings").mkdir(parents=True)
 
-    def _reject(*args: Any, **kwargs: Any) -> NoReturn:
+    def _reject(path: str, bindings_dirs: list[str], **kwargs: Any) -> NoReturn:
+        assert bindings_dirs == [str(tmp_path / "dts" / "bindings")]
         raise ValueError("unknown binding for compatible 'acme,bus'")
 
     monkeypatch.setattr(dts_lookup, "_preprocess_dts_file", _fake_preprocess_dts_file)

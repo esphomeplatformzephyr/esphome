@@ -85,6 +85,11 @@ def _git_source(sha: str | None = _SHA) -> dict[str, Any]:
     return source
 
 
+def _venv(tmp_path: Path) -> Path:
+    """The official workspace's own venv, named after the workspace folder."""
+    return tmp_path / "zephyr" / "penvs" / _workspace(tmp_path).name
+
+
 def _workspace(tmp_path: Path, source: dict[str, Any] | None = None) -> Path:
     return (
         tmp_path
@@ -154,14 +159,14 @@ def _git(calls: _Calls) -> list[list[str]]:
 
 
 def test_install_locks_are_per_workspace(tmp_path: Path) -> None:
-    """Workspaces of one version install apart; the venv they share has its own
-    lock, for building it and for installing Zephyr's requirements."""
+    """Workspaces of one version install apart; each has its own venv, so the
+    workspace's lock covers it too."""
     with patch("filelock.FileLock") as file_lock:
         _install(tmp_path)
 
     lock_files = [Path(c.args[0]).name for c in file_lock.call_args_list]
     workspace = _workspace(tmp_path).name
-    assert lock_files == [f"{workspace}.lock", "penv-v4.4.1.lock", "penv-v4.4.1.lock"]
+    assert lock_files == [f"{workspace}.lock"]
 
 
 def test_official_source_fetches_the_build_projects(tmp_path: Path) -> None:
@@ -190,10 +195,62 @@ def test_official_source_fetches_the_build_projects(tmp_path: Path) -> None:
 
 
 def test_finished_workspace_only_checks_the_names(tmp_path: Path) -> None:
+    """Every build checks the names, so an unknown project fails on any workspace."""
     _install(tmp_path)
     calls, _ = _install(tmp_path)
 
     assert [c[2:4] for c in calls] == [["west", "list"]]
+    assert "hal_stm32" in calls[0]
+
+
+def test_unknown_project_fails_before_any_fetch(tmp_path: Path) -> None:
+    """The failed name check leaves the workspace's filter and record alone."""
+    _install(tmp_path)
+    record = (_workspace(tmp_path) / ".west_projects").read_text()
+    calls = _Calls()
+
+    def fake_run_command_ok(cmd: list[str], **kwargs: Any) -> bool:
+        calls.append(cmd)
+        return cmd[2:4] != ["west", "list"]
+
+    with (
+        patch.object(
+            framework, "get_zephyr_tools_path", return_value=tmp_path / "zephyr"
+        ),
+        patch(
+            "esphome.components.zephyr.framework_helpers.run_command_ok",
+            side_effect=fake_run_command_ok,
+        ),
+        pytest.raises(EsphomeError, match="west list failed .* Zephyr v4.4.1"),
+    ):
+        check_and_install(
+            manifest=_MANIFEST, version="4.4.1", projects=frozenset({"hal_unknown"})
+        )
+
+    assert [c[2:4] for c in calls] == [["west", "list"]]
+    assert (_workspace(tmp_path) / ".west_projects").read_text() == record
+
+
+def test_new_project_is_added_to_the_filter(tmp_path: Path) -> None:
+    """A workspace only gains projects; the ones already there stay in the filter,
+    and west update names none (it refuses a project from a manifest import)."""
+    _install(tmp_path, projects=frozenset({"hal_nordic"}))
+
+    calls, _ = _install(tmp_path)
+
+    assert [c[3] for c in calls] == ["list", "config", "update"]
+    (update,) = _west(calls, "update")
+    assert update[update.index("update") :] == [
+        "update",
+        "--narrow",
+        "--fetch-opt=--depth=1",
+    ]
+    assert _west(calls, "config")[0][-1] == "-hal_.*,+hal_common,+hal_nordic,+hal_stm32"
+    assert (_workspace(tmp_path) / ".west_projects").read_text().split() == [
+        "hal_common",
+        "hal_nordic",
+        "hal_stm32",
+    ]
 
 
 def test_installed_workspace_gets_the_patches(tmp_path: Path) -> None:
@@ -213,9 +270,7 @@ def test_installed_workspace_gets_the_patches(tmp_path: Path) -> None:
 def test_rebuilt_venv_keeps_the_workspace(tmp_path: Path) -> None:
     """A rebuilt venv (its interpreter was removed) only gets Zephyr's requirements."""
     _install(tmp_path)
-    get_python_env_executable_path(
-        tmp_path / "zephyr" / "penvs" / "v4.4.1", "python"
-    ).unlink()
+    get_python_env_executable_path(_venv(tmp_path), "python").unlink()
 
     calls, _ = _install(tmp_path)
 
@@ -225,6 +280,38 @@ def test_rebuilt_venv_keeps_the_workspace(tmp_path: Path) -> None:
         "-r",
         str(_workspace(tmp_path) / "zephyr" / "scripts" / "requirements.txt"),
     ]
+    assert (_venv(tmp_path) / ".zephyr_reqs_ready").exists()
+
+
+def test_each_workspace_has_its_own_venv(tmp_path: Path) -> None:
+    """A fork of the same version installs into a venv of its own, so its Zephyr
+    requirements can't change the official workspace's packages."""
+    _, (official_python, _, _) = _install(tmp_path)
+    _, (fork_python, fork_path, _) = _install(tmp_path, source=_git_source())
+
+    assert official_python == get_python_env_executable_path(_venv(tmp_path), "python")
+    assert fork_python == get_python_env_executable_path(
+        tmp_path / "zephyr" / "penvs" / fork_path.name, "python"
+    )
+
+
+def test_build_paths_and_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """West runs from the workspace with its venv first on PATH and the SDK named."""
+    monkeypatch.setenv("PATH", "/usr/bin")
+    with patch.object(
+        framework, "get_zephyr_tools_path", return_value=tmp_path / "zephyr"
+    ):
+        python, framework_path = framework.get_build_paths(_MANIFEST, "v4.4.1")
+    assert framework_path == _workspace(tmp_path)
+    assert python == get_python_env_executable_path(_venv(tmp_path), "python")
+
+    env = framework.get_build_env(python, framework_path, Path("/sdk"), None)
+
+    assert env["PATH"].split(os.pathsep) == [str(python.parent), "/usr/bin"]
+    assert env["ZEPHYR_BASE"] == str(framework_path / "zephyr")
+    assert env["ZEPHYR_SDK_INSTALL_DIR"] == str(Path("/sdk"))
+    assert env["ZEPHYR_TOOLCHAIN_VARIANT"] == "zephyr"
+    assert env["CCACHE_DISABLE"] == "1"
 
 
 def test_git_source_clones_the_fork_and_pins_its_commit(tmp_path: Path) -> None:
@@ -690,9 +777,7 @@ def test_new_venv_gets_the_windows_rmtree_fix(tmp_path: Path) -> None:
     ) as install_sitecustomize:
         _install(tmp_path)
         _install(tmp_path)
-    install_sitecustomize.assert_called_once_with(
-        tmp_path / "zephyr" / "penvs" / "v4.4.1"
-    )
+    install_sitecustomize.assert_called_once_with(_venv(tmp_path))
 
 
 @pytest.fixture

@@ -335,11 +335,13 @@ def _west_update(
     version: str,
     projects: set[str],
     *,
-    only: set[str] | None = None,
+    checked: bool = False,
 ) -> bool:
-    """Fetch ``projects``, or just ``only`` of them; False when the fetch fails.
+    """Fetch ``projects``; False when the fetch fails.
 
-    ``only`` is for a finished workspace, whose names are checked already.
+    ``checked`` is for a finished workspace, whose names are checked already.
+    Projects are not named on the command line: west refuses to update a project
+    that came from a manifest import by name.
     """
     if not _set_project_filter(env_python_path, framework_path, source, projects):
         return False
@@ -350,12 +352,11 @@ def _west_update(
         "update",
         "--narrow",
         "--fetch-opt=--depth=1",
-        *sorted(only or ()),
     ]
     # Streamed so the clone's progress reaches the log
     if not run_command_ok(cmd, cwd=framework_path, stream_output=True):
         return False
-    if only is None:
+    if not checked:
         _check_west_projects(env_python_path, framework_path, source, version, projects)
     (framework_path / _WEST_PROJECTS_FILE).write_text(
         "\n".join(sorted(projects)), encoding="utf-8"
@@ -408,8 +409,8 @@ def fetch_missing_west_projects(
 ) -> None:
     """Fetch the wanted projects a finished install lacks; it only ever gains.
 
-    Only the missing projects are updated, so a build running from the others
-    is left alone. Call under the workspace's install lock.
+    Projects already at their pinned revision keep their files, so a build
+    running from them is left alone. Call under the workspace's install lock.
     """
     installed = _installed_west_projects(framework_path)
     # A later release may add a required project, so check the stamp first
@@ -431,7 +432,7 @@ def fetch_missing_west_projects(
         source,
         version,
         installed | projects,
-        only=missing,
+        checked=True,
     ):
         _restore_project_filter(
             env_python_path, framework_path, source, version, installed

@@ -1,9 +1,12 @@
-"""Tests for the stm32: platform schema."""
+"""Tests for the stm32: platform."""
+
+from pathlib import Path
 
 import pytest
 
 from esphome.components import stm32
 from esphome.components.zephyr import (
+    zephyr_add_prj_conf,
     zephyr_data,
     zephyr_framework_type,
     zephyr_toolchain_schema,
@@ -119,3 +122,16 @@ def test_schema_extract_gives_the_platform_schema() -> None:
 def test_toolchain_schema_lists_only_the_families_variants() -> None:
     with pytest.raises(cv.Invalid, match="Unknown value"):
         zephyr_toolchain_schema(frozenset({"other"}))({CONF_VARIANT: "STM32C5"})
+
+
+def test_copy_files_writes_the_zephyr_build_files(tmp_path: Path) -> None:
+    CORE.config_path = tmp_path / "test.yaml"
+    CORE.build_path = tmp_path
+    CORE.name = "test"
+    stm32.CONFIG_SCHEMA({CONF_VARIANT: "STM32C5"})
+    zephyr_add_prj_conf("REBOOT", True)
+
+    stm32.copy_files()
+
+    assert (tmp_path / "zephyr" / "prj.conf").read_text() == "CONFIG_REBOOT=y\n"
+    assert (tmp_path / "zephyr" / "app.overlay").is_file()
