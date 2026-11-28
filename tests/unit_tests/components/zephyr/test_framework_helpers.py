@@ -546,9 +546,7 @@ def zephyr_reqs(tmp_path: Path) -> Path:
 
 
 def _ensure_zephyr_requirements(tmp_path: Path, venv_rebuilt: bool = False) -> None:
-    ensure_zephyr_requirements(
-        tmp_path / "penv", tmp_path / "sdk", venv_rebuilt, "v1", ".marker"
-    )
+    ensure_zephyr_requirements(tmp_path / "penv", tmp_path / "sdk", venv_rebuilt, "v1")
 
 
 @pytest.mark.parametrize(
@@ -569,7 +567,7 @@ def test_ensure_zephyr_requirements(
 ) -> None:
     """Installed when the venv was rebuilt, the marker is missing, or the
     workspace's requirements are newer than the marker."""
-    marker = tmp_path / "penv" / ".marker"
+    marker = tmp_path / "penv" / ".zephyr_reqs_ready"
     if marker_age is not None:
         marker.touch()
         reqs_time = marker.stat().st_mtime - marker_age
@@ -593,7 +591,7 @@ def test_ensure_zephyr_requirements_raises_when_pip_fails(
     ):
         _ensure_zephyr_requirements(tmp_path)
 
-    assert not (tmp_path / "penv" / ".marker").exists()
+    assert not (tmp_path / "penv" / ".zephyr_reqs_ready").exists()
 
 
 PIN: str = "0123456789abcdef0123456789abcdef01234567"
@@ -752,7 +750,7 @@ def test_ensure_zephyr_requirements_of_a_local_checkout(tmp_path: Path) -> None:
 
     with patch.object(framework_helpers, "run_command_ok", return_value=True) as pip:
         ensure_zephyr_requirements(
-            tmp_path / "penv", tmp_path, False, "v1", ".marker", zephyr_dir=checkout
+            tmp_path / "penv", tmp_path, False, "v1", zephyr_dir=checkout
         )
 
     assert pip.call_args.args[0][-1] == str(checkout / "scripts" / "requirements.txt")
@@ -876,7 +874,7 @@ def test_ensure_zephyr_requirements_patches_pyocd_every_build(
     tmp_path: Path, zephyr_reqs: Path
 ) -> None:
     """A current requirements marker skips pip, not the pyOCD patch."""
-    (tmp_path / "penv" / ".marker").touch()
+    (tmp_path / "penv" / ".zephyr_reqs_ready").touch()
     with (
         patch.object(framework_helpers, "run_command_ok") as pip,
         patch.object(framework_helpers, "patch_pyocd_nrf54lm20a_flash_algo") as fix,

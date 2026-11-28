@@ -367,7 +367,6 @@ def _check_and_install(
         framework,
         install_venv,
         ver_tag,
-        ".zephyr_reqs_ready",
         zephyr_dir=zephyr_dir,
     )
 

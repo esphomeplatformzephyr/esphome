@@ -580,26 +580,28 @@ def install_local_framework(env_python_path: Path, checkout: Path, name: str) ->
     return workspace
 
 
+# In the penv, so a venv rebuild removes it; nrf52's name, so its installs keep theirs
+_ZEPHYR_REQS_MARKER = ".zephyr_reqs_ready"
+
+
 def ensure_zephyr_requirements(
     python_env_path: Path,
     framework_path: Path,
     venv_rebuilt: bool,
     label: str,
-    marker_name: str,
     *,
     zephyr_dir: Path | None = None,
 ) -> None:
     """Install the workspace's Zephyr Python requirements into the penv unless current,
     then patch pyOCD's nRF54LM20A flash algorithm.
 
-    ``marker_name`` is the file in the penv that records the install, so a venv
-    rebuild removes it. ``zephyr_dir`` is the Zephyr tree when it isn't
+    ``zephyr_dir`` is the Zephyr tree when it isn't
     ``framework_path/zephyr`` (a local checkout).
     """
     zephyr_reqs = (
         (zephyr_dir or framework_path / "zephyr") / "scripts" / "requirements.txt"
     )
-    sentinel = python_env_path / marker_name
+    sentinel = python_env_path / _ZEPHYR_REQS_MARKER
     if (
         venv_rebuilt
         or not sentinel.exists()
