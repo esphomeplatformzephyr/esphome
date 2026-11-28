@@ -52,6 +52,12 @@ def to_code(config: ConfigType) -> None:
     from esphome.const import CONF_FRAMEWORK, CONF_LOG_LEVEL  # noqa: PLC0415
     from esphome.core import CORE  # noqa: PLC0415
 
+    from ...nrf52.framework import include_west_project  # noqa: PLC0415
+
+    if zephyr_framework_type() == "ncs":
+        # Nordic's PSA crypto (nrf_security), which entropy, Wi-Fi, Thread and BLE all use
+        include_west_project("mbedtls")
+        include_west_project("oberon-psa-crypto")
     zephyr_add_prj_conf("CPP", True)
     zephyr_add_prj_conf("REQUIRES_FULL_LIBCPP", True)
     zephyr_add_prj_conf("FPU", True)

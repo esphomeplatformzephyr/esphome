@@ -7,8 +7,11 @@ from unittest.mock import patch
 import pytest
 
 from esphome.components.nrf.zephyr_variants import nordic_family
+from esphome.components.nrf52.framework import wanted_west_projects
 from esphome.components.zephyr import zephyr_data
 from esphome.components.zephyr.const import KEY_PRJ_CONF, KEY_ZEPHYR
+import esphome.config_validation as cv
+from esphome.const import KEY_CORE, KEY_FRAMEWORK_VERSION
 from esphome.core import CORE, EsphomeError
 from tests.unit_tests.components.zephyr.zephyr_state import (
     empty_zephyr_data,
@@ -50,6 +53,17 @@ def test_nrf5340_random_source(
     prj_conf = zephyr_data()[KEY_PRJ_CONF][""]
     assert {k for k in prj_conf if k.endswith("_GENERATOR")} == {f"CONFIG_{kconfig}"}
     assert (_WARNING in caplog.text) is warns
+
+
+@pytest.mark.parametrize(
+    ("framework_type", "fetched"), [("ncs", True), ("zephyr", False)]
+)
+def test_ncs_psa_crypto_projects(framework_type: str, fetched: bool) -> None:
+    _run(framework_type, {})
+    CORE.data[KEY_CORE][KEY_FRAMEWORK_VERSION] = cv.Version(3, 4, 1)
+
+    crypto = {"mbedtls", "oberon-psa-crypto"}
+    assert (wanted_west_projects() & crypto) == (crypto if fetched else set())
 
 
 def _psel(fun: int, pin: int) -> int:

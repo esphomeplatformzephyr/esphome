@@ -129,6 +129,8 @@ def to_code(config: ConfigType) -> None:
         zephyr_setup_preferences,
     )
 
+    from ...nrf52.framework import include_west_project
+
     cg.add_build_flag("-DUSE_ZEPHYR_VARIANT_NRF5340")
     cg.add_define("ESPHOME_BOARD", config[CONF_BOARD])
     cg.add_define("ESPHOME_VARIANT", "NRF5340")
@@ -141,3 +143,6 @@ def to_code(config: ConfigType) -> None:
     if zephyr_framework_type() == "ncs" and CORE.config.get(CONF_WIFI) is not None:
         # NCS sysbuild forces the image's CONFIG_WIFI_NRF70 off unless this is set.
         zephyr_add_sysbuild_conf("WIFI_NRF70", True)
+        # The nRF7002 driver and firmware blob, and the supplicant; NCS fetches no project unasked.
+        include_west_project("nrf_wifi")
+        include_west_project("hostap")
