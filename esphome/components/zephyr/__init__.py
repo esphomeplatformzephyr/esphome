@@ -645,8 +645,7 @@ def copy_files() -> None:
         written.add(path)
         changed |= write_file_if_changed(path, content)
 
-    if toolchain:
-        changed |= _remove_stale_image_files(written)
+    changed |= _remove_stale_image_files(written)
 
     for filename, path in zephyr_data()[KEY_EXTRA_BUILD_FILES].items():
         changed |= copy_file_if_changed(

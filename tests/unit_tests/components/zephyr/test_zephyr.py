@@ -34,6 +34,7 @@ from esphome.components.zephyr import (
     _zephyr_toolchain_cdc_acm_add_ports,
     add_extra_build_file,
     add_extra_script,
+    copy_files,
     request_zephyr_module,
     resolve_zephyr_modules,
     upload_program,
@@ -2607,6 +2608,25 @@ def test_remove_stale_image_files_keeps_only_written_files(tmp_path: Path) -> No
     assert kept.exists()
     assert cmake.exists()
     assert not _remove_stale_image_files({kept})
+
+
+@pytest.mark.parametrize("toolchain", [Toolchain.ZEPHYR, Toolchain.PLATFORMIO])
+def test_copy_files_removes_a_stale_mcuboot_overlay(
+    tmp_path: Path, toolchain: Toolchain
+) -> None:
+    """platform: nrf52 (PlatformIO) builds pick up sysbuild/<image>.overlay by name too."""
+    CORE.config_path = tmp_path / "test.yaml"
+    CORE.build_path = tmp_path
+    CORE.name = "test"
+    CORE.data[KEY_ZEPHYR] = empty_zephyr_data()
+    CORE.toolchain = toolchain
+    stale = tmp_path / "zephyr" / "sysbuild" / "mcuboot.overlay"
+    stale.parent.mkdir(parents=True)
+    stale.write_text("/delete-node/ &code_partition;")
+
+    copy_files()
+
+    assert not stale.exists()
 
 
 def test_zephyr_data_without_rtos_store() -> None:
