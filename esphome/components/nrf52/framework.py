@@ -20,6 +20,7 @@ from esphome.components.zephyr.framework_helpers import (
     penv_site_packages,
     pyocd_builtin_target,
     unpatched_pyocd_nrf54lm20a_target as _unpatched_pyocd_nrf54lm20a_target,
+    workspace_installed,
 )
 from esphome.components.zephyr.sdk_install import (
     ARM_TOOLCHAIN,
@@ -300,16 +301,14 @@ def _check_and_install(version: str) -> None:
     install_venv = ensure_venv(python_env_path, _REQUIREMENTS, version)
 
     framework_path = _get_framework_path(version)
-    sentinel = framework_path / ".ready"
-    zephyr_reqs = framework_path / "zephyr" / "scripts" / "requirements.txt"
     projects = wanted_west_projects()
-    if not sentinel.exists() or not zephyr_reqs.exists():
+    if not workspace_installed(framework_path):
         install_framework(
             env_python_path, framework_path, NRF_CONNECT_SDK, version, projects
         )
         if CORE.framework_version < cv.Version(2, 9, 2):
             _patch_uf2conv_escape_sequences(framework_path)
-        sentinel.touch()
+        (framework_path / ".ready").touch()
     else:
         fetch_missing_west_projects(
             env_python_path, framework_path, NRF_CONNECT_SDK, version, projects

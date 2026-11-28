@@ -34,6 +34,7 @@ from .framework_helpers import (
     patch_gen_defines_dts_path,
     patch_west_build_source_dir_relpath,
     refresh_framework,
+    workspace_installed,
 )
 from .sdk_install import ensure_sdk
 
@@ -401,8 +402,7 @@ def _install_workspace(
     wanted = set(projects | framework_source.required)
     sentinel = framework / ".ready"
     resolved_marker = framework / ".resolved_ref"
-    zephyr_reqs = framework / "zephyr" / "scripts" / "requirements.txt"
-    if not sentinel.exists() or not zephyr_reqs.exists():
+    if not workspace_installed(framework):
         install_framework(
             python_bin, framework, framework_source, label, wanted, pin=pin
         )
