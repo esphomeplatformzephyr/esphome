@@ -82,7 +82,7 @@ void process(const struct log_backend *const backend, union log_msg_generic *msg
     tag = "zephyr";
 #endif
   // Through log_vprintf_() so lines from other threads go via the task log buffer.
-  esp_log_printf_(level, tag, 0, "%.*s", static_cast<int>(accum_len), accum_buf);
+  esp_log_printf_(level, tag, 0, ESPHOME_LOG_FORMAT("%.*s"), static_cast<int>(accum_len), accum_buf);
 }
 
 void panic(const struct log_backend *const backend) { log_backend_std_panic(&esphome_zephyr_log_output); }

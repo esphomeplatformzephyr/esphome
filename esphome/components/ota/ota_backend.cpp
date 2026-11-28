@@ -97,7 +97,9 @@ void UpdateLock::release() {
 void UpdateLock::force_release() { update_lock_clear(); }
 
 bool UpdateLock::any_held() {
-#ifdef ESPHOME_THREAD_MULTI_ATOMICS
+#if defined(ESPHOME_THREAD_MULTI_ATOMICS) && defined(USE_ZEPHYR)
+  return atomic_get(&update_locked) != 0;
+#elif defined(ESPHOME_THREAD_MULTI_ATOMICS)
   return update_locked.load() != 0;
 #else
   // Same guard as update_lock_test_and_set()
